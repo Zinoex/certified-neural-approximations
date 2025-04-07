@@ -1,4 +1,4 @@
-"""Python setup.py for project_name package"""
+"""Python setup.py for grid_neural_abstractions package"""
 import io
 import os
 from setuptools import find_packages, setup
@@ -6,7 +6,7 @@ from setuptools import find_packages, setup
 
 def read(*paths, **kwargs):
     """Read the contents of a text file safely.
-    >>> read("project_name", "VERSION")
+    >>> read("grid_neural_abstractions", "VERSION")
     '0.1.0'
     >>> read("README.md")
     ...
@@ -30,17 +30,17 @@ def read_requirements(path):
 
 
 setup(
-    name="project_name",
-    version=read("project_name", "VERSION"),
-    description="project_description",
-    url="https://github.com/author_name/project_urlname/",
+    name="grid_neural_abstractions",
+    version=read("grid_neural_abstractions", "VERSION"),
+    description="Awesome grid_neural_abstractions created by Zinoex",
+    url="https://github.com/Zinoex/grid-neural-abstractions/",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
-    author="author_name",
+    author="Zinoex",
     packages=find_packages(exclude=["tests", ".github"]),
     install_requires=read_requirements("requirements.txt"),
     entry_points={
-        "console_scripts": ["project_name = project_name.__main__:main"]
+        "console_scripts": ["grid_neural_abstractions = grid_neural_abstractions.__main__:main"]
     },
     extras_require={"test": read_requirements("requirements-test.txt")},
 )

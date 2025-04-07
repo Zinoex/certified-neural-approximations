@@ -1,5 +1,5 @@
-from project_name.base import NAME
+from grid_neural_abstractions.base import NAME
 
 
 def test_base():
-    assert NAME == "project_name"
+    assert NAME == "grid_neural_abstractions"
