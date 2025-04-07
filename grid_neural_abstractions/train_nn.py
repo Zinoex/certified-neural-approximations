@@ -1,8 +1,9 @@
+import numpy as np  # Add numpy for grid generation
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np  # Add numpy for grid generation
 from dynamics import dynamics
+
 
 # Define the neural network
 class SimpleNN(nn.Module):
@@ -24,8 +25,9 @@ class SimpleNN(nn.Module):
     def _initialize_weights(self):  # Initialize weights for better training
         for layer in self.network:
             if isinstance(layer, nn.Linear):
-                nn.init.kaiming_uniform_(layer.weight, nonlinearity='relu')
+                nn.init.kaiming_uniform_(layer.weight, nonlinearity="relu")
                 nn.init.zeros_(layer.bias)
+
 
 # Generate some synthetic data for training
 def generate_data(input_size, delta=0.01, grid=False, batch_size=256):
@@ -49,6 +51,7 @@ def generate_data(input_size, delta=0.01, grid=False, batch_size=256):
     y_train = dynamics(X_train.T).T
     return X_train, y_train
 
+
 # Train the neural network
 def train_nn():
     input_size = 2
@@ -61,7 +64,9 @@ def train_nn():
     model = SimpleNN(input_size, hidden_sizes, output_size)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.5)  # Add learning rate scheduler
+    scheduler = optim.lr_scheduler.StepLR(
+        optimizer, step_size=10000, gamma=0.5
+    )  # Add learning rate scheduler
 
     # Load data
     X_train, y_train = generate_data(input_size, batch_size=batch_size)
@@ -76,35 +81,45 @@ def train_nn():
         optimizer.step()
         scheduler.step()  # Update learning rate
 
-        if (epoch+1) % 1000 == 0:
-            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, LR: {scheduler.get_last_lr()[0]:.6f}')
+        if (epoch + 1) % 1000 == 0:
+            print(
+                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, LR: {scheduler.get_last_lr()[0]:.6f}"
+            )
 
     # Save the trained model
-    torch.save(model.state_dict(), 'simple_nn.pth')
+    torch.save(model.state_dict(), "simple_nn.pth")
     return model
+
 
 # Save the trained model as an ONNX file
 def save_onnx_model(model, input_size, file_name="simple_nn.onnx"):
-    dummy_input = torch.randn(1, input_size, dtype=torch.float32)  # Ensure input_size matches the model
+    dummy_input = torch.randn(
+        1, input_size, dtype=torch.float32
+    )  # Ensure input_size matches the model
     torch.onnx.export(
-        model, 
-        dummy_input, 
-        file_name, 
-        input_names=["input"], 
-        output_names=["output"], 
+        model,
+        dummy_input,
+        file_name,
+        input_names=["input"],
+        output_names=["output"],
         dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
-        dynamo=False  # Set to False as dynamo=True may not be supported in all cases
+        dynamo=False,  # Set to False as dynamo=True may not be supported in all cases
     )
     print(f"Model saved as {file_name}")
+
 
 # Load the ONNX model for Marabou
 def load_onnx_model(file_name="simple_nn.onnx"):
     from maraboupy import Marabou
+
     network = Marabou.read_onnx(file_name)
     print(f"ONNX model {file_name} loaded for Marabou")
     return network
 
+
 if __name__ == "__main__":
     model = train_nn()
-    save_onnx_model(model, input_size=2)  # Use the correct input_size (2) for ONNX export
+    save_onnx_model(
+        model, input_size=2
+    )  # Use the correct input_size (2) for ONNX export
     marabou_network = load_onnx_model()  # Load the ONNX model for Marabou
