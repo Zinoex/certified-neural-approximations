@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+import torch
 from executors import SinglethreadExecutor
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 from train_nn import generate_data
@@ -15,7 +16,7 @@ def compute_lipschitz_constant(mu, R):
 
 
 def process_batch(
-    onnx_path, delta, L, worker_progress_counters, batch_id, data
+    onnx_path, delta, L, worker_progress_counters, batch_id, data, epsilon=1e-6
 ):
     """
     Process a batch of input points to check for counterexamples.
@@ -51,52 +52,54 @@ def process_batch(
             network.setLowerBound(inputVar, sample[i] - delta)
             network.setUpperBound(inputVar, sample[i] + delta)
 
-        # Create disjunctive constraint for all output dimensions
-        equation_list = []
-        disjuncts = []
         # We need to verify that for all x: |nn_output - f| < delta * L
         # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
         # Which means nn_output - f >= delta * L OR nn_output - f <= -delta * L
-        for i, outputVar in enumerate(outputVars):
+        for j, outputVar in enumerate(outputVars):
             # nn_output >= delta * L + f
             equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
             equation_GE.addAddend(1, outputVar)
-            equation_GE.setScalar(delta * L + dynamics_value[i])
-            equation_list.append([equation_GE])
+            equation_GE.setScalar(dynamics_value[j] + delta * L)
+            network.addEquation(equation_GE, isProperty=True)
+
+            # Find a counterexample for lower bound
+            res, vals, _ = network.solve(verbose=False, options=options)
+            if res == "sat":
+                cex = np.empty(len(inputVars))
+                for i, inputVar in enumerate(inputVars):
+                    cex[i] = vals[inputVar]
+                    assert cex[i] + epsilon >= sample[i].item() - delta
+                    assert cex[i] - epsilon <= sample[i].item() + delta
+
+                violation_found = vals[outputVar] + epsilon >= dynamics_value[j].item() + delta * L
+                assert violation_found, "The counterexample violates the bound, this is not a valid counterexample"
+                cex_list.append(cex)
+                break
+
+            # Reset the equation for the other bound
+            network.additionalEquList.clear()
 
             # nn_output <= -delta * L + f
             equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
             equation_LE.addAddend(1, outputVar)
-            equation_LE.setScalar(-delta * L + dynamics_value[i])
-            equation_list.append([equation_LE])
+            equation_LE.setScalar(dynamics_value[j] - delta * L)
+            network.addEquation(equation_LE, isProperty=True)
 
-            # For this dimension, either GE or LE must be true to violate the property
-            disjuncts.append([equation_GE, equation_LE])
-        network.addDisjunctionConstraint(disjuncts)
+            # Find a counterexample for lower bound
+            res, vals, _ = network.solve(verbose=False, options=options)
+            if res == "sat":
+                cex = np.empty(len(inputVars))
+                for i, inputVar in enumerate(inputVars):
+                    cex[i] = vals[inputVar]
+                    assert cex[i] + epsilon >= sample[i].item() - delta
+                    assert cex[i] - epsilon <= sample[i].item() + delta
+                violation_found = vals[outputVar] - epsilon <= dynamics_value[j].item() - delta * L
+                assert violation_found, "The counterexample violates the bound, this is not a valid counterexample"
+                cex_list.append(cex)
+                break
 
-        # Find a counterexample for lower bound
-        res, vals, _ = network.solve(verbose=False, options=options)
-        if res == "sat":
-            cex = np.empty(len(inputVars))
-            for i, inputVar in enumerate(inputVars):
-                cex[i] = vals[inputVar]
-                assert cex[i] >= sample[i] - delta
-                assert cex[i] <= sample[i] + delta
-            violation_found = False
-            for i, outputVar in enumerate(outputVars):
-                if (
-                    vals[outputVar] > dynamics_value[i] + delta * L
-                    or vals[outputVar] < dynamics_value[i] - delta * L
-                ):
-                    violation_found = True
-                    break
-            assert (
-                violation_found
-            ), "No dimension violates the bound, this is not a valid counterexample"
-            cex_list.append(cex)
-
-        # Remove the disjunctive constraint to avoid mutation issues
-        network.disjunctionList = []
+            # Reset the equation for the next iteration
+            network.additionalEquList.clear()
 
         worker_progress_counters[batch_id] += 1
 
@@ -121,13 +124,13 @@ def verify_nn(
     local_process_batch = partial(process_batch, onnx_path, delta, L)
 
     X_train, y_train = generate_data(input_dim, delta=delta, grid=True)
-    batch_selector = lambda i, batch_size: (
-        X_train[i : i + batch_size],
-        y_train[i : i + batch_size],
-    )
     num_samples = len(X_train)
 
-    aggregate = lambda agg, x: agg + x
+    def batch_selector(i, batch_size):
+        return X_train[i:i + batch_size], y_train[i:i + batch_size]
+
+    def aggregate(agg, x):
+        return agg + x
 
     executor = SinglethreadExecutor()
     sat_counter = executor.execute(
