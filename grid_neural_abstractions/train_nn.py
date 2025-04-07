@@ -2,7 +2,7 @@ import numpy as np  # Add numpy for grid generation
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from dynamics import dynamics
+from dynamics import VanDerPolOscillator, Quadcopter
 
 
 # Define the neural network
@@ -30,12 +30,24 @@ class SimpleNN(nn.Module):
 
 
 # Generate some synthetic data for training
-def generate_data(input_size, delta=0.01, grid=False, batch_size=256):
+def generate_data(input_size, delta=0.01, grid=False, batch_size=256, dynamics_model=None):
     """
     Generate data points for training or verification.
     If grid=True, generate a fixed grid of points with spacing at most delta.
     If grid=False, randomly sample data points.
+    
+    Args:
+        input_size: Dimension of input space
+        delta: Grid spacing when grid=True
+        grid: Whether to use grid sampling (True) or random sampling (False)
+        batch_size: Number of samples when grid=False
+        dynamics_model: The dynamics model to use for generating outputs
+        
+    Returns:
+        X_train: Input data
+        y_train: Output data (dynamics evaluated at input points)
     """
+
     if grid:
         # Generate a grid of points within a fixed range
         range_min, range_max = -1.0, 1.0  # Define the range for each dimension
@@ -48,15 +60,19 @@ def generate_data(input_size, delta=0.01, grid=False, batch_size=256):
         # Randomly sample points
         X_train = torch.randn(batch_size, input_size)  # Match input_size
 
-    y_train = dynamics(X_train.T).T
+    if dynamics_model is None:
+        y_train = None
+    else:
+        y_train = dynamics_model(X_train.T).T
     return X_train, y_train
 
 
 # Train the neural network
 def train_nn():
-    input_size = 2
+    dynamics_model = Quadcopter()
+    input_size = dynamics_model.input_dim
     hidden_sizes = [128, 128, 128]  # Adjust hidden layer sizes
-    output_size = 2  # Update output size to match target size
+    output_size = dynamics_model.output_dim  # Update output size to match target size
     num_epochs = 50000
     learning_rate = 0.001  # Reduced learning rate
     batch_size = 2048
@@ -69,7 +85,7 @@ def train_nn():
     )  # Add learning rate scheduler
 
     # Load data
-    X_train, y_train = generate_data(input_size, batch_size=batch_size)
+    X_train, y_train = generate_data(input_size, batch_size=batch_size, dynamics_model=dynamics_model)
 
     for epoch in range(num_epochs):
         model.train()
@@ -119,7 +135,7 @@ def load_onnx_model(file_name="simple_nn.onnx"):
 
 if __name__ == "__main__":
     model = train_nn()
+    dynamics_model = Quadcopter()
     save_onnx_model(
-        model, input_size=2
-    )  # Use the correct input_size (2) for ONNX export
-    marabou_network = load_onnx_model()  # Load the ONNX model for Marabou
+        model, input_size=dynamics_model.input_dim
+    )  # Use the correct input_size from the dynamics model

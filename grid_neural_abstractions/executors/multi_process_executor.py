@@ -1,6 +1,7 @@
-from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
+from concurrent.futures import ProcessPoolExecutor, TimeoutError, as_completed
 from multiprocessing import Value
-from threading import Event, Thread
+import threading
+import types
 
 import numpy as np
 from tqdm import tqdm  # Added tqdm for progress tracking
@@ -10,16 +11,31 @@ from .multi_thread_executor import update_progress_bar
 
 class MultiprocessRefLong:
     def __init__(self, value):
-        self.shared_value = Value('i', value)
+        self.shared_value = Value("i", value)
 
     def __iadd__(self, x):
-        self.shared_value.value += x
+        with self.shared_value.get_lock():
+            self.shared_value.value += x
 
         return self
 
     @property
     def value(self):
         return self.shared_value.value
+
+
+class Local:
+    def __init__(self, initializer, process):
+        self.initializer = initializer
+        self.process = process
+
+    def initialize(self):
+        global _LOCAL
+        _LOCAL = types.SimpleNamespace()
+        self.initializer(_LOCAL)
+
+    def process_sample(self, data):
+        self.process(_LOCAL, data)
 
 
 class MultiprocessExecutor:
@@ -30,68 +46,24 @@ class MultiprocessExecutor:
 
     def execute(
         self,
-        process_batch,
-        batch_selector,
-        num_samples,
-        aggregate,
+        initializer, process_sample, select_sample, num_samples, aggregate
     ):
-        batch_size = int(
-            np.ceil(num_samples / self.num_workers)
-        )  # Round up to ensure all samples are covered
-
-        # Split the samples into batches
-        batches = [
-            (batch_id, batch_selector(i, batch_size))
-            for batch_id, i in enumerate(range(0, num_samples, batch_size))
-        ]
-        worker_progress_counters = [
-            MultiprocessRefLong(0) for _ in range(self.num_workers)
-        ]  # One counter per worker
-        progress_done = Event()  # Use Event for thread-safe completion signal
-
+        local = Local(initializer, process_sample)
         agg = None
 
-        # Create a progress bar and run the verification
-        with tqdm(total=num_samples, desc="Overall Progress") as pbar:
-            # Start the progress tracking thread
-            progress_thread = Thread(
-                target=update_progress_bar,
-                args=(pbar, worker_progress_counters, progress_done),
-                daemon=True,
-            )
-            progress_thread.start()
+        with ProcessPoolExecutor(max_workers=self.num_workers, initializer=local.initialize) as executor:
+            with tqdm(total=num_samples, desc="Overall Progress") as pbar:
+                futures = []
 
-            # Execute the batches
-            try:
-                with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-                    futures = [
-                        executor.submit(
-                            process_batch,
-                            worker_progress_counters[batch_id],
-                            data,
-                        )
-                        for batch_id, data in batches
-                    ]
+                for i in range(num_samples):
+                    data = select_sample(i)
 
-                    for future in as_completed(futures):
-                        try:
-                            result = future.result()
-                            if agg is None:
-                                agg = result
-                            else:
-                                agg = aggregate(agg, result)
-                        except TimeoutError:
-                            print("A batch timed out")
-                        # except Exception as e:
-                        #     print(
-                        #         f"Error in batch: {str(e)[:200]}"
-                        #     )  # Limit error message length
-            # except Exception as e:
-            #     print(f"Error during execution: {e}")
-            finally:
-                # Ensure resources are cleaned up
-                progress_done.set()
-                progress_thread.join()
-                print("Finished")
+                    future = executor.submit(local.process_sample, data)
+                    future.add_done_callback(lambda p: pbar.update())
+                    futures.append(future)
+
+                for future in as_completed(futures):
+                    result = future.result()
+                    agg = aggregate(agg, result)
 
         return agg
