@@ -43,16 +43,25 @@ def update_progress_bar(pbar, worker_progress_counters, progress_done):
 
 
 class MultithreadExecutor:
+    """
+    Note: Normally, the global interpreter lock (GIL) in Python can limit the performance of multi-threadeding.
+    However, in this case, since Marabou is a C++ library and the heavy lifting is done in C++, the lock is released
+    during the execution of the C++ code, thus not prohibiting the performance benefits of threading.
+    """
+
+    def __init__(self, num_workers=None):
+        # If num_workers is not provided, use the default of ThreadPoolExecutor min(32, os.cpu_count() + 4)
+        self.num_workers = num_workers
+
     def execute(
         self,
         process_batch,
         batch_selector,
         num_samples,
         aggregate,
-        num_workers=8,
     ):
         batch_size = int(
-            np.ceil(num_samples / num_workers)
+            np.ceil(num_samples / self.num_workers)
         )  # Round up to ensure all samples are covered
 
         # Split the samples into batches
@@ -61,7 +70,7 @@ class MultithreadExecutor:
             for batch_id, i in enumerate(range(0, num_samples, batch_size))
         ]
         worker_progress_counters = [
-            AtomicLong(0) for _ in range(num_workers)
+            AtomicLong(0) for _ in range(self.num_workers)
         ]  # One counter per worker
         progress_done = Event()  # Use Event for thread-safe completion signal
 
@@ -79,7 +88,7 @@ class MultithreadExecutor:
 
             # Execute the batches
             try:
-                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
                     futures = [
                         executor.submit(
                             process_batch,
