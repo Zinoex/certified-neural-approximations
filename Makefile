@@ -68,8 +68,10 @@ condaenv:       ## Create a conda environment.
 	@echo "creating conda environment ..."
 	@rm -rf .venv
 	@conda create --name grid-neural-abstractions python=3.11
-	@./.venv/bin/pip install -U pip
-	@./.venv/bin/pip install -e .[test]
+	@conda activate grid-neural-abstractions
+	@pip install -U pip
+	@pip install -e .[test]
+	@conda deactivate
 	@echo
 	@echo "!!! Please run 'conda activate grid-neural-abstractions' to enable the environment !!!"
 
