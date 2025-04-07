@@ -1,5 +1,4 @@
 # Infrastructure
-atomic
 tqdm
 
 # Functionality

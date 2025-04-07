@@ -2,7 +2,7 @@ from functools import partial
 
 import numpy as np
 import torch
-from executors import SinglethreadExecutor
+from executors import SinglethreadExecutor, MultithreadExecutor, MultiprocessExecutor
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 from train_nn import generate_data
 
@@ -16,7 +16,7 @@ def compute_lipschitz_constant(mu, R):
 
 
 def process_batch(
-    onnx_path, delta, L, worker_progress_counters, batch_id, data, epsilon=1e-6
+    onnx_path, delta, L, progress_counter, data, epsilon=1e-6, progress_stride=10
 ):
     """
     Process a batch of input points to check for counterexamples.
@@ -43,6 +43,8 @@ def process_batch(
     options = Marabou.createOptions(verbosity=0)
 
     X_train, y_train = data  # Unpack the data tuple
+
+    local_progress = 0
 
     for idx in range(len(X_train)):
         sample, dynamics_value = X_train[idx], y_train[idx].flatten()
@@ -101,7 +103,14 @@ def process_batch(
             # Reset the equation for the next iteration
             network.additionalEquList.clear()
 
-        worker_progress_counters[batch_id] += 1
+        # Update progress
+        local_progress += 1
+        if local_progress % progress_stride == 0:
+            progress_counter += progress_stride
+            local_progress = 0
+
+    # Update the progress counter for the last batch
+    progress_counter += local_progress
 
     return cex_list
 
@@ -121,7 +130,7 @@ def verify_nn(
     num_samples = num_samples_per_dim**input_dim
     print(f"Number of samples: {num_samples}")
 
-    local_process_batch = partial(process_batch, onnx_path, delta, L)
+    partial_process_batch = partial(process_batch, onnx_path, delta, L)
 
     X_train, y_train = generate_data(input_dim, delta=delta, grid=True)
     num_samples = len(X_train)
@@ -134,7 +143,7 @@ def verify_nn(
 
     executor = SinglethreadExecutor()
     sat_counter = executor.execute(
-        local_process_batch, batch_selector, num_samples, aggregate
+        partial_process_batch, batch_selector, num_samples, aggregate
     )
 
     print(f"Number of counterexamples found: {len(sat_counter)}")

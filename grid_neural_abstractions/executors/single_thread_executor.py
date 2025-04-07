@@ -1,10 +1,9 @@
 from threading import Event, Thread
 
 import numpy as np
-from atomic import AtomicLong
 from tqdm import tqdm  # Added tqdm for progress tracking
 
-from .multi_thread_executor import update_progress_bar
+from .multi_thread_executor import update_progress_bar, RefLong
 
 
 class SinglethreadExecutor:
@@ -12,7 +11,7 @@ class SinglethreadExecutor:
 
         # Split the samples into batches
         data = batch_selector(0, num_samples)
-        worker_progress_counters = [AtomicLong(0)]  # One counter per worker
+        progress_counter = RefLong(0)  # One counter per worker
         progress_done = Event()  # Use Event for thread-safe completion signal
 
         result = None
@@ -22,14 +21,14 @@ class SinglethreadExecutor:
             # Start the progress tracking thread
             progress_thread = Thread(
                 target=update_progress_bar,
-                args=(pbar, worker_progress_counters, progress_done),
+                args=(pbar, [progress_counter], progress_done),
                 daemon=True,
             )
             progress_thread.start()
 
             # Execute the batches
             try:
-                result = process_batch(worker_progress_counters, 0, data)
+                result = process_batch(progress_counter, data)
             finally:
                 # Ensure resources are cleaned up
                 progress_done.set()
