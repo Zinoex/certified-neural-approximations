@@ -66,14 +66,7 @@ clean:            ## Clean unused files.
 .PHONY: condaenv
 condaenv:       ## Create a conda environment.
 	@echo "creating conda environment ..."
-	@rm -rf .venv
-	@conda create --name grid-neural-abstractions python=3.11
-	@conda activate grid-neural-abstractions
-	@pip install -U pip
-	@pip install -e .[test]
-	@conda deactivate
-	@echo
-	@echo "!!! Please run 'conda activate grid-neural-abstractions' to enable the environment !!!"
+	@conda env create --yes --f environment.yml
 
 .PHONY: release
 release:          ## Create a new tag for release.
@@ -93,9 +86,3 @@ docs:             ## Build the documentation.
 	@echo "building documentation ..."
 	@$(ENV_PREFIX)mkdocs build
 	URL="site/index.html"; xdg-open $$URL || sensible-browser $$URL || x-www-browser $$URL || gnome-open $$URL || open $$URL
-
-
-# This project has been generated from rochacbruno/python-project-template
-# __author__ = 'rochacbruno'
-# __repo__ = https://github.com/rochacbruno/python-project-template
-# __sponsor__ = https://github.com/sponsors/rochacbruno/
