@@ -16,7 +16,7 @@ def compute_lipschitz_constant(mu, R):
 
 
 def process_batch(
-    onnx_path, delta, L, progress_counter, data, epsilon=1e-6, progress_stride=10
+    onnx_path, delta, L, progress_counter, data, epsilon=1e-6, progress_stride=10, num_marabou_workers=12
 ):
     """
     Process a batch of input points to check for counterexamples.
@@ -40,7 +40,7 @@ def process_batch(
     cex_list = []
     outputVars = network.outputVars[0].flatten()
     inputVars = network.inputVars[0].flatten()
-    options = Marabou.createOptions(verbosity=0)
+    options = Marabou.createOptions(verbosity=0, numWorkers=num_marabou_workers)
 
     X_train, y_train = data  # Unpack the data tuple
 
