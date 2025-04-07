@@ -52,7 +52,7 @@ class MultiprocessExecutor:
         agg = None
 
         with ProcessPoolExecutor(max_workers=self.num_workers, initializer=local.initialize) as executor:
-            with tqdm(total=num_samples, desc="Overall Progress") as pbar:
+            with tqdm(total=num_samples, desc="Overall Progress", smoothing=0.1) as pbar:
                 futures = []
 
                 for i in range(num_samples):

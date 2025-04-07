@@ -9,7 +9,7 @@ class SinglethreadExecutor:
         initializer(local)
 
         # Create a progress bar and run the verification
-        for i in trange(num_samples, desc="Overall Progress"):
+        for i in trange(num_samples, desc="Overall Progress", smoothing=0.1):
             data = select_sample(i)
 
             # Execute the batches

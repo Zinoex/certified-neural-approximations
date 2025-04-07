@@ -61,7 +61,7 @@ class MultithreadExecutor:
         agg = None
 
         with ThreadPoolExecutor(max_workers=self.num_workers, initializer=initializer, initargs=(local,)) as executor:
-            with tqdm(total=num_samples, desc="Overall Progress") as pbar:
+            with tqdm(total=num_samples, desc="Overall Progress", smoothing=0.1) as pbar:
                 futures = []
 
                 for i in range(num_samples):
