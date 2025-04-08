@@ -1,11 +1,11 @@
-import threading
+import types
 from tqdm import trange  # Added tqdm for progress tracking
 
 
 class SinglethreadExecutor:
     def execute(self, initializer, process_sample, select_sample, num_samples, aggregate):
         agg = None
-        local = threading.local()
+        local = types.SimpleNamespace()
         initializer(local)
 
         # Create a progress bar and run the verification

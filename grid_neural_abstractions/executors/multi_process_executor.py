@@ -1,27 +1,7 @@
-from concurrent.futures import ProcessPoolExecutor, TimeoutError, as_completed
-from multiprocessing import Value
-import threading
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import types
 
-import numpy as np
 from tqdm import tqdm  # Added tqdm for progress tracking
-
-from .multi_thread_executor import update_progress_bar
-
-
-class MultiprocessRefLong:
-    def __init__(self, value):
-        self.shared_value = Value("i", value)
-
-    def __iadd__(self, x):
-        with self.shared_value.get_lock():
-            self.shared_value.value += x
-
-        return self
-
-    @property
-    def value(self):
-        return self.shared_value.value
 
 
 class Local:
@@ -35,7 +15,7 @@ class Local:
         self.initializer(_LOCAL)
 
     def process_sample(self, data):
-        self.process(_LOCAL, data)
+        return self.process(_LOCAL, data)
 
 
 class MultiprocessExecutor:
