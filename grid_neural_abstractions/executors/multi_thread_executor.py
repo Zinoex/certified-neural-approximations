@@ -17,19 +17,17 @@ class MultithreadExecutor:
 
     def execute(
         self,
-        initializer, process_sample, select_sample, num_samples, aggregate
+        initializer, process_sample, aggregate, samples
     ):
         local = threading.local()
         agg = None
 
         with ThreadPoolExecutor(max_workers=self.num_workers, initializer=initializer, initargs=(local,)) as executor:
-            with tqdm(total=num_samples, desc="Overall Progress", smoothing=0.1) as pbar:
+            with tqdm(total=len(samples), desc="Overall Progress", smoothing=0.1) as pbar:
                 futures = []
 
-                for i in range(num_samples):
-                    data = select_sample(i)
-
-                    future = executor.submit(process_sample, local, data)
+                for sample in samples:
+                    future = executor.submit(process_sample, local, sample)
                     future.add_done_callback(lambda p: pbar.update())
                     futures.append(future)
 

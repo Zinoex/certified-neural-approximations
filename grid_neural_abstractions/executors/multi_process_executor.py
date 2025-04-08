@@ -14,8 +14,8 @@ class Local:
         _LOCAL = types.SimpleNamespace()
         self.initializer(_LOCAL)
 
-    def process_sample(self, data):
-        return self.process(_LOCAL, data)
+    def process_sample(self, sample):
+        return self.process(_LOCAL, sample)
 
 
 class MultiprocessExecutor:
@@ -26,19 +26,17 @@ class MultiprocessExecutor:
 
     def execute(
         self,
-        initializer, process_sample, select_sample, num_samples, aggregate
+        initializer, process_sample, aggregate, samples
     ):
         local = Local(initializer, process_sample)
         agg = None
 
         with ProcessPoolExecutor(max_workers=self.num_workers, initializer=local.initialize) as executor:
-            with tqdm(total=num_samples, desc="Overall Progress", smoothing=0.1) as pbar:
+            with tqdm(total=len(samples), desc="Overall Progress", smoothing=0.1) as pbar:
                 futures = []
 
-                for i in range(num_samples):
-                    data = select_sample(i)
-
-                    future = executor.submit(local.process_sample, data)
+                for sample in samples:
+                    future = executor.submit(local.process_sample, sample)
                     future.add_done_callback(lambda p: pbar.update())
                     futures.append(future)
 

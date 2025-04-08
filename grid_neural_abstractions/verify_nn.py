@@ -13,21 +13,23 @@ from train_nn import generate_data
 from dynamics import VanDerPolOscillator, Quadcopter
 
 
-def compute_lipschitz_constant(mu, R):
-    """
-    Compute the Lipschitz constant for the van der Pol oscillator.
-    L = max(1 + 2 * mu * R^2, mu * (1 + R^2))
-    """
-    return max(1 + 2 * mu * R**2, mu * (1 + R**2))
+class Sample:
+    def __init__(self, center: torch.Tensor, radius: torch.Tensor, output: torch.Tensor):
+        self.center = center
+        # radius in the sense of a hyperrectangle
+        # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
+        self.radius = radius
+        self.output = output
+
+    def __iter__(self):
+        return iter((self.center, self.radius, self.output))
 
 
 def process_sample(
-    delta,
     L,
     local,
     data,
     epsilon=1e-6,
-    progress_stride=10,
     num_marabou_workers=4,
 ):
     """
@@ -54,13 +56,13 @@ def process_sample(
         verbosity=0, numWorkers=num_marabou_workers
     )
 
-    sample, dynamics_value = data  # Unpack the data tuple
+    sample, dynamics_value, delta = data  # Unpack the data tuple
     dynamics_value = dynamics_value.flatten()
 
     # Set the input variables to the sampled point
     for i, inputVar in enumerate(inputVars):
-        network.setLowerBound(inputVar, sample[i] - delta)
-        network.setUpperBound(inputVar, sample[i] + delta)
+        network.setLowerBound(inputVar, sample[i] - delta[0])
+        network.setUpperBound(inputVar, sample[i] + delta[0])
 
     # We need to verify that for all x: |nn_output - f| < delta * L
     # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
@@ -69,7 +71,7 @@ def process_sample(
         # nn_output >= delta * L + f
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         equation_GE.addAddend(1, outputVar)
-        equation_GE.setScalar(dynamics_value[j] + delta * L)
+        equation_GE.setScalar(dynamics_value[j] + delta[0] * L)
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -78,12 +80,12 @@ def process_sample(
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
                 cex[i] = vals[inputVar]
-                assert cex[i] + epsilon >= sample[i].item() - delta
-                assert cex[i] - epsilon <= sample[i].item() + delta
+                assert cex[i] + epsilon >= sample[i].item() - delta[0]
+                assert cex[i] - epsilon <= sample[i].item() + delta[0]
 
             violation_found = (
                 vals[outputVar] + epsilon
-                >= dynamics_value[j].item() + delta * L
+                >= dynamics_value[j].item() + delta[0] * L
             )
             assert (
                 violation_found
@@ -97,7 +99,7 @@ def process_sample(
         # nn_output <= -delta * L + f
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         equation_LE.addAddend(1, outputVar)
-        equation_LE.setScalar(dynamics_value[j] - delta * L)
+        equation_LE.setScalar(dynamics_value[j] - delta[0] * L)
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -106,11 +108,11 @@ def process_sample(
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
                 cex[i] = vals[inputVar]
-                assert cex[i] + epsilon >= sample[i].item() - delta
-                assert cex[i] - epsilon <= sample[i].item() + delta
+                assert cex[i] + epsilon >= sample[i].item() - delta[0]
+                assert cex[i] - epsilon <= sample[i].item() + delta[0]
             violation_found = (
                 vals[outputVar] - epsilon
-                <= dynamics_value[j].item() - delta * L
+                <= dynamics_value[j].item() - delta[0] * L
             )
             assert (
                 violation_found
@@ -130,6 +132,12 @@ def read_onnx_into_local(onnx_path, local):
     local.network = network
 
 
+def aggregate(agg, x):
+    if agg is None:
+        return x
+    return agg + x
+
+
 def verify_nn(
     onnx_path, delta=0.01
 ):
@@ -145,28 +153,22 @@ def verify_nn(
     range_min, range_max = -1.0, 1.0  # Match the range in generate_data
     num_samples_per_dim = int((range_max - range_min) / delta) + 1
     num_samples = num_samples_per_dim**input_dim
-    print(f"Number of samples: {num_samples}")
+    print(f"Number of initial samples: {num_samples}")
 
-    partial_process_sample = partial(process_sample, delta, L)
+    partial_process_sample = partial(process_sample, L)
 
     X_train, y_train = generate_data(input_dim, delta=delta, grid=True, dynamics_model=dynamics_model)
-    num_samples = len(X_train)
+    samples = [
+        Sample(X_train[i], y_train[i], torch.full_like(y_train[i], delta)) for i in range(num_samples)
+    ]
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
-    def select_sample(i):
-        return X_train[i], y_train[i]
-
-    def aggregate(agg, x):
-        if agg is None:
-            return x
-        return agg + x
-
-    executor = MultiprocessExecutor(num_workers=12)
-    cex_list = executor.execute(initializer, partial_process_sample, select_sample, num_samples, aggregate)
+    executor = SinglethreadExecutor()
+    cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list)
 
-    print(f"Number of counterexamples found: {len(num_cex)}")
+    print(f"Number of counterexamples found: {num_cex}")
     print("Finished")
 
 
