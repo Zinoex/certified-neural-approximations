@@ -7,10 +7,10 @@ from executors import (
     MultithreadExecutor,
     SinglethreadExecutor,
 )
-import os
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 from train_nn import generate_data
 from dynamics import VanDerPolOscillator, Quadcopter
+from copy import deepcopy
 
 
 class Sample:
@@ -29,7 +29,7 @@ def process_sample(
     dynamics_model,
     local,
     data,
-    epsilon=1e-6,
+    precision=1e-6,
     num_marabou_workers=4,
 ):
     """
@@ -59,14 +59,14 @@ def process_sample(
     sample, dynamics_value, delta = data  # Unpack the data tuple
     dynamics_value = dynamics_value.flatten()
 
-    L = dynamics_model.max_gradient_norm(sample, delta)
+    max_norm = dynamics_model.max_gradient_norm(sample, delta)
 
     # Set the input variables to the sampled point
     for i, inputVar in enumerate(inputVars):
         network.setLowerBound(inputVar, sample[i] - delta[i])
         network.setUpperBound(inputVar, sample[i] + delta[i])
 
-    # TODO: Verifiy |nn_output - f| < epsilon - delta * L - note that this epsilon is not the same as the current epsilon parameter
+    # TODO: Verifiy |nn_output - f| < epsilon - delta * L
     # We need to verify that for all x: |nn_output - f| < delta * L
     # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
     # Which means nn_output - f >= delta * L OR nn_output - f <= -delta * L
@@ -74,7 +74,7 @@ def process_sample(
         # nn_output >= delta * L + f
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         equation_GE.addAddend(1, outputVar)
-        equation_GE.setScalar(dynamics_value[j] + L[j])
+        equation_GE.setScalar(dynamics_value[j] + max_norm[j])
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -83,18 +83,18 @@ def process_sample(
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
                 cex[i] = vals[inputVar]
-                assert cex[i] + epsilon >= sample[i].item() - delta[0]
-                assert cex[i] - epsilon <= sample[i].item() + delta[0]
+                assert cex[i] + precision >= sample[i].item() - delta[i]
+                assert cex[i] - precision <= sample[i].item() + delta[i]
 
             violation_found = (
-                vals[outputVar] + epsilon
-                >= dynamics_value[j].item() + L[j]
+                vals[outputVar] + precision
+                >= dynamics_value[j].item() + max_norm[j]
             )
             assert (
                 violation_found
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
-            return [cex]
+            return [], [cex]
 
         # Reset the equation for the other bound
         network.additionalEquList.clear()
@@ -102,7 +102,7 @@ def process_sample(
         # nn_output <= -delta * L + f
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         equation_LE.addAddend(1, outputVar)
-        equation_LE.setScalar(dynamics_value[j] - L[j])
+        equation_LE.setScalar(dynamics_value[j] - max_norm[j])
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -111,22 +111,37 @@ def process_sample(
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
                 cex[i] = vals[inputVar]
-                assert cex[i] + epsilon >= sample[i].item() - delta[0]
-                assert cex[i] - epsilon <= sample[i].item() + delta[0]
+                assert cex[i] + precision >= sample[i].item() - delta[i]
+                assert cex[i] - precision <= sample[i].item() + delta[i]
             violation_found = (
-                vals[outputVar] - epsilon
-                <= dynamics_value[j].item() - L[j]
+                vals[outputVar] - precision
+                <= dynamics_value[j].item() - max_norm[j]
             )
             assert (
                 violation_found
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
-            return [cex]
+            return [], [cex]
 
         # Reset the equation for the next iteration
         network.additionalEquList.clear()
 
-    return []
+    # If no counterexample is found, then ...
+    split_dim = delta.argmax()
+    split_center = sample[split_dim]
+    split_radius = delta[split_dim] / 2
+    split_left = split_center - split_radius
+    split_right = split_center + split_radius
+
+    sample_left = deepcopy(data)
+    sample_left.center[split_dim] = split_left
+    sample_left.radius[split_dim] = split_radius
+
+    sample_right = deepcopy(data)
+    sample_right.center[split_dim] = split_right
+    sample_right.radius[split_dim] = split_radius
+
+    return [sample_left, sample_right], []
 
 
 # This function has to be in the global scope to be pickled for multiprocessing
