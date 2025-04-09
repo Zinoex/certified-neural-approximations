@@ -60,6 +60,7 @@ def process_sample(
     dynamics_value = dynamics_value.flatten()
 
     max_norm = dynamics_model.max_gradient_norm(sample, delta)
+    total_delta = delta.sum()
 
     # Set the input variables to the sampled point
     for i, inputVar in enumerate(inputVars):
@@ -74,7 +75,7 @@ def process_sample(
         # nn_output >= delta * L + f
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         equation_GE.addAddend(1, outputVar)
-        equation_GE.setScalar(dynamics_value[j] + max_norm[j])
+        equation_GE.setScalar(dynamics_value[j] + total_delta * max_norm[j])
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -88,7 +89,7 @@ def process_sample(
 
             violation_found = (
                 vals[outputVar] + precision
-                >= dynamics_value[j].item() + max_norm[j]
+                >= dynamics_value[j].item() + total_delta * max_norm[j]
             )
             assert (
                 violation_found
@@ -102,7 +103,7 @@ def process_sample(
         # nn_output <= -delta * L + f
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         equation_LE.addAddend(1, outputVar)
-        equation_LE.setScalar(dynamics_value[j] - max_norm[j])
+        equation_LE.setScalar(dynamics_value[j] - total_delta * max_norm[j])
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -115,7 +116,7 @@ def process_sample(
                 assert cex[i] - precision <= sample[i].item() + delta[i]
             violation_found = (
                 vals[outputVar] - precision
-                <= dynamics_value[j].item() - max_norm[j]
+                <= dynamics_value[j].item() - total_delta * max_norm[j]
             )
             assert (
                 violation_found
