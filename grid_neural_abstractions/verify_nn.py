@@ -26,7 +26,7 @@ class Sample:
 
 
 def process_sample(
-    L,
+    dynamics_model,
     local,
     data,
     epsilon=1e-6,
@@ -59,11 +59,14 @@ def process_sample(
     sample, dynamics_value, delta = data  # Unpack the data tuple
     dynamics_value = dynamics_value.flatten()
 
+    L = dynamics_model.max_gradient_norm(sample, delta)
+
     # Set the input variables to the sampled point
     for i, inputVar in enumerate(inputVars):
-        network.setLowerBound(inputVar, sample[i] - delta[0])
-        network.setUpperBound(inputVar, sample[i] + delta[0])
+        network.setLowerBound(inputVar, sample[i] - delta[i])
+        network.setUpperBound(inputVar, sample[i] + delta[i])
 
+    # TODO: Verifiy |nn_output - f| < epsilon - delta * L - note that this epsilon is not the same as the current epsilon parameter
     # We need to verify that for all x: |nn_output - f| < delta * L
     # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
     # Which means nn_output - f >= delta * L OR nn_output - f <= -delta * L
@@ -71,7 +74,7 @@ def process_sample(
         # nn_output >= delta * L + f
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         equation_GE.addAddend(1, outputVar)
-        equation_GE.setScalar(dynamics_value[j] + delta[0] * L)
+        equation_GE.setScalar(dynamics_value[j] + L[j])
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -85,7 +88,7 @@ def process_sample(
 
             violation_found = (
                 vals[outputVar] + epsilon
-                >= dynamics_value[j].item() + delta[0] * L
+                >= dynamics_value[j].item() + L[j]
             )
             assert (
                 violation_found
@@ -99,7 +102,7 @@ def process_sample(
         # nn_output <= -delta * L + f
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         equation_LE.addAddend(1, outputVar)
-        equation_LE.setScalar(dynamics_value[j] - delta[0] * L)
+        equation_LE.setScalar(dynamics_value[j] - L[j])
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -112,7 +115,7 @@ def process_sample(
                 assert cex[i] - epsilon <= sample[i].item() + delta[0]
             violation_found = (
                 vals[outputVar] - epsilon
-                <= dynamics_value[j].item() - delta[0] * L
+                <= dynamics_value[j].item() - L[j]
             )
             assert (
                 violation_found
@@ -143,10 +146,6 @@ def verify_nn(
 ):
     dynamics_model = VanDerPolOscillator()
 
-    # Compute Lipschitz constant
-    L = dynamics_model.compute_lipschitz_constant(delta)
-    print(f"Computed Lipschitz constant L: {L}")
-
     input_dim = dynamics_model.input_dim
 
     # Compute the number of samples for a fixed grid
@@ -155,7 +154,7 @@ def verify_nn(
     num_samples = num_samples_per_dim**input_dim
     print(f"Number of initial samples: {num_samples}")
 
-    partial_process_sample = partial(process_sample, L)
+    partial_process_sample = partial(process_sample, dynamics_model)
 
     X_train, y_train = generate_data(input_dim, delta=delta, grid=True, dynamics_model=dynamics_model)
     samples = [
