@@ -21,11 +21,12 @@ class SinglethreadExecutor:
                 new_samples, result = process_sample(local, sample)
                 agg = aggregate(agg, result)
 
-                # Update the progress bar
-                pbar.update(1)
-
                 # Put the new samples back into the queue
                 for new_sample in new_samples:
                     queue.put(new_sample)
+
+                # Update the progress bar
+                pbar.set_description_str(f"Overall Progress (remaining samples: {queue.qsize()})")
+                pbar.update(1)
 
         return agg
