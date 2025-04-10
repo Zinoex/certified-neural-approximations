@@ -13,16 +13,15 @@ from dynamics import VanDerPolOscillator, Quadcopter
 from copy import deepcopy
 
 
-class Sample:
-    def __init__(self, center: torch.Tensor, radius: torch.Tensor, output: torch.Tensor):
+class Region:
+    def __init__(self, center: torch.Tensor, radius: torch.Tensor):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
         self.radius = radius
-        self.output = output
 
     def __iter__(self):
-        return iter((self.center, self.radius, self.output))
+        return iter((self.center, self.radius))
 
 
 def process_sample(
@@ -57,8 +56,8 @@ def process_sample(
         verbosity=0, numWorkers=num_marabou_workers
     )
 
-    sample, dynamics_value, delta = data  # Unpack the data tuple
-    dynamics_value = dynamics_value.flatten()
+    sample, delta = data  # Unpack the data tuple
+    dynamics_value = dynamics_model(sample).flatten()
 
     max_norm = dynamics_model.max_gradient_norm(sample, delta)
     # That we sum over delta comes from the Lagrange remainder term
@@ -176,9 +175,9 @@ def verify_nn(
 
     partial_process_sample = partial(process_sample, dynamics_model, epsilon)
 
-    X_train, y_train = generate_data(input_dim, delta=delta, grid=True, dynamics_model=dynamics_model)
+    X_train, _ = generate_data(input_dim, delta=delta, grid=True)
     samples = [
-        Sample(X_train[i], y_train[i], torch.full_like(y_train[i], delta)) for i in range(num_samples)
+        Region(X_train[i], torch.full_like(X_train[i], delta)) for i in range(num_samples)
     ]
 
     initializer = partial(read_onnx_into_local, onnx_path)
