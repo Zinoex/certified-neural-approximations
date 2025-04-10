@@ -6,7 +6,7 @@ _Describe in detail the changes including the reasoning._
 1. (...)
 2. (...)
 
-### Bugfixes (delete if dind't have any)
+### Bugfixes (delete if didn't have any)
 -
 
 ### Checks
