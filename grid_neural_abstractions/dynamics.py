@@ -73,7 +73,8 @@ class VanDerPolOscillator:
         ]
 
         # From the first row
-        L1 = 1
+        L11 = 0
+        L12 = 1
 
         # From the second row
         L21 = max(*[
@@ -81,9 +82,9 @@ class VanDerPolOscillator:
         ])
         L22 = self.mu * (1 + max(abs(c[0] + r[0]), abs(c[0] - r[0]))**2)
 
-        L2 = max(L21, L22)
+        L = torch.tensor([[L11, L12], [L21, L22]])
 
-        return torch.tensor([L1, L2])
+        return L
 
 
 class Quadcopter:

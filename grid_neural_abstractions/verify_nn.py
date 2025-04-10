@@ -1,4 +1,5 @@
 from functools import partial
+from itertools import product
 
 import numpy as np
 import torch
@@ -59,12 +60,29 @@ def process_sample(
     sample, delta = data  # Unpack the data tuple
     dynamics_value = dynamics_model(sample).flatten()
 
-    max_norm = dynamics_model.max_gradient_norm(sample, delta)
+    L_max = dynamics_model.max_gradient_norm(sample, delta)
     # That we sum over delta comes from the Lagrange remainder term
     # in the 1st order multivariate Taylor expansion.
     # (Bound the higher order derivate + bound the norm in a closed region)
     # https://en.wikipedia.org/wiki/Taylor%27s_theorem#Taylor's_theorem_for_multivariate_functions
-    total_delta = delta.sum()
+
+    # delta * L 
+    L_step = torch.matmul(L_max, delta)
+
+    if any(epsilon < L_step):
+        # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
+        split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
+        split_radius = delta[split_dim] / 2
+        
+        sample_left = deepcopy(data)
+        sample_left.center[split_dim] -= split_radius
+        sample_left.radius[split_dim] = split_radius
+
+        sample_right = deepcopy(data)
+        sample_right.center[split_dim] += split_radius
+        sample_right.radius[split_dim] = split_radius
+
+        return [sample_left, sample_right], []
 
     # Set the input variables to the sampled point
     for i, inputVar in enumerate(inputVars):
@@ -78,7 +96,7 @@ def process_sample(
         # nn_output >= epsilon - delta * L + f
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         equation_GE.addAddend(1, outputVar)
-        equation_GE.setScalar(dynamics_value[j] + epsilon - total_delta * max_norm[j])
+        equation_GE.setScalar(dynamics_value[j] + (epsilon - L_step[j].item()))
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -92,8 +110,9 @@ def process_sample(
 
             violation_found = (
                 vals[outputVar] + precision
-                >= dynamics_value[j].item() + epsilon - total_delta * max_norm[j]
+                >= dynamics_value[j].item() + (epsilon - L_step[j].item())
             )
+
             assert (
                 violation_found
             ), "The counterexample violates the bound, this is not a valid counterexample"
@@ -106,7 +125,7 @@ def process_sample(
         # nn_output <= -epsilon + delta * L + f
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         equation_LE.addAddend(1, outputVar)
-        equation_LE.setScalar(dynamics_value[j] - epsilon + total_delta * max_norm[j])
+        equation_LE.setScalar(dynamics_value[j] - (epsilon - L_step[j].item()))
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -119,7 +138,7 @@ def process_sample(
                 assert cex[i] - precision <= sample[i].item() + delta[i]
             violation_found = (
                 vals[outputVar] - precision
-                <= dynamics_value[j].item() - epsilon + total_delta * max_norm[j]
+                <= dynamics_value[j].item() - (epsilon - L_step[j].item())
             )
             assert (
                 violation_found
@@ -130,22 +149,7 @@ def process_sample(
         # Reset the equation for the next iteration
         network.additionalEquList.clear()
 
-    # If no counterexample is found, then ...
-    split_dim = delta.argmax()
-    split_center = sample[split_dim]
-    split_radius = delta[split_dim] / 2
-    split_left = split_center - split_radius
-    split_right = split_center + split_radius
-
-    sample_left = deepcopy(data)
-    sample_left.center[split_dim] = split_left
-    sample_left.radius[split_dim] = split_radius
-
-    sample_right = deepcopy(data)
-    sample_right.center[split_dim] = split_right
-    sample_right.radius[split_dim] = split_radius
-
-    return [sample_left, sample_right], []
+        return [], []
 
 
 # This function has to be in the global scope to be pickled for multiprocessing
@@ -161,7 +165,7 @@ def aggregate(agg, x):
 
 
 def verify_nn(
-    onnx_path, delta=0.01, epsilon=0.01, num_workers=4
+    onnx_path, delta=0.01, epsilon=0.1, num_workers=4
 ):
     dynamics_model = VanDerPolOscillator()
 
@@ -193,5 +197,5 @@ def verify_nn(
 if __name__ == "__main__":
     verify_nn(
         "data/simple_nn.onnx",
-        delta=0.01
+        delta=0.1
     )
