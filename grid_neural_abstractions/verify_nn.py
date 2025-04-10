@@ -71,14 +71,14 @@ def process_sample(
         network.setLowerBound(inputVar, sample[i] - delta[i])
         network.setUpperBound(inputVar, sample[i] + delta[i])
 
-    # We need to verify that for all x: |nn_output - f| < epsilon - delta * L
-    # To find a counterexample, we look for x where: |nn_output - f| >= epsilon - delta * L
-    # Which means nn_output - f >= delta * L OR nn_output - f <= epsilon - delta * L
+    # We need to verify that for all x: |nn_output - f| < delta * L
+    # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
+    # Which means nn_output - f >= delta * L OR nn_output - f <= delta * L
     for j, outputVar in enumerate(outputVars):
         # nn_output >= epsilon - delta * L + f
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         equation_GE.addAddend(1, outputVar)
-        equation_GE.setScalar(dynamics_value[j] + epsilon - total_delta * max_norm[j])
+        equation_GE.setScalar(dynamics_value[j] + total_delta * max_norm[j])
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -92,7 +92,7 @@ def process_sample(
 
             violation_found = (
                 vals[outputVar] + precision
-                >= dynamics_value[j].item() + epsilon - total_delta * max_norm[j]
+                >= dynamics_value[j].item() + total_delta * max_norm[j]
             )
             assert (
                 violation_found
@@ -103,10 +103,10 @@ def process_sample(
         # Reset the equation for the other bound
         network.additionalEquList.clear()
 
-        # nn_output <= -epsilon + delta * L + f
+        # nn_output <= -delta * L + f
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         equation_LE.addAddend(1, outputVar)
-        equation_LE.setScalar(dynamics_value[j] - epsilon + total_delta * max_norm[j])
+        equation_LE.setScalar(dynamics_value[j] - total_delta * max_norm[j])
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -119,7 +119,7 @@ def process_sample(
                 assert cex[i] - precision <= sample[i].item() + delta[i]
             violation_found = (
                 vals[outputVar] - precision
-                <= dynamics_value[j].item() - epsilon + total_delta * max_norm[j]
+                <= dynamics_value[j].item() - total_delta * max_norm[j]
             )
             assert (
                 violation_found
