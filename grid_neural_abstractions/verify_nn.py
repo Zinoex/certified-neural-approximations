@@ -27,6 +27,7 @@ class Sample:
 
 def process_sample(
     dynamics_model,
+    epsilon,
     local,
     data,
     precision=1e-6,
@@ -60,6 +61,10 @@ def process_sample(
     dynamics_value = dynamics_value.flatten()
 
     max_norm = dynamics_model.max_gradient_norm(sample, delta)
+    # That we sum over delta comes from the Lagrange remainder term
+    # in the 1st order multivariate Taylor expansion.
+    # (Bound the higher order derivate + bound the norm in a closed region)
+    # https://en.wikipedia.org/wiki/Taylor%27s_theorem#Taylor's_theorem_for_multivariate_functions
     total_delta = delta.sum()
 
     # Set the input variables to the sampled point
@@ -67,15 +72,14 @@ def process_sample(
         network.setLowerBound(inputVar, sample[i] - delta[i])
         network.setUpperBound(inputVar, sample[i] + delta[i])
 
-    # TODO: Verifiy |nn_output - f| < epsilon - delta * L
-    # We need to verify that for all x: |nn_output - f| < delta * L
-    # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
-    # Which means nn_output - f >= delta * L OR nn_output - f <= -delta * L
+    # We need to verify that for all x: |nn_output - f| < epsilon - delta * L
+    # To find a counterexample, we look for x where: |nn_output - f| >= epsilon - delta * L
+    # Which means nn_output - f >= delta * L OR nn_output - f <= epsilon - delta * L
     for j, outputVar in enumerate(outputVars):
-        # nn_output >= delta * L + f
+        # nn_output >= epsilon - delta * L + f
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         equation_GE.addAddend(1, outputVar)
-        equation_GE.setScalar(dynamics_value[j] + total_delta * max_norm[j])
+        equation_GE.setScalar(dynamics_value[j] + epsilon - total_delta * max_norm[j])
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -89,7 +93,7 @@ def process_sample(
 
             violation_found = (
                 vals[outputVar] + precision
-                >= dynamics_value[j].item() + total_delta * max_norm[j]
+                >= dynamics_value[j].item() + epsilon - total_delta * max_norm[j]
             )
             assert (
                 violation_found
@@ -100,10 +104,10 @@ def process_sample(
         # Reset the equation for the other bound
         network.additionalEquList.clear()
 
-        # nn_output <= -delta * L + f
+        # nn_output <= -epsilon + delta * L + f
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         equation_LE.addAddend(1, outputVar)
-        equation_LE.setScalar(dynamics_value[j] - total_delta * max_norm[j])
+        equation_LE.setScalar(dynamics_value[j] - epsilon + total_delta * max_norm[j])
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -116,7 +120,7 @@ def process_sample(
                 assert cex[i] - precision <= sample[i].item() + delta[i]
             violation_found = (
                 vals[outputVar] - precision
-                <= dynamics_value[j].item() - total_delta * max_norm[j]
+                <= dynamics_value[j].item() - epsilon + total_delta * max_norm[j]
             )
             assert (
                 violation_found
@@ -158,7 +162,7 @@ def aggregate(agg, x):
 
 
 def verify_nn(
-    onnx_path, delta=0.01
+    onnx_path, delta=0.01, epsilon=0.01, num_workers=4
 ):
     dynamics_model = VanDerPolOscillator()
 
@@ -170,7 +174,7 @@ def verify_nn(
     num_samples = num_samples_per_dim**input_dim
     print(f"Number of initial samples: {num_samples}")
 
-    partial_process_sample = partial(process_sample, dynamics_model)
+    partial_process_sample = partial(process_sample, dynamics_model, epsilon)
 
     X_train, y_train = generate_data(input_dim, delta=delta, grid=True, dynamics_model=dynamics_model)
     samples = [
