@@ -170,7 +170,7 @@ def aggregate(agg, x):
 
 
 def verify_nn(
-    onnx_path, delta=0.01, epsilon=0.1, num_workers=4
+    onnx_path, delta=0.01, epsilon=0.1, num_workers = 64
 ):
     dynamics_model = VanDerPolOscillator()
 
@@ -191,7 +191,7 @@ def verify_nn(
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
-    executor = SinglethreadExecutor()
+    executor = MultithreadExecutor(num_workers)
     cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list)
 

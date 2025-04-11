@@ -159,7 +159,7 @@ class MultithreadExecutor:
     during the execution of the C++ code, thus not prohibiting the performance benefits of threading.
     """
 
-    def __init__(self, num_workers=None):
+    def __init__(self, num_workers=12):
         # If num_workers is not provided, use the default of ThreadPoolExecutor min(32, os.cpu_count() + 4)
         self.num_workers = num_workers
 
