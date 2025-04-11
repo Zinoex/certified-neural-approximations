@@ -1,6 +1,7 @@
 from concurrent.futures import ProcessPoolExecutor
 from .multi_thread_executor import ExpandableAsCompleted
 import types
+from queue import LifoQueue
 
 from tqdm import tqdm  # Added tqdm for progress tracking
 
@@ -33,6 +34,8 @@ class MultiprocessExecutor:
         agg = None
 
         with ProcessPoolExecutor(max_workers=self.num_workers, initializer=local.initialize) as executor:
+            executor._work_ids = LifoQueue()
+
             with tqdm(desc="Overall Progress", smoothing=0.1) as pbar:
                 futures = []
                 for sample in samples:
