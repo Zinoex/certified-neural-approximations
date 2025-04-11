@@ -8,10 +8,12 @@ from executors import (
     MultithreadExecutor,
     SinglethreadExecutor,
 )
+from translators import TorchTranslator
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 from train_nn import generate_data
 from dynamics import VanDerPolOscillator, Quadcopter
 from copy import deepcopy
+from taylor_expansion import first_order_certified_taylor_expansion
 
 
 class Region:
@@ -58,13 +60,17 @@ def process_sample(
     )
 
     sample, delta = data  # Unpack the data tuple
-    dynamics_value = dynamics_model(sample).flatten()
+    translator = TorchTranslator()
+    dynamics_value = dynamics_model(sample, translator)
 
     L_max = dynamics_model.max_gradient_norm(sample, delta)
     # That we sum over delta comes from the Lagrange remainder term
     # in the 1st order multivariate Taylor expansion.
     # (Bound the higher order derivate + bound the norm in a closed region)
     # https://en.wikipedia.org/wiki/Taylor%27s_theorem#Taylor's_theorem_for_multivariate_functions
+    taylor_pol = first_order_certified_taylor_expansion(
+        dynamics_model, sample, delta
+    )
 
     # delta * L 
     L_step = torch.matmul(L_max, delta)

@@ -1,4 +1,4 @@
-import juliacall import Main as jl
+from juliacall import Main as jl
 
 
 class JuliaTranslator:
@@ -11,8 +11,8 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats [n]
         """
-        return jl.seval(f"{a} * {b}")
-    
+        return jl.seval("(*)")(a, b)
+
     def sin(self, a):
         """
         Element-wise sine
@@ -22,7 +22,7 @@ class JuliaTranslator:
         :return: np.ndarray of floats
         """
         return jl.sin(a)
-    
+
     def cos(self, a):
         """
         Element-wise cosine
@@ -32,7 +32,7 @@ class JuliaTranslator:
         :return: np.ndarray of floats
         """
         return jl.cos(a)
-    
+
     def tan(self, a):
         """
         Element-wise tangent
@@ -42,7 +42,7 @@ class JuliaTranslator:
         :return: np.ndarray of floats
         """
         return jl.tan(a)
-    
+
     def exp(self, a):
         """
         Element-wise exponential
@@ -52,7 +52,7 @@ class JuliaTranslator:
         :return: np.ndarray of floats
         """
         return jl.exp(a)
-    
+
     def log(self, a):
         """
         Element-wise logarithm
@@ -82,7 +82,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return jl.pow(a, b)
+        return jl.seval("(^)")(a, b)
 
     def min(self, a):
         """
@@ -112,7 +112,7 @@ class JuliaTranslator:
 
         :return: np.ndarray
         """
-        return jl.seval(f"vcat({a}...)")
+        return jl.seval("(a) -> vcat(a...)")(a)
 
     def hstack(self, a):
         """
@@ -122,4 +122,4 @@ class JuliaTranslator:
 
         :return: np.ndarray
         """
-        return jl.hcat(f"hcat({a}...)")
+        return jl.hcat("(a) -> hcat(a...)")(a)

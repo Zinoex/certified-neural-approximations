@@ -1,4 +1,5 @@
 import torch
+from translators import TorchTranslator
 
 
 class VanDerPolOscillator:
@@ -10,23 +11,25 @@ class VanDerPolOscillator:
         self.input_dim = 2  # Van der Pol oscillator state dimension
         self.output_dim = 2  # Van der Pol oscillator derivative dimension
 
-    def __call__(self, x):
-        return self.compute_dynamics(x)
+    def __call__(self, x, translator=None):
+        if translator is None:
+            translator = TorchTranslator()
 
-    def compute_dynamics(self, x):
-        # Ensure x has the correct shape (2, N) for computation
-        if x.dim() == 1:
-            x = x.unsqueeze(1)  # Convert 1D tensor to 2D column vector
-        elif x.size(0) != self.input_dim:
-            raise ValueError(
-                f"Input tensor x has incompatible dimensions: {x.size()}, expected first dimension {self.input_dim}"
-            )
+        return self.compute_dynamics(x, translator)
 
-        # Compute the dynamics
+    def compute_dynamics(self, x, translator):
+        # # Ensure x has the correct shape (2, N) for computation
+        # if x.dim() == 1:
+        #     x = x.unsqueeze(1)  # Convert 1D tensor to 2D column vector
+        # elif x.size(0) != self.input_dim:
+        #     raise ValueError(
+        #         f"Input tensor x has incompatible dimensions: {x.size()}, expected first dimension {self.input_dim}"
+        #     )
+
         dx1 = x[1]
-        dx2 = self.mu * (1 - x[0] ** 2) * x[1] - x[0]
+        dx2 = self.mu * (1 - translator.pow(x[0], 2)) * x[1] - x[0]
 
-        return torch.cat((dx1.unsqueeze(0), dx2.unsqueeze(0)), dim=0)
+        return translator.stack((dx1, dx2))
 
     def compute_lipschitz_constant(self, R):
         """
