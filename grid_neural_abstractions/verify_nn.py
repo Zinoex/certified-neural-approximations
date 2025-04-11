@@ -149,7 +149,7 @@ def process_sample(
             nn_cex = network.evaluateWithMarabou([cex])[0]
             f_cex = dynamics_model(torch.tensor(cex)).flatten().numpy()
             if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                split_dim = np.argmax(np.abs(nn_cex - f_cex))
+                split_dim = np.argmax(L_max[j, :] * delta)
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return [sample_left, sample_right], []
 
