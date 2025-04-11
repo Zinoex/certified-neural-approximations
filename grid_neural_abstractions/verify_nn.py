@@ -24,6 +24,12 @@ class Region:
     def __iter__(self):
         return iter((self.center, self.radius))
 
+    def calculate_size(self):
+        """
+        Calculate the size of the region (hypercube volume).
+        """
+        return torch.prod(2 * self.radius).item()
+
 
 def process_sample(
     dynamics_model,
@@ -148,7 +154,7 @@ def process_sample(
         # Reset the equation for the next iteration
         network.additionalEquList.clear()
 
-        return [], []
+        return [data], []
 
 
 # This function has to be in the global scope to be pickled for multiprocessing

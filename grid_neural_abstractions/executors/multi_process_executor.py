@@ -31,6 +31,10 @@ class MultiprocessExecutor:
     ):
         local = Local(initializer, process_sample)
         agg = None
+        
+        # Calculate the total domain size
+        total_domain_size = sum(sample.calculate_size() for sample in samples)
+        certified_domain_size = 0
 
         with ProcessPoolExecutor(max_workers=self.num_workers, initializer=local.initialize) as executor:
             with tqdm(desc="Overall Progress", smoothing=0.1) as pbar:
@@ -43,13 +47,22 @@ class MultiprocessExecutor:
                 waiter = ExpandableAsCompleted(futures)
 
                 for future in waiter.as_completed():
-                    new_samples, result = future.result()
-                    pbar.set_description_str(f"Overall Progress (remaining samples: {len(waiter)})")
-                    agg = aggregate(agg, result)
+                    returned_samples, result = future.result()
+                    
+                    if len(returned_samples) == 1:
+                        # Sample was successfully verified, no new samples to process
+                        # Update certified domain size
+                        certified_domain_size += returned_samples[0].calculate_size()
+                    else:
+                        agg = aggregate(agg, result)
 
-                    for new_sample in new_samples:
-                        new_future = executor.submit(local.process_sample, new_sample)
-                        new_future.add_done_callback(lambda p: pbar.update())
-                        waiter.add(new_future)
-
+                        for new_sample in returned_samples:
+                            new_future = executor.submit(local.process_sample, new_sample)
+                            new_future.add_done_callback(lambda p: pbar.update())
+                            waiter.add(new_future)
+                
+                    certified_percentage = (certified_domain_size / total_domain_size) * 100
+                    pbar.set_description_str(
+                        f"Overall Progress (remaining samples: {len(waiter)}, certified: {certified_percentage:.2f}%)"
+                    )
         return agg
