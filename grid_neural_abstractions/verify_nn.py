@@ -93,6 +93,9 @@ def process_sample(
     # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
     # Which means nn_output - f >= delta * L OR nn_output - f <= delta * L
     for j, outputVar in enumerate(outputVars):
+        # Reset the query
+        network.additionalEquList.clear()
+
         # nn_output >= delta * L + f
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         equation_GE.addAddend(1, outputVar)
@@ -118,7 +121,7 @@ def process_sample(
 
             return [], [cex]
 
-        # Reset the equation for the other bound
+        # Reset the query
         network.additionalEquList.clear()
 
         # nn_output <= -delta * L + f
@@ -144,9 +147,6 @@ def process_sample(
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
             return [], [cex]
-
-        # Reset the equation for the next iteration
-        network.additionalEquList.clear()
 
         return [], []
 
