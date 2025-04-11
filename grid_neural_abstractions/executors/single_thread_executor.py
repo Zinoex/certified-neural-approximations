@@ -1,6 +1,6 @@
 import types
 from tqdm import tqdm  # Added tqdm for progress tracking
-from queue import SimpleQueue
+from queue import LifoQueue
 
 
 class SinglethreadExecutor:
@@ -9,7 +9,7 @@ class SinglethreadExecutor:
         local = types.SimpleNamespace()
         initializer(local)
 
-        queue = SimpleQueue()
+        queue = LifoQueue()
         for sample in samples:
             queue.put(sample)
 
