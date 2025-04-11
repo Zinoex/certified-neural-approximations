@@ -1,6 +1,6 @@
 import types
 from tqdm import tqdm  # Added tqdm for progress tracking
-from queue import SimpleQueue
+from queue import LifoQueue
 
 
 class SinglethreadExecutor:
@@ -12,8 +12,7 @@ class SinglethreadExecutor:
         # Calculate the total domain size
         total_domain_size = sum(sample.calculate_size() for sample in samples)
         certified_domain_size = 0
-
-        queue = SimpleQueue()
+        queue = LifoQueue()
         for sample in samples:
             queue.put(sample)
 
