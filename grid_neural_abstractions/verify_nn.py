@@ -72,16 +72,7 @@ def process_sample(
     if torch.any(L_step > epsilon):
         # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
         split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
-        split_radius = delta[split_dim] / 2
-        
-        sample_left = deepcopy(data)
-        sample_left.center[split_dim] -= split_radius
-        sample_left.radius[split_dim] = split_radius
-
-        sample_right = deepcopy(data)
-        sample_right.center[split_dim] += split_radius
-        sample_right.radius[split_dim] = split_radius
-
+        sample_left, sample_right = split_sample(data, delta, split_dim)
         return [sample_left, sample_right], []
 
     # Set the input variables to the sampled point
@@ -116,6 +107,13 @@ def process_sample(
                 violation_found
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
+            nn_cex = network.evaluateWithoutMarabou([cex])[0]
+            f_cex = dynamics_model(torch.tensor(cex)).flatten().numpy()
+            if np.all(np.abs(nn_cex - f_cex) < epsilon):
+                split_dim = np.argmax(np.abs(nn_cex - f_cex))
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return [sample_left, sample_right], []
+
             return [], [cex]
 
         # Reset the equation for the other bound
@@ -143,12 +141,31 @@ def process_sample(
                 violation_found
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
+            nn_cex = network.evaluateWithoutMarabou([cex])[0]
+            f_cex = dynamics_model(torch.tensor(cex)).flatten().numpy()
+            if np.all(np.abs(nn_cex - f_cex) < epsilon):
+                split_dim = np.argmax(np.abs(nn_cex - f_cex))
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return [sample_left, sample_right], []
+
             return [], [cex]
 
         # Reset the equation for the next iteration
         network.additionalEquList.clear()
 
         return [], []
+
+def split_sample(data, delta, split_dim):
+    split_radius = delta[split_dim] / 2
+        
+    sample_left = deepcopy(data)
+    sample_left.center[split_dim] -= split_radius
+    sample_left.radius[split_dim] = split_radius
+
+    sample_right = deepcopy(data)
+    sample_right.center[split_dim] += split_radius
+    sample_right.radius[split_dim] = split_radius
+    return sample_left, sample_right
 
 
 # This function has to be in the global scope to be pickled for multiprocessing
@@ -185,7 +202,7 @@ def verify_nn(
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
-    executor = SinglethreadExecutor()
+    executor = MultithreadExecutor()
     cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list)
 
