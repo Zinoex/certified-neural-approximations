@@ -33,12 +33,12 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
 
     y = dynamics.compute_dynamics(x, translator)
 
-    # constant term
+    # constant term (select zeroth order, first and only coefficient)
     a = jl.broadcast(jl.seval("yi -> yi[0][1]"), y)
     a_lower = jl.broadcast(jl.inf, a).to_numpy()
     a_upper = jl.broadcast(jl.sup, a).to_numpy()
 
-    # linear term
+    # linear term (select first order, all coefficients)
     b = jl.broadcast(jl.seval("yi -> yi[1][:]"), y)
     b = jl.broadcast(jl.transpose, b)
     b = jl.reduce(jl.vcat, b)
