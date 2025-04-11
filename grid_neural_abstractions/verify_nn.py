@@ -69,7 +69,7 @@ def process_sample(
     # delta * L 
     L_step = torch.matmul(L_max, delta)
 
-    if any(epsilon < L_step):
+    if torch.any(L_step > epsilon):
         # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
         split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
         split_radius = delta[split_dim] / 2
