@@ -112,7 +112,7 @@ class JuliaTranslator:
 
         :return: np.ndarray
         """
-        return jl.seval("(a) -> vcat(a...)")(a)
+        return jl.reduce(jl.vcat, a)
 
     def hstack(self, a):
         """
@@ -122,4 +122,4 @@ class JuliaTranslator:
 
         :return: np.ndarray
         """
-        return jl.hcat("(a) -> hcat(a...)")(a)
+        return jl.reduce(jl.hcat, a)

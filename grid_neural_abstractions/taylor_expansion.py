@@ -16,7 +16,7 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     :param dynamics: An object representing the dynamics to be expanded.
     :param expansion_point: The point around which to expand the dynamics.
     :param delta: The (hyperrectangular) radius of the expansion.
-    :return: (a = f(c) - c Df(c), B = Df(c), R) where the Taylor expansion is `f(c) + (x - c) Df(c) \oplus R`.
+    :return: (a = f(c), B = Df(c), R) where the Taylor expansion is `f(c) + (x - c) Df(c) \oplus R`.
     """
     translator = JuliaTranslator()
 
@@ -29,13 +29,30 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
         order, expansion_point.to(torch.float64).numpy(), dom, input_dim
     )
-    # x = jl.seval(f"{z} - {expansion_point}")
+    # x = jl.seval("(z, c) -> z - c")(z, expansion_point.to(torch.float64).numpy())
 
     y = dynamics.compute_dynamics(x, translator)
 
-    return y
+    # constant term
+    a = jl.broadcast(jl.seval("yi -> yi[0][1]"), y)
+    a_lower = jl.broadcast(jl.inf, a).to_numpy()
+    a_upper = jl.broadcast(jl.sup, a).to_numpy()
+
+    # linear term
+    b = jl.broadcast(jl.seval("yi -> yi[1][:]"), y)
+    b = jl.broadcast(jl.transpose, b)
+    b = jl.reduce(jl.vcat, b)
+    b_lower = jl.broadcast(jl.inf, b).to_numpy()
+    b_upper = jl.broadcast(jl.sup, b).to_numpy()
+
+    # remainder
+    r = jl.broadcast(jl.remainder, y)
+    r_lower = jl.broadcast(jl.inf, r).to_numpy()
+    r_upper = jl.broadcast(jl.sup, r).to_numpy()
+
+    return None
 
 
 def prepare_taylor_expansion(dynamics):
     n = dynamics.input_dim
-    jl.seval(f"set_variables(Float64, \"z\", order=1, numvars={n})")
+    jl.seval("n -> set_variables(Float64, \"z\", order=1, numvars=n)")(n)
