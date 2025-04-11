@@ -50,6 +50,42 @@ class VanDerPolOscillator:
         )  # From the second row
         return max(L1, L2)
 
+    def max_gradient_norm(self, c, r):
+        """
+        Compute the maximum for the van der Pol oscillator.
+        Using the Jacobian matrix maximum eigenvalue over the domain.
+
+        :param c: The state vector
+        :param r: The (hyperrectangular) radius of the domain
+
+        :return: The maximum gradient norm
+        """
+
+        # For Van der Pol, the Jacobian is:
+        # [ 0,  1 ]
+        # [-1 - 2*mu*x₁*x₂, mu*(1-x₁²)]
+
+        corners = [
+            c + r * torch.tensor([1, 1]),
+            c + r * torch.tensor([-1, 1]),
+            c + r * torch.tensor([1, -1]),
+            c + r * torch.tensor([-1, -1]),
+        ]
+
+        # From the first row
+        L11 = 0
+        L12 = 1
+
+        # From the second row
+        L21 = max(*[
+            abs(-1 - 2 * self.mu * corner[0] * corner[1]) for corner in corners
+        ])
+        L22 = self.mu * (1 + max(abs(c[0] + r[0]), abs(c[0] - r[0]))**2)
+
+        L = torch.tensor([[L11, L12], [L21, L22]])
+
+        return L
+
 
 class Quadcopter:
     """A class representing the 10D dynamics of a quadcopter."""
