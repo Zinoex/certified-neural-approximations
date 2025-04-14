@@ -173,6 +173,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         dynamics_value = dynamics(sample, translator)
 
         L_max = dynamics.max_gradient_norm(sample, delta)
+
         # That we sum over delta comes from the Lagrange remainder term
         # in the 1st order multivariate Taylor expansion.
         # (Bound the higher order derivate + bound the norm in a closed region)
@@ -187,16 +188,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         if torch.any(L_step > epsilon):
             # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
             split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
-            split_radius = delta[split_dim] / 2
-
-            sample_left = deepcopy(data)
-            sample_left.center[split_dim] -= split_radius
-            sample_left.radius[split_dim] = split_radius
-
-            sample_right = deepcopy(data)
-            sample_right.center[split_dim] += split_radius
-            sample_right.radius[split_dim] = split_radius
-
+            sample_left, sample_right = split_sample(data, delta, split_dim)
             return [sample_left, sample_right], [], []
 
         # Set the input variables to the sampled point
@@ -208,6 +200,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
         # Which means nn_output - f >= delta * L OR nn_output - f <= delta * L
         for j, outputVar in enumerate(outputVars):
+            # Reset the query
+            network.additionalEquList.clear()
+
             # nn_output >= delta * L + f
             equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
             equation_GE.addAddend(1, outputVar)
@@ -231,9 +226,17 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     violation_found
                 ), "The counterexample violates the bound, this is not a valid counterexample"
 
+                network.additionalEquList.clear()
+                nn_cex = network.evaluateWithMarabou([cex])[0]
+                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                if np.all(np.abs(nn_cex - f_cex) < epsilon):
+                    split_dim = np.argmax(L_max[j, :] * delta)
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    return [sample_left, sample_right], [], []
+
                 return [], [cex], []
 
-            # Reset the equation for the other bound
+            # Reset the query
             network.additionalEquList.clear()
 
             # nn_output <= -delta * L + f
@@ -258,9 +261,14 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     violation_found
                 ), "The counterexample violates the bound, this is not a valid counterexample"
 
+                network.additionalEquList.clear()
+                nn_cex = network.evaluateWithMarabou([cex])[0]
+                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                if np.all(np.abs(nn_cex - f_cex) < epsilon):
+                    split_dim = np.argmax(L_max[j, :] * delta)
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    return [sample_left, sample_right], [], []
+
                 return [], [cex], []
 
-            # Reset the equation for the next iteration
-            network.additionalEquList.clear()
-
-            return [], [], [data]
+            return [], [], [data]  # No counterexample found, return the original sample
