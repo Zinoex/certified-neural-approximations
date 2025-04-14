@@ -188,9 +188,9 @@ class MultithreadExecutor:
                 waiter = ExpandableAsCompleted(futures)
 
                 for future in waiter.as_completed():
-                    new_samples, result, certified_sample = future.result()
+                    new_samples, result, certified_samples = future.result()
                     
-                    if certified_sample:
+                    for certified_sample in certified_samples:
                         # Sample was succesfully verified, no new samples to process
                         # Update certified domain size in a thread-safe manner
                         certified_domain_size += certified_sample.calculate_size()

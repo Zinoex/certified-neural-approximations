@@ -164,7 +164,7 @@ def process_sample(
 
             return [], [cex], []
 
-        return [], [], data  # No counterexample found, return the original sample
+        return [], [], [data]  # No counterexample found, return the original sample
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2

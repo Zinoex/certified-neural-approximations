@@ -21,9 +21,9 @@ class SinglethreadExecutor:
                 sample = queue.get()
 
                 # Execute the batches
-                new_samples, result, certified_sample = process_sample(local, sample)
+                new_samples, result, certified_samples = process_sample(local, sample)
                 
-                if certified_sample:
+                for certified_sample in certified_samples:
                         # Sample was succesfully verified, no new samples to process
                         # Update certified domain size in a thread-safe manner
                         certified_domain_size += certified_sample.calculate_size()
