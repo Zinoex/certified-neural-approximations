@@ -5,12 +5,12 @@ import numpy as np
 
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 
-from translators import TorchTranslator, JuliaTranslator
+from translators import TorchTranslator, JuliaTranslator, NumpyTranslator
 from taylor_expansion import first_order_certified_taylor_expansion
 
 
 class Region:
-    def __init__(self, center: torch.Tensor, radius: torch.Tensor):
+    def __init__(self, center: np.array, radius: np.float32):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
@@ -23,7 +23,7 @@ class Region:
         """
         Calculate the size of the region (hypercube volume).
         """
-        return torch.prod(2 * self.radius).item()
+        return np.prod(2 * self.radius).item()
 
 
 def split_sample(data, delta, split_dim):
@@ -169,23 +169,21 @@ class MarabouTaylorStrategy(VerificationStrategy):
         options = Marabou.createOptions(verbosity=0)
 
         sample, delta = data  # Unpack the data tuple
-        translator = TorchTranslator()
+        translator = NumpyTranslator()
         dynamics_value = dynamics(sample, translator)
 
-        L_max = dynamics.max_gradient_norm(sample, delta)
-
-        # That we sum over delta comes from the Lagrange remainder term
-        # in the 1st order multivariate Taylor expansion.
-        # (Bound the higher order derivate + bound the norm in a closed region)
-        # https://en.wikipedia.org/wiki/Taylor%27s_theorem#Taylor's_theorem_for_multivariate_functions
+        # taylor_pol_lower = (a_lower, b_lower, r_lower), 
+        # taylor_pol_upper = (a_upper, b_upper, r_upper)
+        # where a = f(c), B = Df(c), R = remainder
         taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
             dynamics, sample, delta
         )
 
         # delta * L 
-        L_step = torch.matmul(L_max, delta)
+        L_max = np.abs(taylor_pol_upper[1])
+        L_step = np.matmul(L_max, delta)
 
-        if torch.any(L_step > epsilon):
+        if np.any(L_step > epsilon):
             # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
             split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
             sample_left, sample_right = split_sample(data, delta, split_dim)

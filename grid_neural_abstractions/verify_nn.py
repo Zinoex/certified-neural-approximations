@@ -1,6 +1,6 @@
 from functools import partial
 
-import torch
+import numpy as np
 from executors import (
     MultiprocessExecutor,
     MultithreadExecutor,
@@ -65,7 +65,7 @@ def aggregate(agg, x):
 def verify_nn(
     onnx_path, delta=0.01, epsilon=0.1, num_workers=16
 ):
-    strategy = MarabouLipschitzStrategy()
+    strategy = MarabouTaylorStrategy()
     dynamics_model = VanDerPolOscillator()
 
     input_dim = dynamics_model.input_dim
@@ -80,12 +80,12 @@ def verify_nn(
 
     X_train, _ = generate_data(input_dim, delta=delta, grid=True)
     samples = [
-        Region(X_train[i], torch.full_like(X_train[i], delta)) for i in range(num_samples)
+        Region(X_train[i], np.full_like(X_train[i], delta)) for i in range(num_samples)
     ]
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
-    executor = MultiprocessExecutor(num_workers)
+    executor = SinglethreadExecutor()
     cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list)
 
