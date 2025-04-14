@@ -29,7 +29,6 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
         order, expansion_point.to(torch.float64).numpy(), dom, input_dim
     )
-    # x = jl.seval("(z, c) -> z - c")(z, expansion_point.to(torch.float64).numpy())
 
     y = dynamics.compute_dynamics(x, translator)
 
@@ -50,9 +49,9 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     r_lower = jl.broadcast(jl.inf, r).to_numpy()
     r_upper = jl.broadcast(jl.sup, r).to_numpy()
 
-    return None
+    return (a_lower, b_lower, r_lower), (a_upper, b_upper, r_upper)
 
 
 def prepare_taylor_expansion(dynamics):
     n = dynamics.input_dim
-    jl.seval("n -> set_variables(Float64, \"z\", order=1, numvars=n)")(n)
+    jl.seval("n -> set_variables(Float64, \"x\", order=1, numvars=n)")(n)
