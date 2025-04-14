@@ -21,18 +21,18 @@ class SinglethreadExecutor:
                 sample = queue.get()
 
                 # Execute the batches
-                returned_samples, result = process_sample(local, sample)
+                new_samples, result, certified_sample = process_sample(local, sample)
                 
-                if len(returned_samples) == 1:
-                    # Sample was successfully verified, no new samples to process
-                    # Update certified domain size
-                    certified_domain_size += returned_samples[0].calculate_size()
-                else:
-                    agg = aggregate(agg, result)
+                if certified_sample:
+                        # Sample was succesfully verified, no new samples to process
+                        # Update certified domain size in a thread-safe manner
+                        certified_domain_size += certified_sample.calculate_size()
+                
+                agg = aggregate(agg, result)
 
-                    # Put the new samples back into the queue
-                    for new_sample in returned_samples:
-                        queue.put(new_sample)
+                # Put the new samples back into the queue
+                for new_sample in new_samples:
+                    queue.put(new_sample)
                 
                 pbar.update(1)
                 certified_percentage = (certified_domain_size / total_domain_size) * 100

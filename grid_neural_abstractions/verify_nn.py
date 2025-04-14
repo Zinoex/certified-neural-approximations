@@ -53,7 +53,9 @@ def process_sample(
         y_train: Training output data
 
     Returns:
-        List of counterexamples found
+        - split regions: List of regions to be processed further, if any
+        - counterexamples: List of counterexamples found
+        - the original sample: The original sample, if Marabou fails to find a counterexample
     """
     network = local.network
 
@@ -88,7 +90,7 @@ def process_sample(
         sample_right.center[split_dim] += split_radius
         sample_right.radius[split_dim] = split_radius
 
-        return [sample_left, sample_right], []
+        return [sample_left, sample_right], [], []
 
     # Set the input variables to the sampled point
     for i, inputVar in enumerate(inputVars):
@@ -125,7 +127,7 @@ def process_sample(
                 violation_found
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
-            return [], [cex]
+            return [], [cex], []
 
         # Reset the query
         network.additionalEquList.clear()
@@ -152,9 +154,9 @@ def process_sample(
                 violation_found
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
-            return [], [cex]
+            return [], [cex], []
 
-        return [data], []
+        return [], [], data  # No counterexample found, return the original sample
 
 
 # This function has to be in the global scope to be pickled for multiprocessing

@@ -50,19 +50,19 @@ class MultiprocessExecutor:
                 waiter = ExpandableAsCompleted(futures)
 
                 for future in waiter.as_completed():
-                    returned_samples, result = future.result()
+                    new_samples, result, certified_sample = future.result()
                     
-                    if len(returned_samples) == 1:
-                        # Sample was successfully verified, no new samples to process
-                        # Update certified domain size
-                        certified_domain_size += returned_samples[0].calculate_size()
-                    else:
-                        agg = aggregate(agg, result)
+                    if certified_sample:
+                        # Sample was succesfully verified, no new samples to process
+                        # Update certified domain size in a thread-safe manner
+                        certified_domain_size += certified_sample.calculate_size()
+                    
+                    agg = aggregate(agg, result)
 
-                        for new_sample in returned_samples:
-                            new_future = executor.submit(local.process_sample, new_sample)
-                            new_future.add_done_callback(lambda p: pbar.update())
-                            waiter.add(new_future)
+                    for new_sample in new_samples:
+                        new_future = executor.submit(local.process_sample, new_sample)
+                        new_future.add_done_callback(lambda p: pbar.update())
+                        waiter.add(new_future)
                 
                     certified_percentage = (certified_domain_size / total_domain_size) * 100
                     pbar.set_description_str(
