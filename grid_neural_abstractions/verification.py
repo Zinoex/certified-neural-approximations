@@ -197,7 +197,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             sample_right.center[split_dim] += split_radius
             sample_right.radius[split_dim] = split_radius
 
-            return [sample_left, sample_right], []
+            return [sample_left, sample_right], [], []
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -231,7 +231,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     violation_found
                 ), "The counterexample violates the bound, this is not a valid counterexample"
 
-                return [], [cex]
+                return [], [cex], []
 
             # Reset the equation for the other bound
             network.additionalEquList.clear()
@@ -258,9 +258,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     violation_found
                 ), "The counterexample violates the bound, this is not a valid counterexample"
 
-                return [], [cex]
+                return [], [cex], []
 
             # Reset the equation for the next iteration
             network.additionalEquList.clear()
 
-            return [], []
+            return [], [], [data]
