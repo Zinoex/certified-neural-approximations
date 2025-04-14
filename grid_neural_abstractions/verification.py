@@ -9,7 +9,6 @@ from translators import TorchTranslator, JuliaTranslator
 from taylor_expansion import first_order_certified_taylor_expansion
 
 
-
 class Region:
     def __init__(self, center: torch.Tensor, radius: torch.Tensor):
         self.center = center
@@ -19,6 +18,25 @@ class Region:
 
     def __iter__(self):
         return iter((self.center, self.radius))
+
+    def calculate_size(self):
+        """
+        Calculate the size of the region (hypercube volume).
+        """
+        return torch.prod(2 * self.radius).item()
+
+
+def split_sample(data, delta, split_dim):
+    split_radius = delta[split_dim] / 2
+
+    sample_left = deepcopy(data)
+    sample_left.center[split_dim] -= split_radius
+    sample_left.radius[split_dim] = split_radius
+
+    sample_right = deepcopy(data)
+    sample_right.center[split_dim] += split_radius
+    sample_right.radius[split_dim] = split_radius
+    return sample_left, sample_right
 
 
 class VerificationStrategy(ABC):
@@ -44,8 +62,7 @@ class MarabouLipschitzStrategy(VerificationStrategy):
         options = Marabou.createOptions(verbosity=0)
 
         sample, delta = data  # Unpack the data tuple
-        translator = TorchTranslator()
-        dynamics_value = dynamics(sample, translator)
+        dynamics_value = dynamics(sample).flatten()
 
         L_max = dynamics.max_gradient_norm(sample, delta)
         # That we sum over delta comes from the Lagrange remainder term
@@ -59,17 +76,8 @@ class MarabouLipschitzStrategy(VerificationStrategy):
         if torch.any(L_step > epsilon):
             # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
             split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
-            split_radius = delta[split_dim] / 2
-
-            sample_left = deepcopy(data)
-            sample_left.center[split_dim] -= split_radius
-            sample_left.radius[split_dim] = split_radius
-
-            sample_right = deepcopy(data)
-            sample_right.center[split_dim] += split_radius
-            sample_right.radius[split_dim] = split_radius
-
-            return [sample_left, sample_right], []
+            sample_left, sample_right = split_sample(data, delta, split_dim)
+            return [sample_left, sample_right], [], []
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -80,6 +88,9 @@ class MarabouLipschitzStrategy(VerificationStrategy):
         # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
         # Which means nn_output - f >= delta * L OR nn_output - f <= delta * L
         for j, outputVar in enumerate(outputVars):
+            # Reset the query
+            network.additionalEquList.clear()
+
             # nn_output >= delta * L + f
             equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
             equation_GE.addAddend(1, outputVar)
@@ -102,10 +113,18 @@ class MarabouLipschitzStrategy(VerificationStrategy):
                 assert (
                     violation_found
                 ), "The counterexample violates the bound, this is not a valid counterexample"
+                
+                network.additionalEquList.clear()
+                nn_cex = network.evaluateWithMarabou([cex])[0]
+                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                if np.all(np.abs(nn_cex - f_cex) < epsilon):
+                    split_dim = np.argmax(L_max[j, :] * delta)
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    return [sample_left, sample_right], [], []
 
-                return [], [cex]
+                return [], [cex], []
 
-            # Reset the equation for the other bound
+            # Reset the query
             network.additionalEquList.clear()
 
             # nn_output <= -delta * L + f
@@ -130,12 +149,17 @@ class MarabouLipschitzStrategy(VerificationStrategy):
                     violation_found
                 ), "The counterexample violates the bound, this is not a valid counterexample"
 
-                return [], [cex]
+                network.additionalEquList.clear()
+                nn_cex = network.evaluateWithMarabou([cex])[0]
+                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                if np.all(np.abs(nn_cex - f_cex) < epsilon):
+                    split_dim = np.argmax(L_max[j, :] * delta)
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    return [sample_left, sample_right], [], []
 
-            # Reset the equation for the next iteration
-            network.additionalEquList.clear()
+                return [], [cex], []
 
-            return [], []
+            return [], [], [data]  # No counterexample found, return the original sample
 
 
 class MarabouTaylorStrategy(VerificationStrategy):
