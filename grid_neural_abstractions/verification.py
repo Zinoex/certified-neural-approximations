@@ -1,12 +1,14 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from juliacall import Main as jl
+
+from translators import TorchTranslator, JuliaTranslator
 import torch
 import numpy as np
 
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 
-from translators import TorchTranslator, JuliaTranslator
-from taylor_expansion import first_order_certified_taylor_expansion
+from taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
 
 
 class Region:
@@ -163,6 +165,15 @@ class MarabouLipschitzStrategy(VerificationStrategy):
 
 
 class MarabouTaylorStrategy(VerificationStrategy):
+    def __init__(self, dynamics):
+        # prepare_taylor_expansion(dynamics.input_dim)
+        # Precompile to allow multithreading
+        # TODO: Pick a better point/region for the expansion
+        first_order_certified_taylor_expansion(
+            dynamics, torch.zeros(dynamics.input_dim), torch.full((dynamics.input_dim,), 0.01)
+        )
+        getattr(jl, 'yield')()
+
     def verify(self, network, dynamics, data, epsilon, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()

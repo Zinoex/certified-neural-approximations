@@ -11,7 +11,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats [n]
         """
-        return jl.seval("(*)")(a, b)
+        return jl.seval("(*)")._jl_call_nogil(a, b)
 
     def sin(self, a):
         """
@@ -21,7 +21,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return jl.sin(a)
+        return jl.sin._jl_call_nogil(a)
 
     def cos(self, a):
         """
@@ -31,7 +31,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return jl.cos(a)
+        return jl.cos._jl_call_nogil(a)
 
     def tan(self, a):
         """
@@ -41,7 +41,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return jl.tan(a)
+        return jl.tan._jl_call_nogil(a)
 
     def exp(self, a):
         """
@@ -51,7 +51,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return jl.exp(a)
+        return jl.exp._jl_call_nogil(a)
 
     def log(self, a):
         """
@@ -61,7 +61,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return jl.log(a)
+        return jl.log._jl_call_nogil(a)
 
     def sqrt(self, a):
         """
@@ -71,7 +71,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return jl.sqrt(a)
+        return jl.sqrt._jl_call_nogil(a)
 
     def pow(self, a, b):
         """
@@ -82,7 +82,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return jl.seval("(^)")(a, b)
+        return jl.seval("(^)")._jl_call_nogil(a, b)
 
     def min(self, a):
         """
@@ -92,7 +92,7 @@ class JuliaTranslator:
 
         :return: float
         """
-        return jl.minimum(a)
+        return jl.minimum._jl_call_nogil(a)
 
     def max(self, a):
         """
@@ -102,7 +102,7 @@ class JuliaTranslator:
 
         :return: float
         """
-        return jl.maximum(a)
+        return jl.maximum._jl_call_nogil(a)
 
     def stack(self, a):
         """
@@ -112,7 +112,7 @@ class JuliaTranslator:
 
         :return: np.ndarray
         """
-        return jl.reduce(jl.vcat, a)
+        return jl.reduce._jl_call_nogil(jl.vcat, a)
 
     def hstack(self, a):
         """
@@ -122,4 +122,4 @@ class JuliaTranslator:
 
         :return: np.ndarray
         """
-        return jl.reduce(jl.hcat, a)
+        return jl.reduce._jl_call_nogil(jl.hcat, a)

@@ -1,5 +1,8 @@
 from functools import partial
 
+import numpy as np
+from verification import Region, MarabouLipschitzStrategy, MarabouTaylorStrategy
+
 import torch
 from executors import (
     MultiprocessExecutor,
@@ -9,8 +12,6 @@ from executors import (
 from maraboupy import Marabou
 from train_nn import generate_data
 from dynamics import VanDerPolOscillator, Quadcopter
-
-from verification import Region, MarabouLipschitzStrategy, MarabouTaylorStrategy
 
 
 
@@ -65,10 +66,11 @@ def aggregate(agg, x):
 def verify_nn(
     onnx_path, delta=0.01, epsilon=0.1, num_workers=16
 ):
-    strategy = MarabouLipschitzStrategy()
     dynamics_model = VanDerPolOscillator()
 
     input_dim = dynamics_model.input_dim
+    strategy = MarabouTaylorStrategy(dynamics_model)
+    # strategy = MarabouLipschitzStrategy()
 
     # Compute the number of samples for a fixed grid
     range_min, range_max = -1.0, 1.0  # Match the range in generate_data
