@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
+from queue import LifoQueue
 
 from tqdm import tqdm  # Added tqdm for progress tracking
 
@@ -159,7 +160,7 @@ class MultithreadExecutor:
     during the execution of the C++ code, thus not prohibiting the performance benefits of threading.
     """
 
-    def __init__(self, num_workers=None):
+    def __init__(self, num_workers=12):
         # If num_workers is not provided, use the default of ThreadPoolExecutor min(32, os.cpu_count() + 4)
         self.num_workers = num_workers
 
@@ -170,7 +171,13 @@ class MultithreadExecutor:
         local = threading.local()
         agg = None
 
+        # Calculate the total domain size
+        total_domain_size = sum(sample.calculate_size() for sample in samples)
+        certified_domain_size = 0
+
         with ThreadPoolExecutor(max_workers=self.num_workers, initializer=initializer, initargs=(local,)) as executor:
+            executor._work_queue = LifoQueue()
+
             with tqdm(desc="Overall Progress", smoothing=0.1) as pbar:
                 futures = []
                 for sample in samples:
@@ -181,13 +188,23 @@ class MultithreadExecutor:
                 waiter = ExpandableAsCompleted(futures)
 
                 for future in waiter.as_completed():
-                    new_samples, result = future.result()
-                    pbar.set_description_str(f"Overall Progress (remaining samples: {len(waiter)})")
+                    new_samples, result, certified_samples = future.result()
+                    
+                    for certified_sample in certified_samples:
+                        # Sample was succesfully verified, no new samples to process
+                        # Update certified domain size in a thread-safe manner
+                        certified_domain_size += certified_sample.calculate_size()
+                       
                     agg = aggregate(agg, result)
-
+                    # Put the new samples into the queue
                     for new_sample in new_samples:
                         new_future = executor.submit(process_sample, local, new_sample)
                         new_future.add_done_callback(lambda p: pbar.update())
                         waiter.add(new_future)
-
+                    
+                    certified_percentage = (certified_domain_size / total_domain_size) * 100
+                    pbar.set_description_str(
+                        f"Overall Progress (remaining samples: {len(waiter)}, certified: {certified_percentage:.2f}%)"
+                    )
+                    
         return agg

@@ -13,6 +13,7 @@ from dynamics import VanDerPolOscillator, Quadcopter
 from verification import Region, MarabouLipschitzStrategy, MarabouTaylorStrategy
 
 
+
 def process_sample(
     strategy,
     dynamics_model,
@@ -35,7 +36,9 @@ def process_sample(
         y_train: Training output data
 
     Returns:
-        List of counterexamples found
+        - split regions: List of regions to be processed further, if any
+        - counterexamples: List of counterexamples found
+        - the original sample: The original sample, if Marabou fails to find a counterexample
     """
     network = local.network
     return strategy.verify(
@@ -60,7 +63,7 @@ def aggregate(agg, x):
 
 
 def verify_nn(
-    onnx_path, delta=0.01, epsilon=0.1, num_workers=4
+    onnx_path, delta=0.01, epsilon=0.1, num_workers=16
 ):
     strategy = MarabouLipschitzStrategy()
     dynamics_model = VanDerPolOscillator()
@@ -82,7 +85,7 @@ def verify_nn(
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
-    executor = SinglethreadExecutor()
+    executor = MultiprocessExecutor(num_workers)
     cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list)
 
