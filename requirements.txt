@@ -1,5 +1,6 @@
 # Infrastructure
 tqdm
+juliacall
 
 # Functionality
 numpy
