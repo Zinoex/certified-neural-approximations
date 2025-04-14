@@ -24,6 +24,12 @@ class Region:
     def __iter__(self):
         return iter((self.center, self.radius))
 
+    def calculate_size(self):
+        """
+        Calculate the size of the region (hypercube volume).
+        """
+        return torch.prod(2 * self.radius).item()
+
 
 def process_sample(
     dynamics_model,
@@ -47,7 +53,9 @@ def process_sample(
         y_train: Training output data
 
     Returns:
-        List of counterexamples found
+        - split regions: List of regions to be processed further, if any
+        - counterexamples: List of counterexamples found
+        - the original sample: The original sample, if Marabou fails to find a counterexample
     """
     network = local.network
 
@@ -73,7 +81,7 @@ def process_sample(
         # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
         split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
         sample_left, sample_right = split_sample(data, delta, split_dim)
-        return [sample_left, sample_right], []
+        return [sample_left, sample_right], [], []
 
     # Set the input variables to the sampled point
     for i, inputVar in enumerate(inputVars):
@@ -109,16 +117,17 @@ def process_sample(
             assert (
                 violation_found
             ), "The counterexample violates the bound, this is not a valid counterexample"
-
+            
             network.additionalEquList.clear()
             nn_cex = network.evaluateWithMarabou([cex])[0]
             f_cex = dynamics_model(torch.tensor(cex)).flatten().numpy()
             if np.all(np.abs(nn_cex - f_cex) < epsilon):
                 split_dim = np.argmax(L_max[j, :] * delta)
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                return [sample_left, sample_right], []
+                return [sample_left, sample_right], [], []
 
-            return [], [cex]
+            return [], [cex], []
+
 
         # Reset the query
         network.additionalEquList.clear()
@@ -151,11 +160,11 @@ def process_sample(
             if np.all(np.abs(nn_cex - f_cex) < epsilon):
                 split_dim = np.argmax(L_max[j, :] * delta)
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                return [sample_left, sample_right], []
+                return [sample_left, sample_right], [], []
 
-            return [], [cex]
+            return [], [cex], []
 
-        return [], []
+        return [], [], [data]  # No counterexample found, return the original sample
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2
