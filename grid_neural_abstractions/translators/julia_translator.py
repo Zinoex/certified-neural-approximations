@@ -123,3 +123,13 @@ class JuliaTranslator:
         :return: np.ndarray
         """
         return jl.reduce(jl.hcat, a)
+
+    def abs(self, a):
+        """
+        Element-wise absolute value
+
+        :param a: np.ndarray of floats
+
+        :return: np.ndarray of floats
+        """
+        return jl.abs(a)
