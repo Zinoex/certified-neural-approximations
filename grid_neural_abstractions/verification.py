@@ -10,7 +10,7 @@ from taylor_expansion import first_order_certified_taylor_expansion
 
 
 class Region:
-    def __init__(self, center: np.array, radius: np.float32):
+    def __init__(self, center: np.array, radius: np.array):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
