@@ -1,9 +1,9 @@
 import abc
-import torch
+import numpy as np
 
 
 class Region:
-    def __init__(self, center: torch.Tensor, radius: torch.Tensor):
+    def __init__(self, center: np.array, radius: np.array):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
@@ -16,7 +16,7 @@ class Region:
         """
         Calculate the size of the region (hypercube volume).
         """
-        return torch.prod(2 * self.radius).item()
+        return np.prod(2 * self.radius).item()
     
 
 class SampleResult(abc.ABC):
