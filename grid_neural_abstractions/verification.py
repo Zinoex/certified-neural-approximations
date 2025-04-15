@@ -223,6 +223,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             # x df_c - nn_output >= -epsilon - c df_c + f(c) + r_max
             equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)            
             for i, inputVar in enumerate(inputVars):
+                # j is the output dimension, i is the input dimension, thus df_c[j,i] is the partial derivative of the j-th output with respect to the i-th input
                 equation_LE.addAddend(df_c[j,i].item(), inputVar)
             equation_LE.addAddend(-1, outputVar)
             equation_LE.setScalar((-epsilon - np.matmul(sample, df_c[j]) + f_c[j] + r_max).item())
