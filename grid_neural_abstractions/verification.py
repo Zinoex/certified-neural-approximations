@@ -169,23 +169,24 @@ class MarabouTaylorStrategy(VerificationStrategy):
         options = Marabou.createOptions(verbosity=0)
 
         sample, delta = data  # Unpack the data tuple
-        translator = NumpyTranslator()
-        dynamics_value = dynamics(sample, translator)
 
-        # taylor_pol_lower = (a_lower, b_lower, r_lower), 
-        # taylor_pol_upper = (a_upper, b_upper, r_upper)
-        # where a = f(c), B = Df(c), R = remainder
         taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
             dynamics, sample, delta
         )
 
-        # delta * L 
-        L_max = np.abs(taylor_pol_upper[1])
-        L_step = np.matmul(L_max, delta)
+        # Unpack the Taylor expansion components
+        # taylor_pol_lower <-- (f(c), Df(c), R_min)
+        # taylor_pol_upper <-- (f(c), Df(c), R_max)
+        f_c = taylor_pol_upper[0]  # f(c) - function value at center
+        df_c = taylor_pol_upper[1]  # Df(c) - gradient at center
+        r_min = np.min(taylor_pol_lower[2])  # Minimum remainder term
+        r_max = np.max(taylor_pol_upper[2])  # Maximum remainder term
 
-        if np.any(L_step > epsilon):
-            # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
-            split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
+        # Check if we need to split based on remainder bounds
+        max_step = np.matmul(np.abs(df_c), delta)
+        if np.any(max_step > epsilon):
+            # Find the dimension that contributes most to the remainder
+            split_dim = np.argmax(np.abs(df_c)[np.argmax(max_step), :] * delta)
             sample_left, sample_right = split_sample(data, delta, split_dim)
             return [sample_left, sample_right], [], []
 
@@ -194,17 +195,16 @@ class MarabouTaylorStrategy(VerificationStrategy):
             network.setLowerBound(inputVar, sample[i] - delta[i])
             network.setUpperBound(inputVar, sample[i] + delta[i])
 
-        # We need to verify that for all x: |nn_output - f| < delta * L
-        # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
-        # Which means nn_output - f >= delta * L OR nn_output - f <= delta * L
         for j, outputVar in enumerate(outputVars):
             # Reset the query
             network.additionalEquList.clear()
 
-            # nn_output >= delta * L + f
+            # x df_c - nn_output >= epsilon + c df_c - f(c) - r_max
             equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
-            equation_GE.addAddend(1, outputVar)
-            equation_GE.setScalar(dynamics_value[j] + L_step[j].item())
+            for i, inputVar in enumerate(inputVars):
+                equation_GE.addAddend(df_c[j][i].item(), inputVar)
+            equation_GE.addAddend(-1, outputVar)
+            equation_GE.setScalar((epsilon + np.matmul(sample, df_c[j]) - f_c[j] - r_max).item())
             network.addEquation(equation_GE, isProperty=True)
 
             # Find a counterexample for lower bound
@@ -217,7 +217,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     assert cex[i] - precision <= sample[i].item() + delta[i]
 
                 violation_found = (
-                    vals[outputVar] + precision >= dynamics_value[j] + L_step[j].item()
+                    np.matmul(cex, df_c[j]) - vals[outputVar] + precision >= epsilon + np.matmul(sample, df_c[j]) - f_c[j] - r_max
                 )
 
                 assert (
@@ -228,7 +228,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 nn_cex = network.evaluateWithMarabou([cex])[0]
                 f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                    split_dim = np.argmax(L_max[j, :] * delta)
+                    split_dim = np.argmax(np.abs(df_c)[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
                     return [sample_left, sample_right], [], []
 
@@ -237,10 +237,12 @@ class MarabouTaylorStrategy(VerificationStrategy):
             # Reset the query
             network.additionalEquList.clear()
 
-            # nn_output <= -delta * L + f
-            equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
-            equation_LE.addAddend(1, outputVar)
-            equation_LE.setScalar(dynamics_value[j] - L_step[j].item())
+            # x df_c - nn_output >= -epsilon - c df_c + f(c) + r_max
+            equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)            
+            for i, inputVar in enumerate(inputVars):
+                equation_LE.addAddend(df_c[j][i].item(), inputVar)
+            equation_LE.addAddend(-1, outputVar)
+            equation_LE.setScalar((-epsilon - np.matmul(sample, df_c[j]) + f_c[j] + r_max).item())
             network.addEquation(equation_LE, isProperty=True)
 
             # Find a counterexample for lower bound
@@ -252,8 +254,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     assert cex[i] + precision >= sample[i].item() - delta[i]
                     assert cex[i] - precision <= sample[i].item() + delta[i]
                 violation_found = (
-                    vals[outputVar] - precision
-                    <= dynamics_value[j] - L_step[j].item()
+                    np.matmul(cex, df_c[j]) - vals[outputVar] + precision <= -epsilon - np.matmul(sample, df_c[j]) + f_c[j] + r_max
                 )
                 assert (
                     violation_found
@@ -263,7 +264,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 nn_cex = network.evaluateWithMarabou([cex])[0]
                 f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                    split_dim = np.argmax(L_max[j, :] * delta)
+                    split_dim = np.argmax(np.abs(df_c)[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
                     return [sample_left, sample_right], [], []
 
