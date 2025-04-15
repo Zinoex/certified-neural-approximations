@@ -10,8 +10,8 @@ from maraboupy import Marabou
 from train_nn import generate_data
 from dynamics import VanDerPolOscillator, Quadcopter
 
-from verification import Region, MarabouLipschitzStrategy, MarabouTaylorStrategy
-
+from verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
+from certification_results import Region
 
 
 def process_sample(
@@ -56,10 +56,14 @@ def read_onnx_into_local(onnx_path, local):
     local.network = network
 
 
-def aggregate(agg, x):
+def aggregate(agg, result):
+    if not result.isunsat():
+        return agg
+
     if agg is None:
-        return x
-    return agg + x
+        return result.counterexamples()
+    
+    return agg + result.counterexamples()
 
 
 def verify_nn(
@@ -86,6 +90,7 @@ def verify_nn(
     initializer = partial(read_onnx_into_local, onnx_path)
 
     executor = SinglethreadExecutor()
+
     cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list)
 
