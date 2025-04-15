@@ -120,12 +120,12 @@ class Quadcopter:
 
     def compute_dynamics(self, x, translator):
         # Ensure x has the correct shape for computation
-        if x.dim() == 1:
-            x = x.unsqueeze(1)  # Convert 1D tensor to 2D column vector
-        elif x.size(0) != self.input_dim:
-            raise ValueError(
-                f"Input tensor x has incompatible dimensions: {x.size()}, expected first dimension {self.input_dim}"
-            )
+        # if x.dim() == 1:
+        #     x = x.unsqueeze(1)  # Convert 1D tensor to 2D column vector
+        # elif x.size(0) != self.input_dim:
+        #     raise ValueError(
+        #         f"Input tensor x has incompatible dimensions: {x.size()}, expected first dimension {self.input_dim}"
+        #     )
 
         # Extract state variables
         # Orientation: roll, pitch, yaw
@@ -158,7 +158,7 @@ class Quadcopter:
         ) / self.mass - self.gravity
 
         # Combine all derivatives
-        derivatives = translator.stack([dvx, dvy, dvz], dim=0)
+        derivatives = translator.stack((dvx, dvy, dvz))
 
         return derivatives
 

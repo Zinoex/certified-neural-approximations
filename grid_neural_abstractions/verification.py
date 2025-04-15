@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-import torch
 import numpy as np
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 
-from taylor_expansion import first_order_certified_taylor_expansion
+from taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
 from certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, Region
 
+import torch
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2
@@ -146,6 +146,9 @@ class MarabouLipschitzStrategy(VerificationStrategy):
 
 
 class MarabouTaylorStrategy(VerificationStrategy):
+    def __init__(self, dynamics):
+        prepare_taylor_expansion(dynamics.input_dim)
+
     def verify(self, network, dynamics, data, epsilon, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
@@ -189,7 +192,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             for i, inputVar in enumerate(inputVars):
                 equation_GE.addAddend(df_c_lower[j,i].item(), inputVar)
             equation_GE.addAddend(-1, outputVar)
-            equation_GE.setScalar((epsilon + np.matmul(sample, df_c_lower[j]) - f_c_lower[j] - r_lower[j]).item())
+            equation_GE.setScalar((epsilon + np.dot(sample, df_c_lower[j]) - f_c_lower[j] - r_lower[j]).item())
             network.addEquation(equation_GE, isProperty=True)
 
             # Find a counterexample for lower bound
@@ -202,7 +205,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     assert cex[i] - precision <= sample[i].item() + delta[i]
 
                 violation_found = (
-                    np.matmul(cex, df_c_lower[j]) - vals[outputVar] + precision >= epsilon + np.matmul(sample, df_c_lower[j]) - f_c_lower[j] - r_lower[j]
+                    np.dot(cex, df_c_lower[j]) - vals[outputVar] + precision >= epsilon + np.dot(sample, df_c_lower[j]) - f_c_lower[j] - r_lower[j]
                 )
 
                 assert (
@@ -228,7 +231,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 # j is the output dimension, i is the input dimension, thus df_c[j,i] is the partial derivative of the j-th output with respect to the i-th input
                 equation_LE.addAddend(df_c_upper[j,i].item(), inputVar)
             equation_LE.addAddend(-1, outputVar)
-            equation_LE.setScalar((-epsilon - np.matmul(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]).item())
+            equation_LE.setScalar((-epsilon - np.dot(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]).item())
             network.addEquation(equation_LE, isProperty=True)
 
             # Find a counterexample for lower bound
@@ -240,7 +243,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     assert cex[i] + precision >= sample[i].item() - delta[i]
                     assert cex[i] - precision <= sample[i].item() + delta[i]
                 violation_found = (
-                    np.matmul(cex, df_c_upper[j]) - vals[outputVar] + precision <= -epsilon - np.matmul(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]
+                    np.dot(cex, df_c_upper[j]) - vals[outputVar] + precision <= -epsilon - np.dot(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]
                 )
                 assert (
                     violation_found
