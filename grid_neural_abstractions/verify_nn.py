@@ -7,7 +7,7 @@ from .executors import (
     SinglethreadExecutor,
 )
 from maraboupy import Marabou
-from .dynamics import VanDerPolOscillator, Quadcopter
+from .dynamics import VanDerPolOscillator
 
 from .verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
 from .certification_results import Region
@@ -72,10 +72,8 @@ def aggregate(agg, result):
 
 
 def verify_nn(
-    onnx_path, delta=0.01, epsilon=0.1, num_workers=1, dynamics_model=None
+    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=1
 ):
-    if dynamics_model is None:
-        dynamics_model = Quadcopter()
     
     strategy = MarabouTaylorStrategy(dynamics_model)
 
@@ -114,5 +112,6 @@ def verify_nn(
 if __name__ == "__main__":
     verify_nn(
         "data/simple_nn.onnx",
+        VanDerPolOscillator(),
         delta=0.1
     )
