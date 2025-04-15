@@ -1,4 +1,3 @@
-import torch
 from translators import TorchTranslator
 
 
@@ -113,10 +112,13 @@ class Quadcopter:
         self.input_dim = 3  # 12D state: position (3), velocity (3), angles (3), angular rates (3)
         self.output_dim = 3  # 12D derivatives
 
-    def __call__(self, x):
-        return self.compute_dynamics(x)
+    def __call__(self, x, translator=None):
+        if translator is None:
+            translator = TorchTranslator()
 
-    def compute_dynamics(self, x):
+        return self.compute_dynamics(x, translator)
+
+    def compute_dynamics(self, x, translator):
         # Ensure x has the correct shape for computation
         if x.dim() == 1:
             x = x.unsqueeze(1)  # Convert 1D tensor to 2D column vector
@@ -137,26 +139,26 @@ class Quadcopter:
         # Simplified model assuming small angles and considering yaw
         dvx = (
             (
-                torch.sin(pitch) * torch.cos(yaw)
-                + torch.sin(roll) * torch.cos(pitch) * torch.sin(yaw)
+                translator.sin(pitch) * translator.cos(yaw)
+                + translator.sin(roll) * translator.cos(pitch) * translator.sin(yaw)
             )
             * thrust
             / self.mass
         )
         dvy = (
             (
-                torch.sin(pitch) * torch.sin(yaw)
-                - torch.sin(roll) * torch.cos(pitch) * torch.cos(yaw)
+                translator.sin(pitch) * translator.sin(yaw)
+                - translator.sin(roll) * translator.cos(pitch) * translator.cos(yaw)
             )
             * thrust
             / self.mass
         )
         dvz = (
-            torch.cos(roll) * torch.cos(pitch) * thrust
+            translator.cos(roll) * translator.cos(pitch) * thrust
         ) / self.mass - self.gravity
 
         # Combine all derivatives
-        derivatives = torch.stack([dvx, dvy, dvz], dim=0)
+        derivatives = translator.stack([dvx, dvy, dvz], dim=0)
 
         return derivatives
 
