@@ -2,7 +2,7 @@ import numpy as np  # Add numpy for grid generation
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from dynamics import VanDerPolOscillator, Quadcopter
+from .dynamics import VanDerPolOscillator, Quadcopter
 
 
 # Define the neural network

@@ -1,18 +1,18 @@
 from functools import partial
 
 import numpy as np
-from executors import (
+from .executors import (
     MultiprocessExecutor,
     MultithreadExecutor,
     SinglethreadExecutor,
 )
 from maraboupy import Marabou
-from dynamics import VanDerPolOscillator, Quadcopter
+from .dynamics import VanDerPolOscillator, Quadcopter
 
-from verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
-from certification_results import Region
+from .verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
+from .certification_results import Region
 
-from train_nn import generate_data
+from .train_nn import generate_data
 
 def process_sample(
     strategy,

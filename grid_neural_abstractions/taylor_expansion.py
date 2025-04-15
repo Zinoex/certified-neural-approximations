@@ -2,8 +2,8 @@ from juliacall import Main as jl
 jl.seval("using TaylorModels")
 
 import torch
-
-from translators import JuliaTranslator
+import numpy as np
+from .translators import JuliaTranslator
 
 
 def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):

@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import numpy as np
+import torch
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 
-from taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
-from certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, Region
-
-import torch
+from .taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
+from .certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, Region
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2
