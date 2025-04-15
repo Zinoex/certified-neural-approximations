@@ -22,12 +22,15 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
 
     order = 1
 
+    if type(expansion_point) is not np.ndarray:
+        expansion_point = expansion_point.to(torch.float64).numpy()
+    
     low, high = expansion_point - delta, expansion_point + delta
-    dom = jl.IntervalBox(low.to(torch.float64).numpy(), high.to(torch.float64).numpy())
+    dom = jl.IntervalBox(low, high)
 
     input_dim = dynamics.input_dim
     x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
-        order, expansion_point.to(torch.float64).numpy(), dom, input_dim
+        order, expansion_point, dom, input_dim
     )
 
     y = dynamics.compute_dynamics(x, translator)

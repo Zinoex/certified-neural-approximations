@@ -54,9 +54,9 @@ class MarabouLipschitzStrategy(VerificationStrategy):
         # https://en.wikipedia.org/wiki/Taylor%27s_theorem#Taylor's_theorem_for_multivariate_functions
 
         # delta * L 
-        L_step = torch.matmul(L_max, delta)
+        L_step = np.matmul(L_max, delta)
 
-        if torch.any(L_step > epsilon):
+        if np.any(L_step > epsilon):
             # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
             split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
             sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -100,7 +100,7 @@ class MarabouLipschitzStrategy(VerificationStrategy):
                 
                 network.additionalEquList.clear()
                 nn_cex = network.evaluateWithMarabou([cex])[0]
-                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
                     split_dim = np.argmax(L_max[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -135,7 +135,7 @@ class MarabouLipschitzStrategy(VerificationStrategy):
 
                 network.additionalEquList.clear()
                 nn_cex = network.evaluateWithMarabou([cex])[0]
-                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
                     split_dim = np.argmax(L_max[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -215,7 +215,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
                 network.additionalEquList.clear()
                 nn_cex = network.evaluateWithMarabou([cex])[0]
-                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
                     split_dim = np.argmax(np.abs(df_c_lower)[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -252,7 +252,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
                 network.additionalEquList.clear()
                 nn_cex = network.evaluateWithMarabou([cex])[0]
-                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
                     split_dim = np.argmax(np.abs(df_c_upper)[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)

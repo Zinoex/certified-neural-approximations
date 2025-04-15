@@ -72,9 +72,11 @@ def aggregate(agg, result):
 
 
 def verify_nn(
-    onnx_path, delta=0.01, epsilon=0.1, num_workers=16
+    onnx_path, delta=0.01, epsilon=0.1, num_workers=1, dynamics_model=None
 ):
-    dynamics_model = Quadcopter()
+    if dynamics_model is None:
+        dynamics_model = Quadcopter()
+    
     strategy = MarabouTaylorStrategy(dynamics_model)
 
     input_dim = dynamics_model.input_dim
@@ -90,14 +92,17 @@ def verify_nn(
 
     partial_process_sample = partial(process_sample, strategy, dynamics_model, epsilon)
 
-    X_train, _ = generate_data(input_dim, delta=delta, grid=True)
+    X_train, _ = generate_data(input_dim, delta=delta, grid=True, device="cpu")
     samples = [
-        Region(X_train[i], np.full_like(X_train[i], delta)) for i in range(num_samples)
+        Region(X_train[i].numpy(), np.full_like(X_train[i], delta)) for i in range(num_samples)
     ]
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
-    executor = SinglethreadExecutor()
+    if num_workers == 1:
+        executor = SinglethreadExecutor()
+    elif num_workers > 1:
+        executor = MultiprocessExecutor(num_workers)
 
     cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list) if cex_list else 0
