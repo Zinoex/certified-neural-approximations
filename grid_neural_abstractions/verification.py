@@ -30,7 +30,9 @@ class VerificationStrategy(ABC):
         :param network: The neural network to be verified.
         :param dynamics: The dynamics of the system.
         :param data: The region of interest (center and radius).
-        :return: A tuple containing two lists of new regions to verify and counterexamples respectively.
+        :param epsilon: The tolerance for verification.
+        :param precision: The precision for numerical checks.
+        :return: A result object indicating the verification outcome.
         """
         raise NotImplementedError(
             "This method should be overridden by subclasses."

@@ -23,22 +23,18 @@ def process_sample(
     precision=1e-6
 ):
     """
-    Process a batch of input points to check for counterexamples.
+    Process a sample to check for counterexamples.
 
     Args:
-        network: The Marabou network to verify
-        batch: List of (sample_number, sample) tuples to process
-        batch_id: ID of the current batch
-        worker_progress_counters: List to track progress across workers
-        worker_locks: List of locks for each worker
-        delta: The delta parameter for verification
-        L: The Lipschitz constant
-        y_train: Training output data
+        strategy: The verification strategy to use.
+        dynamics_model: The dynamics model being verified.
+        epsilon: The perturbation bound for verification.
+        local: Local instance for the network.
+        data: The input data sample.
+        precision: The precision for verification.
 
     Returns:
-        - split regions: List of regions to be processed further, if any
-        - counterexamples: List of counterexamples found
-        - the original sample: The original sample, if Marabou fails to find a counterexample
+        The result of the verification process.
     """
     network = local.network
     return strategy.verify(
