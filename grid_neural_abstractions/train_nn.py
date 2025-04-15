@@ -71,7 +71,7 @@ def generate_data(input_size, delta=0.01, grid=False, batch_size=256, dynamics_m
 
 # Train the neural network
 def train_nn():
-    dynamics_model = VanDerPolOscillator()
+    dynamics_model = Quadcopter()
     input_size = dynamics_model.input_dim
     hidden_sizes = [128, 128, 128]  # Adjust hidden layer sizes
     output_size = dynamics_model.output_dim  # Update output size to match target size

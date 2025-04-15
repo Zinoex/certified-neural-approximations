@@ -7,12 +7,12 @@ from executors import (
     SinglethreadExecutor,
 )
 from maraboupy import Marabou
-from train_nn import generate_data
 from dynamics import VanDerPolOscillator, Quadcopter
 
 from verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
 from certification_results import Region
 
+from train_nn import generate_data
 
 def process_sample(
     strategy,
@@ -23,22 +23,18 @@ def process_sample(
     precision=1e-6
 ):
     """
-    Process a batch of input points to check for counterexamples.
+    Process a sample to check for counterexamples.
 
     Args:
-        network: The Marabou network to verify
-        batch: List of (sample_number, sample) tuples to process
-        batch_id: ID of the current batch
-        worker_progress_counters: List to track progress across workers
-        worker_locks: List of locks for each worker
-        delta: The delta parameter for verification
-        L: The Lipschitz constant
-        y_train: Training output data
+        strategy: The verification strategy to use.
+        dynamics_model: The dynamics model being verified.
+        epsilon: The perturbation bound for verification.
+        local: Local instance for the network.
+        data: The input data sample.
+        precision: The precision for verification.
 
     Returns:
-        - split regions: List of regions to be processed further, if any
-        - counterexamples: List of counterexamples found
-        - the original sample: The original sample, if Marabou fails to find a counterexample
+        The result of the verification process.
     """
     network = local.network
     return strategy.verify(
@@ -56,6 +52,15 @@ def read_onnx_into_local(onnx_path, local):
     local.network = network
 
 
+def onnx_input_shape(onnx_path):
+    """
+    Get the input shape of the ONNX model.
+    """
+    network = Marabou.read_onnx(onnx_path)
+    inputVars = network.inputVars
+    return inputVars[0].shape[1:]
+
+
 def aggregate(agg, result):
     if not result.isunsat():
         return agg
@@ -69,10 +74,13 @@ def aggregate(agg, result):
 def verify_nn(
     onnx_path, delta=0.01, epsilon=0.1, num_workers=16
 ):
-    strategy = MarabouTaylorStrategy()
-    dynamics_model = VanDerPolOscillator()
+    dynamics_model = Quadcopter()
+    strategy = MarabouTaylorStrategy(dynamics_model)
 
     input_dim = dynamics_model.input_dim
+    onnx_input_dim = onnx_input_shape(onnx_path)
+    assert len(onnx_input_dim) == 1, f"Only 1D input dims are supported, was {len(onnx_input_dim)}"
+    assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
 
     # Compute the number of samples for a fixed grid
     range_min, range_max = -1.0, 1.0  # Match the range in generate_data

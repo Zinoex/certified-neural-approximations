@@ -52,6 +52,5 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     return (a_lower, b_lower, r_lower), (a_upper, b_upper, r_upper)
 
 
-def prepare_taylor_expansion(dynamics):
-    n = dynamics.input_dim
-    jl.seval("n -> set_variables(Float64, \"x\", order=1, numvars=n)")(n)
+def prepare_taylor_expansion(n):
+    jl.seval("n -> set_variables(Float64, \"x\", order=2, numvars=n)")(n)
