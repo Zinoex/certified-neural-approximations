@@ -172,7 +172,7 @@ class MultithreadExecutor:
         agg = None
 
         # Calculate the total domain size
-        total_domain_size = sum(sample.calculate_size() for sample in samples)
+        total_domain_size = sum(sample.lebesguemeasure() for sample in samples)
         certified_domain_size = 0
 
         with ThreadPoolExecutor(max_workers=self.num_workers, initializer=initializer, initargs=(local,)) as executor:
@@ -188,19 +188,24 @@ class MultithreadExecutor:
                 waiter = ExpandableAsCompleted(futures)
 
                 for future in waiter.as_completed():
-                    new_samples, result, certified_samples = future.result()
-                    
-                    for certified_sample in certified_samples:
+                    result = future.result()
+
+                    if result.issat():
                         # Sample was succesfully verified, no new samples to process
                         # Update certified domain size in a thread-safe manner
-                        certified_domain_size += certified_sample.calculate_size()
-                       
+                        certified_domain_size += result.lebesguemeasure()
+                                          
                     agg = aggregate(agg, result)
-                    # Put the new samples into the queue
-                    for new_sample in new_samples:
-                        new_future = executor.submit(process_sample, local, new_sample)
-                        new_future.add_done_callback(lambda p: pbar.update())
-                        waiter.add(new_future)
+                    
+                    if result.hasnewsamples():
+                        # Get the new samples
+                        new_samples = result.newsamples()
+
+                        # Put the new samples into the queue
+                        for new_sample in new_samples:
+                            new_future = executor.submit(process_sample, local, new_sample)
+                            new_future.add_done_callback(lambda p: pbar.update())
+                            waiter.add(new_future)
                     
                     certified_percentage = (certified_domain_size / total_domain_size) * 100
                     pbar.set_description_str(

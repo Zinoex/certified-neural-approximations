@@ -8,22 +8,7 @@ from maraboupy import Marabou, MarabouCore, MarabouUtils
 from translators import TorchTranslator, JuliaTranslator
 from taylor_expansion import first_order_certified_taylor_expansion
 
-
-class Region:
-    def __init__(self, center: torch.Tensor, radius: torch.Tensor):
-        self.center = center
-        # radius in the sense of a hyperrectangle
-        # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
-        self.radius = radius
-
-    def __iter__(self):
-        return iter((self.center, self.radius))
-
-    def calculate_size(self):
-        """
-        Calculate the size of the region (hypercube volume).
-        """
-        return torch.prod(2 * self.radius).item()
+from certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, Region
 
 
 def split_sample(data, delta, split_dim):
@@ -77,7 +62,8 @@ class MarabouLipschitzStrategy(VerificationStrategy):
             # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
             split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
             sample_left, sample_right = split_sample(data, delta, split_dim)
-            return [sample_left, sample_right], [], []
+
+            return SampleResultMaybe(data, [sample_left, sample_right])
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -120,9 +106,9 @@ class MarabouLipschitzStrategy(VerificationStrategy):
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
                     split_dim = np.argmax(L_max[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
-                    return [sample_left, sample_right], [], []
-
-                return [], [cex], []
+                    return SampleResultMaybe(data, [sample_left, sample_right])
+                
+                return SampleResultUNSAT(data, [cex])
 
             # Reset the query
             network.additionalEquList.clear()
@@ -155,11 +141,11 @@ class MarabouLipschitzStrategy(VerificationStrategy):
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
                     split_dim = np.argmax(L_max[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
-                    return [sample_left, sample_right], [], []
+                    return SampleResultMaybe(data, [sample_left, sample_right])
 
-                return [], [cex], []
+                return SampleResultUNSAT(data, [cex])
 
-            return [], [], [data]  # No counterexample found, return the original sample
+            return SampleResultSAT(data)  # No counterexample found, return the original sample
 
 
 class MarabouTaylorStrategy(VerificationStrategy):

@@ -34,7 +34,7 @@ class MultiprocessExecutor:
         agg = None
         
         # Calculate the total domain size
-        total_domain_size = sum(sample.calculate_size() for sample in samples)
+        total_domain_size = sum(sample.lebesguemeasure() for sample in samples)
         certified_domain_size = 0
 
         with ProcessPoolExecutor(max_workers=self.num_workers, initializer=local.initialize) as executor:
@@ -50,19 +50,24 @@ class MultiprocessExecutor:
                 waiter = ExpandableAsCompleted(futures)
 
                 for future in waiter.as_completed():
-                    new_samples, result, certified_samples = future.result()
+                    result = future.result()
                     
-                    for certified_sample in certified_samples:
+                    if result.issat():
                         # Sample was succesfully verified, no new samples to process
                         # Update certified domain size in a thread-safe manner
-                        certified_domain_size += certified_sample.calculate_size()
-                    
+                        certified_domain_size += result.lebesguemeasure()
+
                     agg = aggregate(agg, result)
 
-                    for new_sample in new_samples:
-                        new_future = executor.submit(local.process_sample, new_sample)
-                        new_future.add_done_callback(lambda p: pbar.update())
-                        waiter.add(new_future)
+                    if result.hasnewsamples():
+                        # Put the new samples into the queue
+                        new_samples = result.newsamples()
+                        
+                        # Submit new samples to the executor
+                        for new_sample in new_samples:
+                            new_future = executor.submit(local.process_sample, new_sample)
+                            new_future.add_done_callback(lambda p: pbar.update())
+                            waiter.add(new_future)
                 
                     certified_percentage = (certified_domain_size / total_domain_size) * 100
                     pbar.set_description_str(
