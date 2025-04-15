@@ -92,7 +92,7 @@ def verify_nn(
     executor = SinglethreadExecutor()
 
     cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
-    num_cex = len(cex_list)
+    num_cex = len(cex_list) if cex_list else 0
 
     print(f"Number of counterexamples found: {num_cex}")
     print("Finished")
