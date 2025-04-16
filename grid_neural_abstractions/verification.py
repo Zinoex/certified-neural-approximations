@@ -176,7 +176,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         if np.any(max_step > epsilon):
             # Find the dimension that contributes most to the remainder
             max_output_dim = np.argmax(max_step)
-            split_dimensions = np.argsort(-(np.abs(df_c_lower[max_output_dim]) * delta))  # Sort in descending order
+            split_dimensions = np.argsort(-np.abs(df_c_lower[max_output_dim]) * delta)  # Sort in descending order
             split_dim = [sd for sd in split_dimensions if delta[sd] > min_delta]
             if split_dim:
                 split_dim = split_dim[0]
@@ -221,7 +221,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 nn_cex = network.evaluateWithMarabou([cex])[0]
                 f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                    split_dimensions = np.argsort(np.abs(df_c_lower)[j, :] * delta)
+                    split_dimensions = np.argsort(-np.abs(df_c_lower)[j, :] * delta)
                     split_dim = [split_dim for split_dim in split_dimensions if delta[split_dim] > min_delta]
                     if split_dim:
                         split_dim = split_dim[0]
@@ -261,7 +261,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 nn_cex = network.evaluateWithMarabou([cex])[0]
                 f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                    split_dimensions = np.argsort(np.abs(df_c_upper)[j, :] * delta)
+                    split_dimensions = np.argsort(-np.abs(df_c_upper)[j, :] * delta)
                     split_dim = [split_dim for split_dim in split_dimensions if delta[split_dim] > min_delta]
                     if split_dim:
                         split_dim = split_dim[0]
