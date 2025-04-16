@@ -11,6 +11,7 @@ from .dynamics import VanDerPolOscillator
 
 from .verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
 from .certification_results import Region
+from .visualization import DynamicsPlotter  # Import the new plotter
 
 from .train_nn import generate_data
 
@@ -72,7 +73,7 @@ def aggregate(agg, result):
 
 
 def verify_nn(
-    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=1
+    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=1, visualize=True
 ):
     
     strategy = MarabouTaylorStrategy(dynamics_model)
@@ -91,16 +92,29 @@ def verify_nn(
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
+    # Initialize plotter for 1D case if visualization is enabled
+    plotter = None
+    if visualize and input_dim == 1:
+        plotter = DynamicsPlotter(dynamics_model)
+        print("Initialized visualization for 1D dynamics")
+
     if num_workers == 1:
         executor = SinglethreadExecutor()
+        # Pass the plotter to the executor
+        cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples, plotter)
     elif num_workers > 1:
         executor = MultiprocessExecutor(num_workers)
+        # Note: Visualization is not supported in multiprocessing mode
+        cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
 
-    cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list) if cex_list else 0
 
     print(f"Number of counterexamples found: {num_cex}")
     print("Finished")
+    
+    # Keep the plot window open if we're visualizing
+    if plotter is not None:
+        input("Press Enter to close the visualization...")
 
 
 if __name__ == "__main__":
