@@ -2,8 +2,8 @@ from juliacall import Main as jl
 jl.seval("using TaylorModels")
 
 import torch
-
-from translators import JuliaTranslator
+import numpy as np
+from .translators import JuliaTranslator
 
 
 def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
@@ -22,32 +22,50 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
 
     order = 1
 
+    if not isinstance(expansion_point, np.ndarray):
+        expansion_point = expansion_point.to(torch.float64).numpy()
+    
     low, high = expansion_point - delta, expansion_point + delta
-    dom = jl.IntervalBox(low.to(torch.float64).numpy(), high.to(torch.float64).numpy())
+    dom = jl.IntervalBox(low, high)
 
     input_dim = dynamics.input_dim
     x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
-        order, expansion_point.to(torch.float64).numpy(), dom, input_dim
+        order, expansion_point, dom, input_dim
     )
 
     y = dynamics.compute_dynamics(x, translator)
 
     # constant term (select zeroth order, first and only coefficient)
     a = jl.broadcast(jl.seval("yi -> yi[0][1]"), y)
-    a_lower = jl.broadcast(jl.inf, a).to_numpy()
-    a_upper = jl.broadcast(jl.sup, a).to_numpy()
+    a_lower = jl.broadcast(jl.inf, a)
+    a_upper = jl.broadcast(jl.sup, a)
 
     # linear term (select first order, all coefficients)
     b = jl.broadcast(jl.seval("yi -> yi[1][:]"), y)
     b = jl.broadcast(jl.transpose, b)
     b = jl.reduce(jl.vcat, b)
-    b_lower = jl.broadcast(jl.inf, b).to_numpy()
-    b_upper = jl.broadcast(jl.sup, b).to_numpy()
+    b_lower = jl.broadcast(jl.inf, b)
+    b_upper = jl.broadcast(jl.sup, b)
 
     # remainder
     r = jl.broadcast(jl.remainder, y)
-    r_lower = jl.broadcast(jl.inf, r).to_numpy()
-    r_upper = jl.broadcast(jl.sup, r).to_numpy()
+    r_lower = jl.broadcast(jl.inf, r)
+    r_upper = jl.broadcast(jl.sup, r)
+
+    if input_dim>1:
+        a_lower = a_lower.to_numpy()
+        a_upper = a_upper.to_numpy()
+        b_lower = b_lower.to_numpy()
+        b_upper = b_upper.to_numpy()
+        r_lower = r_lower.to_numpy()
+        r_upper = r_upper.to_numpy()
+    else:
+        a_lower = np.array([[a_lower]])
+        a_upper = np.array([[a_upper]])
+        b_lower = np.array([[b_lower]])
+        b_upper = np.array([[b_upper]])
+        r_lower = np.array([[r_lower]])
+        r_upper = np.array([[r_upper]])
 
     return (a_lower, b_lower, r_lower), (a_upper, b_upper, r_upper)
 

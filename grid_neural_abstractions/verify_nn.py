@@ -1,18 +1,18 @@
 from functools import partial
 
 import numpy as np
-from executors import (
+from .executors import (
     MultiprocessExecutor,
     MultithreadExecutor,
     SinglethreadExecutor,
 )
 from maraboupy import Marabou
-from dynamics import VanDerPolOscillator, Quadcopter
+from .dynamics import VanDerPolOscillator
 
-from verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
-from certification_results import Region
+from .verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
+from .certification_results import Region
 
-from train_nn import generate_data
+from .train_nn import generate_data
 
 def process_sample(
     strategy,
@@ -72,9 +72,9 @@ def aggregate(agg, result):
 
 
 def verify_nn(
-    onnx_path, delta=0.01, epsilon=0.1, num_workers=16
+    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=1
 ):
-    dynamics_model = Quadcopter()
+    
     strategy = MarabouTaylorStrategy(dynamics_model)
 
     input_dim = dynamics_model.input_dim
@@ -82,22 +82,19 @@ def verify_nn(
     assert len(onnx_input_dim) == 1, f"Only 1D input dims are supported, was {len(onnx_input_dim)}"
     assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
 
-    # Compute the number of samples for a fixed grid
-    range_min, range_max = -1.0, 1.0  # Match the range in generate_data
-    num_samples_per_dim = int((range_max - range_min) / delta) + 1
-    num_samples = num_samples_per_dim**input_dim
-    print(f"Number of initial samples: {num_samples}")
-
     partial_process_sample = partial(process_sample, strategy, dynamics_model, epsilon)
 
-    X_train, _ = generate_data(input_dim, delta=delta, grid=True)
+    X_train, _ = generate_data(input_dim, input_domain=dynamics_model.input_domain, delta=delta, grid=True, device="cpu")
     samples = [
-        Region(X_train[i], np.full_like(X_train[i], delta)) for i in range(num_samples)
+        Region(x.double().numpy(), np.full_like(x.double(), delta)) for x in X_train
     ]
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
-    executor = SinglethreadExecutor()
+    if num_workers == 1:
+        executor = SinglethreadExecutor()
+    elif num_workers > 1:
+        executor = MultiprocessExecutor(num_workers)
 
     cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
     num_cex = len(cex_list) if cex_list else 0
@@ -109,5 +106,6 @@ def verify_nn(
 if __name__ == "__main__":
     verify_nn(
         "data/simple_nn.onnx",
+        VanDerPolOscillator(),
         delta=0.1
     )

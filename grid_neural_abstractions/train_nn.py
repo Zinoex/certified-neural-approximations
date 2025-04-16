@@ -2,7 +2,7 @@ import numpy as np  # Add numpy for grid generation
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from dynamics import VanDerPolOscillator, Quadcopter
+from .dynamics import VanDerPolOscillator, Quadcopter
 
 
 # Define the neural network
@@ -32,7 +32,7 @@ class SimpleNN(nn.Module):
 
 
 # Generate some synthetic data for training
-def generate_data(input_size, delta=0.01, grid=False, batch_size=256, dynamics_model=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+def generate_data(input_size, input_domain=None, delta=0.01, grid=False, batch_size=256, dynamics_model=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
     """
     Generate data points for training or verification.
     If grid=True, generate a fixed grid of points with spacing at most delta.
@@ -40,71 +40,115 @@ def generate_data(input_size, delta=0.01, grid=False, batch_size=256, dynamics_m
     
     Args:
         input_size: Dimension of input space
+        input_domain: List of tuples [(min_1, max_1), ..., (min_n, max_n)] defining the domain for each dimension
+                      If None, defaults to [(-1.0, 1.0)] * input_size
         delta: Grid spacing when grid=True
         grid: Whether to use grid sampling (True) or random sampling (False)
         batch_size: Number of samples when grid=False
         dynamics_model: The dynamics model to use for generating outputs
+        device: The device to place tensors on
         
     Returns:
-        X_train: Input data
-        y_train: Output data (dynamics evaluated at input points)
+        X_train: Input data with shape [input_dim, batch_size]
+        y_train: Output data with shape [input_dim, batch_size]
     """
+    # Set default domain if not provided
+    if input_domain is None:
+        input_domain = [(-1.0, 1.0)] * input_size
+    
+    # Ensure domain size matches input_size
+    assert len(input_domain) == input_size, f"Input domain size {len(input_domain)} must match input size {input_size}"
 
     if grid:
-        # Generate a grid of points within a fixed range
-        range_min, range_max = -1.0, 1.0  # Define the range for each dimension
-        num_points_per_dim = int((range_max - range_min) / delta) + 1
-        grid_points = np.linspace(range_min, range_max, num_points_per_dim)
-        mesh = np.meshgrid(*[grid_points] * input_size)
-        X_train = np.vstack(list(map(np.ravel, mesh))).T  # Convert map to list
-        X_train = torch.tensor(X_train, dtype=torch.float32, device=device)  # Move to device
+        # Generate grid points for each dimension based on its domain
+        grid_points_per_dim = []
+        for i in range(input_size):
+            min_val, max_val = input_domain[i]
+            # Remove edge of domain, as this is covered by the hypercubes
+            min_val = min_val + delta 
+            max_val = max_val - delta
+            num_points = int(np.ceil((max_val - min_val) / (2 * delta))) + 1
+            grid_points_per_dim.append(np.linspace(min_val, max_val, num_points))
+        
+        # Create meshgrid from the points
+        mesh = np.meshgrid(*grid_points_per_dim)
+        X_train = np.vstack(list(map(np.ravel, mesh))).T
+        X_train = torch.tensor(X_train, dtype=torch.float32, device=device)
     else:
-        # Randomly sample points
-        X_train = torch.randn(batch_size, input_size, device=device)  # Move to device
+        # Randomly sample points within each dimension's domain
+        X_train = torch.zeros(input_size, batch_size, device=device)
+        for i in range(input_size):
+            min_val, max_val = input_domain[i]
+            X_train[i] = (max_val - min_val) * torch.rand(batch_size, device=device) + min_val
 
     if dynamics_model is None:
         y_train = None
     else:
-        y_train = dynamics_model(X_train.T).T.to(device)  # Ensure y_train is on the same device
+        # Get outputs in [output_dim, batch_size] format
+        y_train = dynamics_model(X_train)
+    
     return X_train, y_train
 
 
 # Train the neural network
-def train_nn():
-    dynamics_model = Quadcopter()
+def train_nn(dynamics_model=None):
+    if dynamics_model is None:
+        dynamics_model = Quadcopter()
+    
     input_size = dynamics_model.input_dim
     hidden_sizes = [128, 128, 128]  # Adjust hidden layer sizes
     output_size = dynamics_model.output_dim  # Update output size to match target size
+    input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
     num_epochs = 50000
     learning_rate = 0.001  # Reduced learning rate
     batch_size = 2048
+    
+    # Add parameters for gradient clipping and early stopping
+    max_grad_norm = 1.0
+    patience = 5
+    best_loss = float('inf')
+    patience_counter = 0
 
-    model = SimpleNN(input_size, hidden_sizes, output_size) # Move model to device
+    model = SimpleNN(input_size, hidden_sizes, output_size)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = optim.lr_scheduler.StepLR(
-        optimizer, step_size=10000, gamma=0.5
-    )  # Add learning rate scheduler
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-5)  # Use AdamW optimizer
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.9, patience=1000, min_lr=1e-6
+    )
 
     # Load data
     for epoch in range(num_epochs):
-        X_train, y_train = generate_data(input_size, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
-        model.train()
-        outputs = model(X_train)
-        loss = criterion(outputs, y_train)
+        X_train, y_train = generate_data(input_size, input_domain=input_domain, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
 
+        model.train()
+        outputs = model(X_train.T)
+        loss = criterion(outputs, y_train.T)
+            
         optimizer.zero_grad()
         loss.backward()
+        
+        # Apply gradient clipping to prevent explosion
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+        
         optimizer.step()
-        scheduler.step()  # Update learning rate
+        scheduler.step(loss)  # Update learning rate based on loss
 
-        if (epoch + 1) % 1000 == 0:
+        if (epoch + 1) % 100 == 0:
             print(
-                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, LR: {scheduler.get_last_lr()[0]:.6f}"
+                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, LR: {optimizer.param_groups[0]['lr']:.6f}"
             )
+            
+        # Early stopping logic
+        if loss.item() < best_loss:
+            best_loss = loss.item()
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            
+        if patience_counter >= patience and best_loss < 0.001:
+            print(f"Early stopping triggered at epoch {epoch+1}. Best loss: {best_loss:.6f}")
+            break
 
-    # Save the trained model
-    save_onnx_model(model)
     return model
 
 
@@ -137,3 +181,6 @@ def load_onnx_model(file_name="data/simple_nn.onnx"):
 
 if __name__ == "__main__":
     model = train_nn()  # Use the correct input_size from the dynamics model
+    
+    # Save the trained model
+    save_onnx_model(model)

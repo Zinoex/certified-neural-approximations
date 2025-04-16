@@ -8,3 +8,6 @@ torch
 maraboupy
 onnx
 onnxruntime
+
+#Plotting
+matplotlib

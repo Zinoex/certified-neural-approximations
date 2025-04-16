@@ -3,14 +3,11 @@ from copy import deepcopy
 import numpy as np
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 
-from taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
-from certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, Region
-
-import torch
+from .taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
+from .certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, Region
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2
-
     sample_left = deepcopy(data)
     sample_left.center[split_dim] -= split_radius
     sample_left.radius[split_dim] = split_radius
@@ -55,9 +52,9 @@ class MarabouLipschitzStrategy(VerificationStrategy):
         # https://en.wikipedia.org/wiki/Taylor%27s_theorem#Taylor's_theorem_for_multivariate_functions
 
         # delta * L 
-        L_step = torch.matmul(L_max, delta)
+        L_step = np.matmul(L_max, delta)
 
-        if torch.any(L_step > epsilon):
+        if np.any(L_step > epsilon):
             # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
             split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
             sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -101,7 +98,7 @@ class MarabouLipschitzStrategy(VerificationStrategy):
                 
                 network.additionalEquList.clear()
                 nn_cex = network.evaluateWithMarabou([cex])[0]
-                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
                     split_dim = np.argmax(L_max[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -136,7 +133,7 @@ class MarabouLipschitzStrategy(VerificationStrategy):
 
                 network.additionalEquList.clear()
                 nn_cex = network.evaluateWithMarabou([cex])[0]
-                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
                     split_dim = np.argmax(L_max[j, :] * delta)
                     sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -152,6 +149,8 @@ class MarabouTaylorStrategy(VerificationStrategy):
         prepare_taylor_expansion(dynamics.input_dim)
 
     def verify(self, network, dynamics, data, epsilon, precision=1e-6):
+        min_delta = 1e-3
+
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         options = Marabou.createOptions(verbosity=0)
@@ -176,9 +175,13 @@ class MarabouTaylorStrategy(VerificationStrategy):
         max_step = np.matmul(np.abs(df_c_lower), delta)
         if np.any(max_step > epsilon):
             # Find the dimension that contributes most to the remainder
-            split_dim = np.argmax(np.abs(df_c_lower)[np.argmax(max_step), :] * delta)
-            sample_left, sample_right = split_sample(data, delta, split_dim)
-            return SampleResultMaybe(data, [sample_left, sample_right])
+            max_output_dim = np.argmax(max_step)
+            split_dimensions = np.argsort(-(np.abs(df_c_lower[max_output_dim]) * delta))  # Sort in descending order
+            split_dim = [sd for sd in split_dimensions if delta[sd] > min_delta]
+            if split_dim:
+                split_dim = split_dim[0]
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return SampleResultMaybe(data, [sample_left, sample_right])
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -216,11 +219,14 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
                 network.additionalEquList.clear()
                 nn_cex = network.evaluateWithMarabou([cex])[0]
-                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                    split_dim = np.argmax(np.abs(df_c_lower)[j, :] * delta)
-                    sample_left, sample_right = split_sample(data, delta, split_dim)
-                    return SampleResultMaybe(data, [sample_left, sample_right])
+                    split_dimensions = np.argsort(np.abs(df_c_lower)[j, :] * delta)
+                    split_dim = [split_dim for split_dim in split_dimensions if delta[split_dim] > min_delta]
+                    if split_dim:
+                        split_dim = split_dim[0]
+                        sample_left, sample_right = split_sample(data, delta, split_dim)
+                        return SampleResultMaybe(data, [sample_left, sample_right])
 
                 return SampleResultUNSAT(data, [cex])
 
@@ -253,11 +259,14 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
                 network.additionalEquList.clear()
                 nn_cex = network.evaluateWithMarabou([cex])[0]
-                f_cex = dynamics(torch.tensor(cex)).flatten().numpy()
+                f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                    split_dim = np.argmax(np.abs(df_c_upper)[j, :] * delta)
-                    sample_left, sample_right = split_sample(data, delta, split_dim)
-                    return SampleResultMaybe(data, [sample_left, sample_right])
+                    split_dimensions = np.argsort(np.abs(df_c_upper)[j, :] * delta)
+                    split_dim = [split_dim for split_dim in split_dimensions if delta[split_dim] > min_delta]
+                    if split_dim:
+                        split_dim = split_dim[0]
+                        sample_left, sample_right = split_sample(data, delta, split_dim)
+                        return SampleResultMaybe(data, [sample_left, sample_right])
 
                 return SampleResultUNSAT(data, [cex])
 

@@ -1,34 +1,74 @@
-from translators import TorchTranslator
-
-
-class VanDerPolOscillator:
+from .translators import TorchTranslator, NumpyTranslator
+import numpy as np
+import torch
+class DynamicalSystem:
+    """Base class for dynamical systems."""
+    
+    def __init__(self):
+        self.input_dim = None  # State dimension
+        self.output_dim = None  # Derivative dimension
+        self.input_domain = None  # Domain for each input dimension [(min_1, max_1), ..., (min_n, max_n)]
+    
+    def __call__(self, x, translator=None):
+        """
+        Compute the dynamics for the system.
+        
+        Args:
+            x: The state tensor with shape [input_dim, batch_size]
+            translator: The translator for mathematical operations
+            
+        Returns:
+            The derivatives of the system with shape [output_dim, batch_size]
+        """
+        if translator is None:
+            if isinstance(x, np.ndarray):
+                # Use NumpyTranslator if x is a NumPy array
+                translator = NumpyTranslator()
+            else:
+                translator = TorchTranslator()
+        
+        return self.compute_dynamics(x, translator)
+    
+    def compute_dynamics(self, x, translator):
+        """
+        Compute the dynamics for the system.
+        
+        Args:
+            x: The state tensor with shape [input_dim, batch_size]
+            translator: The translator for mathematical operations
+            
+        Returns:
+            The derivatives of the system with shape [output_dim, batch_size]
+        """
+        raise NotImplementedError("Subclasses must implement compute_dynamics")
+    
+    
+class VanDerPolOscillator(DynamicalSystem):
     """A class representing the Van der Pol oscillator dynamics."""
 
     def __init__(self, mu=1.0):
+        super().__init__()
         # Parameter for the Van der Pol oscillator
         self.mu = mu
         self.input_dim = 2  # Van der Pol oscillator state dimension
         self.output_dim = 2  # Van der Pol oscillator derivative dimension
-
-    def __call__(self, x, translator=None):
-        if translator is None:
-            translator = TorchTranslator()
-
-        return self.compute_dynamics(x, translator)
+        self.input_domain = [(-3.0, 3.0), (-3.0, 3.0)]  # Typical domain for Van der Pol oscillator
 
     def compute_dynamics(self, x, translator):
-        # # Ensure x has the correct shape (2, N) for computation
-        # if x.dim() == 1:
-        #     x = x.unsqueeze(1)  # Convert 1D tensor to 2D column vector
-        # elif x.size(0) != self.input_dim:
-        #     raise ValueError(
-        #         f"Input tensor x has incompatible dimensions: {x.size()}, expected first dimension {self.input_dim}"
-        #     )
-
+        """
+        Compute Van der Pol dynamics.
+        
+        Args:
+            x: Input tensor with shape [2, batch_size]
+            translator: The translator for mathematical operations
+            
+        Returns:
+            Tensor of shape [2, batch_size] with the dynamics
+        """
         dx1 = x[1]
         dx2 = self.mu * (1 - translator.pow(x[0], 2)) * x[1] - x[0]
 
-        return translator.stack((dx1, dx2))
+        return translator.stack([dx1, dx2])
 
     def compute_lipschitz_constant(self, R):
         """
@@ -62,7 +102,7 @@ class VanDerPolOscillator:
 
         :return: The maximum gradient norm
         """
-
+        import torch
         # For Van der Pol, the Jacobian is:
         # [ 0,  1 ]
         # [-1 - 2*mu*x₁*x₂, mu*(1-x₁²)]
@@ -89,7 +129,7 @@ class VanDerPolOscillator:
         return L
 
 
-class Quadcopter:
+class Quadcopter(DynamicalSystem):
     """A class representing the 10D dynamics of a quadcopter."""
 
     def __init__(
@@ -101,6 +141,7 @@ class Quadcopter:
         moment_inertia_y=0.01,
         moment_inertia_z=0.02,
     ):
+        super().__init__()
         # Parameters for the quadcopter model
         self.mass = mass
         self.gravity = gravity
@@ -109,24 +150,21 @@ class Quadcopter:
         self.moment_inertia_y = moment_inertia_y
         self.moment_inertia_z = moment_inertia_z
 
-        self.input_dim = 3  # 12D state: position (3), velocity (3), angles (3), angular rates (3)
-        self.output_dim = 3  # 12D derivatives
-
-    def __call__(self, x, translator=None):
-        if translator is None:
-            translator = TorchTranslator()
-
-        return self.compute_dynamics(x, translator)
+        self.input_dim = 3  # 3D state: roll, pitch, yaw
+        self.output_dim = 3  # 3D derivatives
+        self.input_domain = [(-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5)]  # Typical domain for angles in radians
 
     def compute_dynamics(self, x, translator):
-        # Ensure x has the correct shape for computation
-        # if x.dim() == 1:
-        #     x = x.unsqueeze(1)  # Convert 1D tensor to 2D column vector
-        # elif x.size(0) != self.input_dim:
-        #     raise ValueError(
-        #         f"Input tensor x has incompatible dimensions: {x.size()}, expected first dimension {self.input_dim}"
-        #     )
-
+        """
+        Compute quadcopter dynamics.
+        
+        Args:
+            x: Input tensor with shape [3, batch_size]
+            translator: The translator for mathematical operations
+            
+        Returns:
+            Tensor of shape [3, batch_size] with the dynamics
+        """
         # Extract state variables
         # Orientation: roll, pitch, yaw
         roll, pitch, yaw = x[0], x[1], x[2]
@@ -158,34 +196,146 @@ class Quadcopter:
         ) / self.mass - self.gravity
 
         # Combine all derivatives
-        derivatives = translator.stack((dvx, dvy, dvz))
+        derivatives = translator.stack([dvx, dvy, dvz])
 
         return derivatives
 
-    def compute_lipschitz_constant(self, R):
-        """
-        Compute a more accurate Lipschitz constant for the quadcopter dynamics
-        based on the maximum eigenvalue of the Jacobian matrix.
 
+class WaterTank(DynamicalSystem):
+    """Water Tank dynamical system as described in equation (13)."""
+    
+    def __init__(self):
+        super().__init__()
+        self.input_dim = 1
+        self.output_dim = 1
+        self.input_domain = [(0.1, 10.0)]  # Water level should be positive
+        
+    def compute_dynamics(self, x, translator):
+        # ẋ = 1.5 - √x
+        return translator.stack([1.5 - translator.sqrt(x[0])])
+
+
+class JetEngine(DynamicalSystem):
+    """Jet Engine dynamical system as described in equation (14)."""
+    
+    def __init__(self):
+        super().__init__()
+        self.input_dim = 2
+        self.output_dim = 2
+        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0)]  # Typical domain for jet engine state variables
+        
+    def compute_dynamics(self, x, translator):
+        # ẋ = -y - 1.5x² - 0.5x³ - 0.1
+        # ẏ = 3x - y
+        dx = -x[1] - 1.5 * translator.pow(x[0], 2) - 0.5 * translator.pow(x[0], 3) - 0.1
+        dy = 3 * x[0] - x[1]
+        
+        return translator.stack([dx, dy])
+
+
+class SteamGovernor(DynamicalSystem):
+    """Steam Governor dynamical system as described in equation (15)."""
+    
+    def __init__(self):
+        super().__init__()
+        self.input_dim = 3
+        self.output_dim = 3
+        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0)]  # Typical domain for steam governor
+        
+    def compute_dynamics(self, x, translator):
+        # ẋ = y
+        # ẏ = z² sin(x) cos(x) - sin(x) - 3y
+        # ż = -(cos(x) - 1)
+        
+        dx = x[1]
+        dy = translator.pow(x[2], 2) * translator.sin(x[0]) * translator.cos(x[0]) - translator.sin(x[0]) - 3 * x[1]
+        dz = -(translator.cos(x[0]) - 1)
+        
+        return translator.stack([dx, dy, dz])
+
+
+class Exponential(DynamicalSystem):
+    """Exponential dynamical system as described in equation (16)."""
+    
+    def __init__(self):
+        super().__init__()
+        self.input_dim = 2
+        self.output_dim = 2
+        self.input_domain = [(-1.5, 1.5), (-1.0, 1.0)]  # Restricted domain to avoid extremely large values
+        
+    def compute_dynamics(self, x, translator):
+        # ẋ = -sin(exp(y³ + 1)) - y²
+        # ẏ = -x
+        
+        dx = -translator.sin(translator.exp(translator.pow(x[1], 3) + 1)) - translator.pow(x[1], 2)
+        dy = -x[0]
+
+        return translator.stack([dx, dy])
+
+
+class NonLipschitzVectorField1(DynamicalSystem):
+    """Non-Lipschitz Vector Field 1 (NL1) dynamical system as described in equation (17)."""
+    
+    def __init__(self):
+        super().__init__()
+        self.input_dim = 2
+        self.output_dim = 2
+        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
+        
+    def compute_dynamics(self, x, translator):
+        # ẋ = y
+        # ẏ = √|x|
+        
+        dx = x[1]
+        dy = translator.sqrt(translator.abs(x[0]))
+        
+        return translator.stack([dx, dy])
+
+
+class NonLipschitzVectorField2(DynamicalSystem):
+    """Non-Lipschitz Vector Field 2 (NL2) dynamical system as described in equation (18)."""
+    
+    def __init__(self):
+        super().__init__()
+        self.input_dim = 2
+        self.output_dim = 2
+        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
+        
+    def compute_dynamics(self, x, translator):
+        # ẋ = x² + y
+        # ẏ = (x²)^(1/3) - x
+        
+        dx = translator.pow(x[0], 2) + x[1]
+        dy = translator.pow(translator.pow(x[0], 2), 1/3) - x[0]
+        
+        return translator.stack([dx, dy])
+
+
+class NonlinearOscillator(DynamicalSystem):
+    """A nonlinear 1D oscillator system with cubic and sine terms."""
+    
+    def __init__(self, linear_coeff=1.0, cubic_coeff=0.5, sine_coeff=0.3):
+        super().__init__()
+        # Parameters for the nonlinear terms
+        self.linear_coeff = linear_coeff
+        self.cubic_coeff = cubic_coeff
+        self.sine_coeff = sine_coeff
+        self.input_dim = 1  # 1D system
+        self.output_dim = 1  # 1D output
+        self.input_domain = [(-3.0, 3.0)]  # Typical domain for oscillator
+    
+    def compute_dynamics(self, x, translator):
+        """
+        Compute nonlinear oscillator dynamics.
+        
         Args:
-            R: The radius of the domain
-
+            x: Input tensor with shape [1, batch_size]
+            translator: The translator for mathematical operations
+            
         Returns:
-            The Lipschitz constant for the dynamics
+            Tensor of shape [1, batch_size] with the dynamics
         """
-        # Compute based on the partial derivatives of the dynamics equations
-        g = self.gravity
-        m = self.mass
-
-        # Maximum possible control thrust
-        thrust_max = m * g * 2  # Assuming max thrust is twice hover thrust
-
-        # Compute bounds on trigonometric functions (sin, cos are bounded by 1)
-        # Maximum effect of angular positions on velocities
-        angle_vel_coupling = thrust_max / m
-
-        # Consider the largest possible value in the Jacobian
-        L = angle_vel_coupling * (1 + R)
-
-        # Add a safety factor
-        return L
+        # ẋ = -linear_coeff * x - cubic_coeff * x³ + sine_coeff * sin(x)
+        dx = -self.linear_coeff * x[0] - self.cubic_coeff * translator.pow(x[0], 3) + self.sine_coeff * translator.sin(x[0])
+        
+        return translator.stack([dx])
