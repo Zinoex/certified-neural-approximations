@@ -22,7 +22,7 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
 
     order = 1
 
-    if type(expansion_point) is not np.ndarray:
+    if not isinstance(expansion_point, np.ndarray):
         expansion_point = expansion_point.to(torch.float64).numpy()
     
     low, high = expansion_point - delta, expansion_point + delta
