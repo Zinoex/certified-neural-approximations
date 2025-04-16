@@ -308,3 +308,33 @@ class NonLipschitzVectorField2(DynamicalSystem):
         dy = translator.pow(translator.pow(x[0], 2), 1/3) - x[0]
         
         return translator.stack([dx, dy])
+
+
+class NonlinearOscillator(DynamicalSystem):
+    """A nonlinear 1D oscillator system with cubic and sine terms."""
+    
+    def __init__(self, linear_coeff=1.0, cubic_coeff=0.5, sine_coeff=0.3):
+        super().__init__()
+        # Parameters for the nonlinear terms
+        self.linear_coeff = linear_coeff
+        self.cubic_coeff = cubic_coeff
+        self.sine_coeff = sine_coeff
+        self.input_dim = 1  # 1D system
+        self.output_dim = 1  # 1D output
+        self.input_domain = [(-3.0, 3.0)]  # Typical domain for oscillator
+    
+    def compute_dynamics(self, x, translator):
+        """
+        Compute nonlinear oscillator dynamics.
+        
+        Args:
+            x: Input tensor with shape [1, batch_size]
+            translator: The translator for mathematical operations
+            
+        Returns:
+            Tensor of shape [1, batch_size] with the dynamics
+        """
+        # ẋ = -linear_coeff * x - cubic_coeff * x³ + sine_coeff * sin(x)
+        dx = -self.linear_coeff * x[0] - self.cubic_coeff * translator.pow(x[0], 3) + self.sine_coeff * translator.sin(x[0])
+        
+        return translator.stack([dx])

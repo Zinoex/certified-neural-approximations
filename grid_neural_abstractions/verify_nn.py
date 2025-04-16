@@ -82,17 +82,11 @@ def verify_nn(
     assert len(onnx_input_dim) == 1, f"Only 1D input dims are supported, was {len(onnx_input_dim)}"
     assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
 
-    # Compute the number of samples for a fixed grid
-    range_min, range_max = -1.0, 1.0  # Match the range in generate_data
-    num_samples_per_dim = int((range_max - range_min) / delta) + 1
-    num_samples = num_samples_per_dim**input_dim
-    print(f"Number of initial samples: {num_samples}")
-
     partial_process_sample = partial(process_sample, strategy, dynamics_model, epsilon)
 
     X_train, _ = generate_data(input_dim, delta=delta, grid=True, device="cpu")
     samples = [
-        Region(X_train[i].numpy(), np.full_like(X_train[i], delta)) for i in range(num_samples)
+        Region(x.double().numpy(), np.full_like(x.double(), delta)) for x in X_train
     ]
 
     initializer = partial(read_onnx_into_local, onnx_path)

@@ -37,20 +37,35 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
 
     # constant term (select zeroth order, first and only coefficient)
     a = jl.broadcast(jl.seval("yi -> yi[0][1]"), y)
-    a_lower = jl.broadcast(jl.inf, a).to_numpy()
-    a_upper = jl.broadcast(jl.sup, a).to_numpy()
+    a_lower = jl.broadcast(jl.inf, a)
+    a_upper = jl.broadcast(jl.sup, a)
 
     # linear term (select first order, all coefficients)
     b = jl.broadcast(jl.seval("yi -> yi[1][:]"), y)
     b = jl.broadcast(jl.transpose, b)
     b = jl.reduce(jl.vcat, b)
-    b_lower = jl.broadcast(jl.inf, b).to_numpy()
-    b_upper = jl.broadcast(jl.sup, b).to_numpy()
+    b_lower = jl.broadcast(jl.inf, b)
+    b_upper = jl.broadcast(jl.sup, b)
 
     # remainder
     r = jl.broadcast(jl.remainder, y)
-    r_lower = jl.broadcast(jl.inf, r).to_numpy()
-    r_upper = jl.broadcast(jl.sup, r).to_numpy()
+    r_lower = jl.broadcast(jl.inf, r)
+    r_upper = jl.broadcast(jl.sup, r)
+
+    if input_dim>1:
+        a_lower = a_lower.to_numpy()
+        a_upper = a_upper.to_numpy()
+        b_lower = b_lower.to_numpy()
+        b_upper = b_upper.to_numpy()
+        r_lower = r_lower.to_numpy()
+        r_upper = r_upper.to_numpy()
+    else:
+        a_lower = np.array([[a_lower]])
+        a_upper = np.array([[a_upper]])
+        b_lower = np.array([[b_lower]])
+        b_upper = np.array([[b_upper]])
+        r_lower = np.array([[r_lower]])
+        r_upper = np.array([[r_upper]])
 
     return (a_lower, b_lower, r_lower), (a_upper, b_upper, r_upper)
 

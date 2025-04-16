@@ -176,8 +176,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
         max_step = np.matmul(np.abs(df_c_lower), delta)
         if np.any(max_step > epsilon):
             # Find the dimension that contributes most to the remainder
-            split_dimensions = np.argsort(np.abs(df_c_lower)[np.argmax(max_step), :] * delta)
-            split_dim = [split_dim for split_dim in split_dimensions if delta[split_dim] > min_delta]
+            max_output_dim = np.argmax(max_step)
+            split_dimensions = np.argsort(-(np.abs(df_c_lower[max_output_dim]) * delta))  # Sort in descending order
+            split_dim = [sd for sd in split_dimensions if delta[sd] > min_delta]
             if split_dim:
                 split_dim = split_dim[0]
                 sample_left, sample_right = split_sample(data, delta, split_dim)
