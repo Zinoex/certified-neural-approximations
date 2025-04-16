@@ -111,7 +111,7 @@ def train_nn(dynamics_model=None):
 
     model = SimpleNN(input_size, hidden_sizes, output_size)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)  # Added weight decay
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-5)  # Use AdamW optimizer
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.9, patience=1000, min_lr=1e-6
     )
