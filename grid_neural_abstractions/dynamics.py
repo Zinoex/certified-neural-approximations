@@ -20,7 +20,7 @@ class DynamicalSystem:
         Returns:
             The derivatives of the system with shape [output_dim, batch_size]
         """
-        if translator is None
+        if translator is None:
             if isinstance(x, np.ndarray):
                 # Use NumpyTranslator if x is a NumPy array
                 translator = NumpyTranslator()

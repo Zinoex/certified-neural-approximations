@@ -8,7 +8,7 @@ from .taylor_expansion import first_order_certified_taylor_expansion, prepare_ta
 from .certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, Region
 
 def split_sample(data, delta, split_dim):
-    split_radius = delta[split_dim] / 2  # Ensure a minimum radius to avoid zero division
+    split_radius = delta[split_dim] / 2
     sample_left = deepcopy(data)
     sample_left.center[split_dim] -= split_radius
     sample_left.radius[split_dim] = split_radius
