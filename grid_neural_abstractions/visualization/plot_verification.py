@@ -28,7 +28,6 @@ class DynamicsPlotter:
         # Show plot
         plt.ion()  # Turn on interactive mode
         self.fig.show()
-        plt.pause(0.1)
         
     def plot_dynamics(self):
         """Plot the dynamics function."""
@@ -42,8 +41,7 @@ class DynamicsPlotter:
         x_input = np.array([x_val for x_val in x]).reshape(-1, 1)
         y = np.array([self.dynamics_model(x_val)[0] for x_val in x_input])
         
-        self.ax.plot(x, y, 'b-', label='Dynamics')
-        self.ax.legend()
+        self.ax.plot(x, y, 'b-')
     
     def update_figure(self, result):
         """
@@ -89,13 +87,7 @@ class DynamicsPlotter:
         
         # Add the rectangle to the plot
         self.ax.add_patch(rect)
-        
-        # Update legend (avoiding duplicates)
-        handles, labels = self.ax.get_legend_handles_labels()
-        if label not in labels:
-            self.ax.legend()
             
         # Redraw the figure
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
-        plt.pause(0.01)
