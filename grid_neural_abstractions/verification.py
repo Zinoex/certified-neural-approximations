@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import numpy as np
-import torch
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 
 from .taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion

@@ -2,7 +2,6 @@ import sys
 import unittest
 import inspect
 from pathlib import Path
-import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
