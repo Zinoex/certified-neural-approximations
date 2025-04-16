@@ -272,7 +272,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     assert cex[i] + precision >= sample[i].item() - delta[i]
                     assert cex[i] - precision <= sample[i].item() + delta[i]
                 violation_found = (
-                    np.dot(cex, df_c_upper[j]) - vals[outputVar] + precision <= -epsilon - np.dot(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]
+                    np.dot(cex, df_c_upper[j]) - vals[outputVar] - precision <= -epsilon - np.dot(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]
                 )
                 assert (
                     violation_found
