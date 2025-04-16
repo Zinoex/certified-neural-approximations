@@ -92,11 +92,11 @@ def verify_nn(
 
     initializer = partial(read_onnx_into_local, onnx_path)
 
-    # Initialize plotter for 1D case if visualization is enabled
+    # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
-    if visualize and input_dim == 1:
+    if visualize and input_dim in [1, 2]:
         plotter = DynamicsPlotter(dynamics_model)
-        print("Initialized visualization for 1D dynamics")
+        print(f"Initialized visualization for {input_dim}D dynamics")
 
     if num_workers == 1:
         executor = SinglethreadExecutor()
