@@ -88,7 +88,7 @@ class TestDynamicsModels(unittest.TestCase):
             verification_result = verify_dynamics_model(str(model_path), dynamics_instance)
             
             # Just report the result
-            print(f"Verification result for {name}: {'Passed' if verification_result else 'Failed'}")
+            print(f"Verification result for {name}: {'Passed' if verification_result is None else 'Failed'}")
 
 
 if __name__ == "__main__":
