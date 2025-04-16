@@ -67,7 +67,7 @@ def generate_data(input_size, input_domain=None, delta=0.01, grid=False, batch_s
             # Remove edge of domain, as this is covered by the hypercubes
             min_val = min_val + delta 
             max_val = max_val - delta
-            num_points = int((max_val - min_val) / delta) + 1 - 2**input_size
+            num_points = int(np.ceil((max_val - min_val) / (2 * delta))) + 1
             grid_points_per_dim.append(np.linspace(min_val, max_val, num_points))
         
         # Create meshgrid from the points
