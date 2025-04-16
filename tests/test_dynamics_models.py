@@ -32,7 +32,7 @@ def model_exists(dynamics_name):
     """
     Check if a trained model exists for the given dynamics system.
     """
-    model_dir = Path(__file__).parent.parent / "models"
+    model_dir = Path(__file__).parent.parent / "data"
     model_path = model_dir / f"{dynamics_name.lower()}_model.onnx"
     return model_path.exists()
 
@@ -58,7 +58,7 @@ class TestDynamicsModels(unittest.TestCase):
     
     def test_all_dynamics_systems(self):
         # Create models directory if it doesn't exist
-        model_dir = Path(__file__).parent.parent / "models"
+        model_dir = Path(__file__).parent.parent / "data"
         model_dir.mkdir(exist_ok=True)
         
         dynamics_systems = get_all_dynamics_systems()
