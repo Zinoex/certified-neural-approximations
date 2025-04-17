@@ -32,7 +32,7 @@ class SimpleNN(nn.Module):
 
 
 # Generate some synthetic data for training
-def generate_data(input_size, input_domain=None, delta=0.01, grid=False, batch_size=256, dynamics_model=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+def generate_data(input_size, input_domain, delta=0.01, grid=False, batch_size=256, dynamics_model=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
     """
     Generate data points for training or verification.
     If grid=True, generate a fixed grid of points with spacing at most delta.
@@ -52,9 +52,6 @@ def generate_data(input_size, input_domain=None, delta=0.01, grid=False, batch_s
         X_train: Input data with shape [input_dim, batch_size]
         y_train: Output data with shape [input_dim, batch_size]
     """
-    # Set default domain if not provided
-    if input_domain is None:
-        input_domain = [(-1.0, 1.0)] * input_size
     
     # Ensure domain size matches input_size
     assert len(input_domain) == input_size, f"Input domain size {len(input_domain)} must match input size {input_size}"
@@ -118,7 +115,7 @@ def train_nn(dynamics_model=None):
 
     # Load data
     for epoch in range(num_epochs):
-        X_train, y_train = generate_data(input_size, input_domain=input_domain, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
+        X_train, y_train = generate_data(input_size, input_domain, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
 
         model.train()
         outputs = model(X_train.T)

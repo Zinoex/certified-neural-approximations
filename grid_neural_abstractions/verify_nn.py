@@ -85,7 +85,7 @@ def verify_nn(
 
     partial_process_sample = partial(process_sample, strategy, dynamics_model, epsilon)
 
-    X_train, _ = generate_data(input_dim, input_domain=dynamics_model.input_domain, delta=delta, grid=True, device="cpu")
+    X_train, _ = generate_data(input_dim, dynamics_model.input_domain, delta=delta, grid=True, device="cpu")
     samples = [
         Region(x.double().numpy(), np.full_like(x.double(), delta)) for x in X_train
     ]
