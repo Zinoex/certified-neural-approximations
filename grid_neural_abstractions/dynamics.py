@@ -221,7 +221,7 @@ class JetEngine(DynamicalSystem):
         super().__init__()
         self.input_dim = 2
         self.output_dim = 2
-        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0)]  # Typical domain for jet engine state variables
+        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for jet engine state variables
         
     def compute_dynamics(self, x, translator):
         # ẋ = -y - 1.5x² - 0.5x³ - 0.1
@@ -239,7 +239,7 @@ class SteamGovernor(DynamicalSystem):
         super().__init__()
         self.input_dim = 3
         self.output_dim = 3
-        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0)]  # Typical domain for steam governor
+        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for steam governor
         
     def compute_dynamics(self, x, translator):
         # ẋ = y
@@ -260,7 +260,7 @@ class Exponential(DynamicalSystem):
         super().__init__()
         self.input_dim = 2
         self.output_dim = 2
-        self.input_domain = [(-1.5, 1.5), (-1.0, 1.0)]  # Restricted domain to avoid extremely large values
+        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Restricted domain to avoid extremely large values
         
     def compute_dynamics(self, x, translator):
         # ẋ = -sin(exp(y³ + 1)) - y²
@@ -279,7 +279,7 @@ class NonLipschitzVectorField1(DynamicalSystem):
         super().__init__()
         self.input_dim = 2
         self.output_dim = 2
-        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
+        self.input_domain = [(0.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
         
     def compute_dynamics(self, x, translator):
         # ẋ = y
