@@ -22,7 +22,7 @@ class DynamicsNetworkPlotter:
         self.resolution = resolution
         self.input_dim = dynamics_model.input_dim
         self.output_dim = dynamics_model.output_dim
-        self.alpha = 0.3 # Transparency for the patches
+        self.alpha = 0.6 # Transparency for the patches
         
         # Initialize figure based on input dimension
         if self.input_dim == 1:
@@ -221,8 +221,9 @@ class DynamicsNetworkPlotter:
         
         # Create rectangle patch for each output dimension
         ax = self.axes[output_dim]
-        y_range = ax.get_ylim()
-        height = (y_range[1] - y_range[0])*0.05
+        x_vals = np.linspace(x_min, x_min + width, self.resolution)
+        y_vals = [self.dynamics_model(np.array([[x]]))[0][output_dim] for x in x_vals]
+        height = max(y_vals) - min(y_vals)
         y_min = f[output_dim] - height/2
         
         # Create rectangle patch with alpha transparency
@@ -261,8 +262,10 @@ class DynamicsNetworkPlotter:
         # Create a rectangle in the correct subplot
         ax = self.axes[output_dim]
 
-        z_range = ax.get_ylim()
-        height = (z_range[1] - z_range[0])*0.05
+        # Calculate the height based on the maximum dynamics value over the corners
+        corner_values = [self.dynamics_model(np.array([x, y])).flatten()[output_dim] for x, y in [
+            (x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]]
+        height = max(corner_values) - min(corner_values)
         z_min, z_max = f[output_dim] - height/2, f[output_dim] + height/2
         
         # Define the vertices of the rectangular prism
