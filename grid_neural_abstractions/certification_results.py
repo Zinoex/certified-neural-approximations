@@ -26,13 +26,15 @@ class CertificationRegion:
     
     def nextsplitdim(self, taylor_approximation, dynamics):
         """
-        Estimate the error of the Taylor approximation for a random point in the region.
+        Identify the dimension with the highest approximation error for splitting.
+        
+        This method tests a random point within the region to find which dimension
+        contributes most to the approximation error between the Taylor approximation
+        and the actual dynamics.
 
-        :param sample: The center point of the region.
-        :param data: A tuple containing the sample, delta (perturbation vector), and output dimension index.
-        :param taylor_pol: The Taylor polynomial coefficients (f(c), Df(c), R).
-        :param dynamics: The dynamics function to compare against.
-        :return: The absolute error between the Taylor approximation and the dynamics function at a random point.
+        :param taylor_approximation: Function that computes the Taylor approximation at a given point
+        :param dynamics: The actual dynamics function to compare against
+        :return: The dimension index with the highest approximation error
         """
         sample, delta = self.center, self.radius  # Unpack the data tuple
         random_offset = 2 * np.random.random() - 1

@@ -205,7 +205,18 @@ class DynamicsNetworkPlotter:
             self._update_2d_figure(result)
     
     def _update_1d_figure(self, result):
-        """Update 1D figure with verification results"""
+        """
+        Update the 1D figure with verification results by adding colored rectangles.
+        
+        For certified regions (result.issat()), green rectangles are added.
+        For counterexample regions (result.isunsat()), red rectangles are added.
+        The rectangle width corresponds to the input domain of the region,
+        and the height covers the range of output values within that region.
+        
+        Args:
+            result: Verification result object containing sample information
+                    (center point, radius, and output dimension)
+        """
         center = result.sample.center
         radius = result.sample.radius
         output_dim = result.sample.output_dim
@@ -245,7 +256,18 @@ class DynamicsNetworkPlotter:
         self.fig.canvas.flush_events()
     
     def _update_2d_figure(self, result):
-        """Update 2D figure with verification results"""
+        """
+        Update the 2D figure with verification results by adding colored 3D rectangular prisms.
+        
+        For certified regions (result.issat()), green prisms are added.
+        For counterexample regions (result.isunsat()), red prisms are added.
+        The prism base corresponds to the 2D input domain of the region,
+        and the height represents the range of output values within that region.
+        
+        Args:
+            result: Verification result object containing sample information
+                    (center point, radius, and output dimension)
+        """
         center = result.sample.center
         radius = result.sample.radius
         output_dim = result.sample.output_dim
