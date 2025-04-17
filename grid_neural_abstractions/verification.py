@@ -20,6 +20,18 @@ def split_sample(data, delta, split_dim):
 
     return sample_left, sample_right
 
+def taylor_approximation(x, taylor_pol, c):
+    """
+    Evaluate the Taylor approximation at a given point x.
+
+    :param taylor_pol: The Taylor polynomial coefficients.
+    :param x: The point at which to evaluate the polynomial.
+    :return: The value of the polynomial at x.
+    """
+    # Unpack the Taylor polynomial components
+    f_c, df_c, r = taylor_pol
+    return f_c + np.dot(df_c, (x-c)) + r
+
 
 class VerificationStrategy(ABC):
     @abstractmethod
@@ -190,12 +202,12 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Reset the query
         network.additionalEquList.clear()
 
-        # x df_c - nn_output >= epsilon + c df_c - f(c) - r_lower
+        # x df_c - nn_output >= epsilon + c df_c - f(c) - r_upper
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         for i, inputVar in enumerate(inputVars):
-            equation_GE.addAddend(df_c_lower[j, i].item(), inputVar)
+            equation_GE.addAddend(df_c_upper[j, i].item(), inputVar)
         equation_GE.addAddend(-1, outputVar)
-        equation_GE.setScalar((epsilon + np.dot(sample, df_c_lower[j]) - f_c_lower[j] - r_lower[j]).item())
+        equation_GE.setScalar((epsilon + np.dot(sample, df_c_upper[j]) - f_c_upper[j] - r_upper[j]).item())
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -208,7 +220,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 assert cex[i] - precision <= sample[i].item() + delta[i]
 
             violation_found = (
-                np.dot(cex, df_c_lower[j]) - vals[outputVar] + precision >= epsilon + np.dot(sample, df_c_lower[j]) - f_c_lower[j] - r_lower[j]
+                np.dot(cex, df_c_upper[j]) - vals[outputVar] + precision >= epsilon + np.dot(sample, df_c_upper[j]) - f_c_upper[j] - r_upper[j]
             )
 
             assert (
@@ -228,13 +240,13 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Reset the query
         network.additionalEquList.clear()
 
-        # x df_c - nn_output >= -epsilon - c df_c + f(c) + r_upper
-        equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)            
+        # x df_c - nn_output >= -epsilon - c df_c + f(c) + r_lower
+        equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         for i, inputVar in enumerate(inputVars):
             # j is the output dimension, i is the input dimension, thus df_c[j, i] is the partial derivative of the j-th output with respect to the i-th input
-            equation_LE.addAddend(df_c_upper[j, i].item(), inputVar)
+            equation_LE.addAddend(df_c_lower[j, i].item(), inputVar)
         equation_LE.addAddend(-1, outputVar)
-        equation_LE.setScalar((-epsilon - np.dot(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]).item())
+        equation_LE.setScalar((-epsilon + np.dot(sample, df_c_lower[j]) - f_c_lower[j] - r_lower[j]).item())
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
@@ -246,7 +258,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 assert cex[i] + precision >= sample[i].item() - delta[i]
                 assert cex[i] - precision <= sample[i].item() + delta[i]
             violation_found = (
-                np.dot(cex, df_c_upper[j]) - vals[outputVar] - precision <= -epsilon - np.dot(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]
+                np.dot(cex, df_c_lower[j]) - vals[outputVar] - precision <= -epsilon + np.dot(sample, df_c_lower[j]) - f_c_lower[j] - r_lower[j]
             )
             assert (
                 violation_found

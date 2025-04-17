@@ -221,7 +221,7 @@ class JetEngine(DynamicalSystem):
         super().__init__()
         self.input_dim = 2
         self.output_dim = 2
-        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0)]  # Typical domain for jet engine state variables
+        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for jet engine state variables
         
     def compute_dynamics(self, x, translator):
         # ẋ = -y - 1.5x² - 0.5x³ - 0.1
@@ -239,7 +239,7 @@ class SteamGovernor(DynamicalSystem):
         super().__init__()
         self.input_dim = 3
         self.output_dim = 3
-        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0)]  # Typical domain for steam governor
+        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for steam governor
         
     def compute_dynamics(self, x, translator):
         # ẋ = y
@@ -260,7 +260,7 @@ class Exponential(DynamicalSystem):
         super().__init__()
         self.input_dim = 2
         self.output_dim = 2
-        self.input_domain = [(-1.5, 1.5), (-1.0, 1.0)]  # Restricted domain to avoid extremely large values
+        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Restricted domain to avoid extremely large values
         
     def compute_dynamics(self, x, translator):
         # ẋ = -sin(exp(y³ + 1)) - y²
@@ -279,7 +279,7 @@ class NonLipschitzVectorField1(DynamicalSystem):
         super().__init__()
         self.input_dim = 2
         self.output_dim = 2
-        self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
+        self.input_domain = [(0.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
         
     def compute_dynamics(self, x, translator):
         # ẋ = y
@@ -338,3 +338,34 @@ class NonlinearOscillator(DynamicalSystem):
         dx = -self.linear_coeff * x[0] - self.cubic_coeff * translator.pow(x[0], 3) + self.sine_coeff * translator.sin(x[0])
         
         return translator.stack([dx])
+
+
+class Sine2D(DynamicalSystem):
+    """A simple 2D sine dynamical system with configurable frequencies."""
+    
+    def __init__(self, freq_x=1.0, freq_y=1.0):
+        super().__init__()
+        # Frequency parameters to control oscillation speed
+        self.freq_x = freq_x
+        self.freq_y = freq_y
+        self.input_dim = 2  # 2D system
+        self.output_dim = 2  # 2D output
+        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0)]  # Domain for both dimensions
+    
+    def compute_dynamics(self, x, translator):
+        """
+        Compute 2D sine dynamics with frequency components.
+        
+        Args:
+            x: Input tensor with shape [2, batch_size]
+            translator: The translator for mathematical operations
+            
+        Returns:
+            Tensor of shape [2, batch_size] with the dynamics
+        """
+        # ẋ = sin(freq_y * y)
+        # ẏ = -sin(freq_x * x)
+        dx = translator.sin(self.freq_y * x[1])
+        dy = -translator.sin(self.freq_x * x[0])
+        
+        return translator.stack([dx, dy])
