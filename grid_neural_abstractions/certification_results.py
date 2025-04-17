@@ -3,12 +3,16 @@ import numpy as np
 
 
 class CertificationRegion:
-    def __init__(self, center: np.array, radius: np.array, ouput_dim: int = None):
+    def __init__(self, center: np.array, radius: np.array, ouput_dim: int = None, split_dim: int = None):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
         self.radius = radius
         self.output_dim = ouput_dim
+
+        if split_dim is None:
+            split_dim = center.shape[0] - 1
+        self.split_dim = split_dim
 
     def __iter__(self):
         return iter((self.center, self.radius, self.output_dim))
@@ -18,6 +22,13 @@ class CertificationRegion:
         Calculate the size of the region (hypercube volume).
         """
         return np.prod(2 * self.radius).item()
+    
+    def nextsplitdim(self):
+        return (self.split_dim + 1) % self.center.shape[0]
+    
+    def incrementsplitdim(self):
+        self.split_dim = (self.split_dim + 1) % self.center.shape[0]
+        return self.split_dim
     
     def __repr__(self):
         return f"CertificationRegion(center={self.center}, radius={self.radius}, output_dim={self.output_dim})"
