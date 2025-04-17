@@ -22,6 +22,7 @@ class DynamicsNetworkPlotter:
         self.resolution = resolution
         self.input_dim = dynamics_model.input_dim
         self.output_dim = dynamics_model.output_dim
+        self.alpha = 0.3 # Transparency for the patches
         
         # Initialize figure based on input dimension
         if self.input_dim == 1:
@@ -228,12 +229,12 @@ class DynamicsNetworkPlotter:
         if result.issat():
             color = 'green'
             rect = Rectangle((x_min, y_min), width, height, 
-                            color=color, alpha=0.2, label='Certified')
+                            color=color, alpha=self.alpha, label='Certified')
             ax.add_patch(rect)
         elif result.isunsat():
             color = 'red'
             rect = Rectangle((x_min, y_min), width, height, 
-                            color=color, alpha=0.2, label='Counterexample')
+                            color=color, alpha=self.alpha, label='Counterexample')
             ax.add_patch(rect)
         else:
             return
@@ -290,10 +291,10 @@ class DynamicsNetworkPlotter:
         # Create a collection of polygons
         if result.issat():
             color = 'green'
-            alpha = 0.15
+            alpha = self.alpha
         elif result.isunsat():
             color = 'red'
-            alpha = 0.15
+            alpha = self.alpha
         else:
             return
             
