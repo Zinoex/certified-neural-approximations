@@ -2,15 +2,20 @@ import abc
 import numpy as np
 
 
-class Region:
-    def __init__(self, center: np.array, radius: np.array):
+class CertificationRegion:
+    def __init__(self, center: np.array, radius: np.array, output_dim: int = None, split_dim: int = None):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
         self.radius = radius
+        self.output_dim = output_dim
+
+        if split_dim is None:
+            split_dim = center.shape[0] - 1
+        self.split_dim = split_dim
 
     def __iter__(self):
-        return iter((self.center, self.radius))
+        return iter((self.center, self.radius, self.output_dim))
 
     def lebesguemeasure(self):
         """
@@ -18,6 +23,16 @@ class Region:
         """
         return np.prod(2 * self.radius).item()
     
+    def nextsplitdim(self):
+        return (self.split_dim + 1) % self.center.shape[0]
+    
+    def incrementsplitdim(self):
+        self.split_dim = (self.split_dim + 1) % self.center.shape[0]
+        return self.split_dim
+    
+    def __repr__(self):
+        return f"CertificationRegion(center={self.center}, radius={self.radius}, output_dim={self.output_dim})"
+
 
 class SampleResult(abc.ABC):
     def __init__(self, sample):
@@ -61,7 +76,10 @@ class SampleResultSAT(SampleResult):
 
     def hascounterexamples(self) -> bool:
         return False
-    
+
+    def __repr__(self):
+        return f"SAT: {self.sample}"
+
 
 class SampleResultUNSAT(SampleResult):
     def __init__(self, sample, counterexamples):
@@ -82,6 +100,9 @@ class SampleResultUNSAT(SampleResult):
     
     def counterexamples(self):
         return self._counterexamples
+
+    def __repr__(self):
+        return f"UNSAT: {self.sample}"
     
 
 class SampleResultMaybe(SampleResult):
@@ -103,3 +124,6 @@ class SampleResultMaybe(SampleResult):
     
     def hascounterexamples(self) -> bool:
         return False
+
+    def __repr__(self):
+        return f"Maybe: {self.sample}"

@@ -1,3 +1,3 @@
-from .plot_verification import DynamicsPlotter
+from .plot_verification import DynamicsNetworkPlotter
 
-__all__ = ['DynamicsPlotter']
+__all__ = ['DynamicsNetworkPlotter']
