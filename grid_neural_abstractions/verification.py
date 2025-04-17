@@ -222,7 +222,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             # Reset the query
             network.additionalEquList.clear()
 
-            # x df_c - nn_output >= epsilon + c df_c - f(c) - r_lower
+            # x df_c - nn_output >= epsilon + c df_c - f(c) - r_upper
             equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
             for i, inputVar in enumerate(inputVars):
                 equation_GE.addAddend(df_c_lower[j,i].item(), inputVar)
@@ -266,7 +266,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             # Reset the query
             network.additionalEquList.clear()
 
-            # x df_c - nn_output <= -epsilon - c df_c + f(c) + r_upper
+            # x df_c - nn_output <= -epsilon + c df_c - f(c) - r_lower
             equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)            
             for i, inputVar in enumerate(inputVars):
                 # j is the output dimension, i is the input dimension, thus df_c[j,i] is the partial derivative of the j-th output with respect to the i-th input
