@@ -107,16 +107,6 @@ class TorchTranslator:
         """
         return torch.max(a)
 
-    def abs(self, a):
-        """
-        Element-wise absolute value
-
-        :param a: torch.tensor of floats
-
-        :return: torch.tensor of floats
-        """
-        return torch.abs(a)
-
     def stack(self, a):
         """
         Stack a list of torch tensors vertically

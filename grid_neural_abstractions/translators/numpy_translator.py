@@ -146,13 +146,3 @@ class NumpyTranslator:
         :return: np.ndarray
         """
         return np.asarray(a, dtype=np.float32)
-    
-    def abs(self, a):
-        """
-        Element-wise absolute value
-
-        :param a: np.ndarray of floats
-
-        :return: np.ndarray of floats
-        """
-        return np.abs(a)

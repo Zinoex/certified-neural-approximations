@@ -286,7 +286,7 @@ class NonLipschitzVectorField1(DynamicalSystem):
         # ẏ = √|x|
         
         dx = x[1]
-        dy = translator.sqrt(translator.abs(x[0]))
+        dy = translator.sqrt(x[0])
         
         return translator.stack([dx, dy])
 
