@@ -150,6 +150,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
     def verify(self, network, dynamics, data, epsilon, precision=1e-6):
         min_delta = 1e-3
+        splitting_threshold = 1e-3
 
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
@@ -176,12 +177,29 @@ class MarabouTaylorStrategy(VerificationStrategy):
         if np.any(max_step > epsilon):
             # Find the dimension that contributes most to the remainder
             max_output_dim = np.argmax(max_step)
-            split_dimensions = np.argsort(-(np.abs(df_c_lower[max_output_dim]) * delta))  # Sort in descending order
-            split_dim = [sd for sd in split_dimensions if delta[sd] > min_delta]
+            split_dimensions = np.argsort(-np.abs(df_c_lower[max_output_dim]) * delta)  # Sort in descending order
+            split_dim = [
+                sd for sd in split_dimensions
+                if delta[sd] > min_delta and np.abs(df_c_upper)[max_output_dim, sd] * delta[sd] > splitting_threshold
+            ]
             if split_dim:
                 split_dim = split_dim[0]
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, [sample_left, sample_right])
+
+        if np.any(r_upper - r_lower > epsilon):
+            # Try and see if splitting the input_dimension is helpful
+            for dim, _ in enumerate(inputVars):
+                delta_tmp = delta.copy()
+                delta_tmp[dim] = delta_tmp[dim] / 2 
+                taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
+                    dynamics, sample, delta_tmp
+                )
+                if np.any(np.abs(r_upper - r_lower) > np.abs(taylor_pol_lower[2] - taylor_pol_upper[2])):
+                    split_dim = dim
+                    if delta[split_dim] > min_delta:
+                        sample_left, sample_right = split_sample(data, delta, split_dim)
+                        return SampleResultMaybe(data, [sample_left, sample_right])    
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -221,8 +239,11 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 nn_cex = network.evaluateWithMarabou([cex])[0]
                 f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                    split_dimensions = np.argsort(np.abs(df_c_lower)[j, :] * delta)
-                    split_dim = [split_dim for split_dim in split_dimensions if delta[split_dim] > min_delta]
+                    split_dimensions = np.argsort(-np.abs(df_c_lower)[j, :] * delta)
+                    split_dim = [
+                        sd for sd in split_dimensions
+                        if delta[sd] > min_delta and np.abs(df_c_upper)[j, sd] * delta[sd] > splitting_threshold
+                    ]
                     if split_dim:
                         split_dim = split_dim[0]
                         sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -251,7 +272,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     assert cex[i] + precision >= sample[i].item() - delta[i]
                     assert cex[i] - precision <= sample[i].item() + delta[i]
                 violation_found = (
-                    np.dot(cex, df_c_upper[j]) - vals[outputVar] + precision <= -epsilon - np.dot(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]
+                    np.dot(cex, df_c_upper[j]) - vals[outputVar] - precision <= -epsilon - np.dot(sample, df_c_upper[j]) + f_c_upper[j] + r_upper[j]
                 )
                 assert (
                     violation_found
@@ -261,8 +282,11 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 nn_cex = network.evaluateWithMarabou([cex])[0]
                 f_cex = dynamics(cex).flatten()
                 if np.all(np.abs(nn_cex - f_cex) < epsilon):
-                    split_dimensions = np.argsort(np.abs(df_c_upper)[j, :] * delta)
-                    split_dim = [split_dim for split_dim in split_dimensions if delta[split_dim] > min_delta]
+                    split_dimensions = np.argsort(-np.abs(df_c_upper)[j, :] * delta)
+                    split_dim = [
+                        sd for sd in split_dimensions
+                        if delta[sd] > min_delta and np.abs(df_c_upper)[j, sd] * delta[sd] > splitting_threshold
+                    ]
                     if split_dim:
                         split_dim = split_dim[0]
                         sample_left, sample_right = split_sample(data, delta, split_dim)

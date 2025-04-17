@@ -4,7 +4,7 @@ from queue import LifoQueue
 
 
 class SinglethreadExecutor:
-    def execute(self, initializer, process_sample, aggregate, samples):
+    def execute(self, initializer, process_sample, aggregate, samples, plotter=None):
         agg = None
         local = types.SimpleNamespace()
         initializer(local)
@@ -28,10 +28,16 @@ class SinglethreadExecutor:
                     # Sample was succesfully verified, no new samples to process
                     # Update certified domain size in a thread-safe manner
                     certified_domain_size += result.lebesguemeasure()
+                    # Update visualization if plotter is provided
+                    if plotter is not None:
+                        plotter.update_figure(result)
                 
                 if result.isunsat():
                     # Sample was not verified, add to the uncertified domain size
                     uncertified_domain_size += result.lebesguemeasure()
+                    # Update visualization if plotter is provided
+                    if plotter is not None:
+                        plotter.update_figure(result)
 
                 agg = aggregate(agg, result)
 

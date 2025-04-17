@@ -1,6 +1,5 @@
 from .translators import TorchTranslator, NumpyTranslator
 import numpy as np
-import torch
 class DynamicalSystem:
     """Base class for dynamical systems."""
     

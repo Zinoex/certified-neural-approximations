@@ -32,7 +32,7 @@ class SimpleNN(nn.Module):
 
 
 # Generate some synthetic data for training
-def generate_data(input_size, input_domain=None, delta=0.01, grid=False, batch_size=256, dynamics_model=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+def generate_data(input_size, input_domain, delta=0.01, grid=False, batch_size=256, dynamics_model=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
     """
     Generate data points for training or verification.
     If grid=True, generate a fixed grid of points with spacing at most delta.
@@ -52,9 +52,6 @@ def generate_data(input_size, input_domain=None, delta=0.01, grid=False, batch_s
         X_train: Input data with shape [input_dim, batch_size]
         y_train: Output data with shape [input_dim, batch_size]
     """
-    # Set default domain if not provided
-    if input_domain is None:
-        input_domain = [(-1.0, 1.0)] * input_size
     
     # Ensure domain size matches input_size
     assert len(input_domain) == input_size, f"Input domain size {len(input_domain)} must match input size {input_size}"
@@ -65,9 +62,9 @@ def generate_data(input_size, input_domain=None, delta=0.01, grid=False, batch_s
         for i in range(input_size):
             min_val, max_val = input_domain[i]
             # Remove edge of domain, as this is covered by the hypercubes
-            min_val = min_val + delta 
-            max_val = max_val - delta
-            num_points = int(np.ceil((max_val - min_val) / (2 * delta))) + 1
+            min_val = min_val + delta[i] 
+            max_val = max_val - delta[i]
+            num_points = int(np.ceil((max_val - min_val) / (2 * delta[i]))) + 1
             grid_points_per_dim.append(np.linspace(min_val, max_val, num_points))
         
         # Create meshgrid from the points
@@ -118,7 +115,7 @@ def train_nn(dynamics_model=None):
 
     # Load data
     for epoch in range(num_epochs):
-        X_train, y_train = generate_data(input_size, input_domain=input_domain, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
+        X_train, y_train = generate_data(input_size, input_domain, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
 
         model.train()
         outputs = model(X_train.T)
