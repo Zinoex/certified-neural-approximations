@@ -133,7 +133,7 @@ class DynamicsNetworkPlotter:
             surface = ax.plot_surface(mesh[0], mesh[1], Z, color='blue', alpha=0.8, 
                                      linewidth=0, antialiased=True)
         
-        self.z_min, self.z_max = ax.get_zlim()
+    
         
     def plot_network(self):
         """Plot the network function."""
@@ -193,10 +193,7 @@ class DynamicsNetworkPlotter:
         """
         if not hasattr(result.sample, 'center') or not hasattr(result.sample, 'radius'):
             return
-            
         center = result.sample.center
-        radius = result.sample.radius
-        
         if len(center) != self.input_dim:  # Check dimension match
             return
             
@@ -211,6 +208,7 @@ class DynamicsNetworkPlotter:
         center = result.sample.center
         radius = result.sample.radius
         output_dim = result.sample.output_dim
+        f = self.dynamics_model(center).flatten()
         
         # Extract center and radius for 1D case
         x_center = center[0]
@@ -223,8 +221,8 @@ class DynamicsNetworkPlotter:
         # Create rectangle patch for each output dimension
         ax = self.axes[output_dim]
         y_range = ax.get_ylim()
-        y_min = y_range[0]
-        height = y_range[1] - y_range[0]
+        height = (y_range[1] - y_range[0])*0.05
+        y_min = f[output_dim] - height/2
         
         # Create rectangle patch with alpha transparency
         if result.issat():
@@ -249,6 +247,7 @@ class DynamicsNetworkPlotter:
         center = result.sample.center
         radius = result.sample.radius
         output_dim = result.sample.output_dim
+        f = self.dynamics_model(center).flatten()
         
         # Extract center and radius for 2D case
         x_center, y_center = center
@@ -261,13 +260,9 @@ class DynamicsNetworkPlotter:
         # Create a rectangle in the correct subplot
         ax = self.axes[output_dim]
 
-        # Get z range for the current axis
-        if self.z_min is None or self.z_max is None:
-            # If z limits are not set, use the default limits of the axis
-            z_min, z_max = ax.get_zlim()
-        else:
-            # Use the z limits set during initialization
-            z_min, z_max = self.z_min, self.z_max
+        z_range = ax.get_ylim()
+        height = (z_range[1] - z_range[0])*0.05
+        z_min, z_max = f[output_dim] - height/2, f[output_dim] + height/2
         
         # Define the vertices of the rectangular prism
         # Use actual z-axis limits to determine the height of the polygon
