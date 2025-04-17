@@ -188,9 +188,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Check if we need to split based on remainder bounds
         if r_upper[j] - r_lower[j] > epsilon:
             # Try and see if splitting the input_dimension is helpful
-            split_dim = data.nextsplitdim()
-            sample_left, sample_right = split_sample(data, delta, split_dim)
-            return SampleResultMaybe(data, [sample_left, sample_right])
+            split_dim = data.nextsplitdim(lambda x: taylor_approximation(x, taylor_pol_upper, sample), dynamics)
+            if split_dim is not None:
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return SampleResultMaybe(data, [sample_left, sample_right])
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -231,9 +232,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dim = data.nextsplitdim()
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, [sample_left, sample_right])
+                split_dim = data.nextsplitdim(lambda x: taylor_approximation(x, taylor_pol_upper, sample), dynamics)
+                if split_dim is not None:
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    return SampleResultMaybe(data, [sample_left, sample_right])
 
             return SampleResultUNSAT(data, [cex])
 
@@ -268,9 +270,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dim = data.nextsplitdim()
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, [sample_left, sample_right])
+                split_dim = data.nextsplitdim(lambda x: taylor_approximation(x, taylor_pol_upper, sample), dynamics)
+                if split_dim is not None:
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    return SampleResultMaybe(data, [sample_left, sample_right])
 
             return SampleResultUNSAT(data, [cex])
 

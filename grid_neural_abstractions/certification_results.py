@@ -9,6 +9,7 @@ class CertificationRegion:
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
         self.radius = radius
         self.output_dim = output_dim
+        self.min_radius = 1e-4
 
         if split_dim is None:
             split_dim = center.shape[0] - 1
@@ -23,8 +24,34 @@ class CertificationRegion:
         """
         return np.prod(2 * self.radius).item()
     
-    def nextsplitdim(self):
-        return (self.split_dim + 1) % self.center.shape[0]
+    def nextsplitdim(self, taylor_approximation, dynamics):
+        """
+        Estimate the error of the Taylor approximation for a random point in the region.
+
+        :param sample: The center point of the region.
+        :param data: A tuple containing the sample, delta (perturbation vector), and output dimension index.
+        :param taylor_pol: The Taylor polynomial coefficients (f(c), Df(c), R).
+        :param dynamics: The dynamics function to compare against.
+        :return: The absolute error between the Taylor approximation and the dynamics function at a random point.
+        """
+        sample, delta = self.center, self.radius  # Unpack the data tuple
+        random_offset = 2 * np.random.random() - 1
+        error = 0.0
+        split_dim = None
+        approximation_error = taylor_approximation(sample)[self.output_dim] - dynamics(sample).flatten()[self.output_dim]
+        for i, delta_i in enumerate(delta):
+            if delta_i < self.min_radius:
+                continue
+            random_point = sample.copy()
+            random_point[i] += random_offset * delta_i
+            # Calculate the Taylor approximation at the random point (corrected by the error from the centre)
+            approx = taylor_approximation(random_point)[self.output_dim]-approximation_error
+            true_value = dynamics(random_point).flatten()[self.output_dim]
+            current_error = np.abs(approx - true_value)
+            if current_error > error:
+                split_dim = i
+                error = current_error
+        return split_dim
     
     def incrementsplitdim(self):
         self.split_dim = (self.split_dim + 1) % self.center.shape[0]
