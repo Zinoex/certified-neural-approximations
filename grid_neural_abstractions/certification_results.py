@@ -3,12 +3,12 @@ import numpy as np
 
 
 class CertificationRegion:
-    def __init__(self, center: np.array, radius: np.array, ouput_dim: int = None, split_dim: int = None):
+    def __init__(self, center: np.array, radius: np.array, output_dim: int = None, split_dim: int = None):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
         self.radius = radius
-        self.output_dim = ouput_dim
+        self.output_dim = output_dim
 
         if split_dim is None:
             split_dim = center.shape[0] - 1
