@@ -20,7 +20,7 @@ def split_sample(data, delta, split_dim):
 
 class VerificationStrategy(ABC):
     @abstractmethod
-    def verify(self, network, dynamics, data: Region, epsilon, precision=1e-6):
+    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
         """
         Verify the neural network against the dynamics.
 
@@ -52,11 +52,11 @@ class MarabouLipschitzStrategy(VerificationStrategy):
         # https://en.wikipedia.org/wiki/Taylor%27s_theorem#Taylor's_theorem_for_multivariate_functions
 
         # delta * L 
-        L_step = np.matmul(L_max, delta)
+        L_step = np.dot(L_max[j], delta)
 
-        if np.any(L_step > epsilon):
+        if L_step[j] > epsilon:
             # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
-            split_dim = np.argmax(L_max[np.argmax(L_step), :] * delta)
+            split_dim = np.argmax(L_max[j, :] * delta)
             sample_left, sample_right = split_sample(data, delta, split_dim)
 
             return SampleResultMaybe(data, [sample_left, sample_right])
@@ -98,9 +98,9 @@ class MarabouLipschitzStrategy(VerificationStrategy):
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
             network.additionalEquList.clear()
-            nn_cex = network.evaluateWithMarabou([cex])[0]
+            nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
-            if np.all(np.abs(nn_cex - f_cex) < epsilon):
+            if np.abs(nn_cex - f_cex)[j] < epsilon:
                 split_dim = np.argmax(L_max[j, :] * delta)
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, [sample_left, sample_right])
@@ -133,9 +133,9 @@ class MarabouLipschitzStrategy(VerificationStrategy):
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
             network.additionalEquList.clear()
-            nn_cex = network.evaluateWithMarabou([cex])[0]
+            nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
-            if np.all(np.abs(nn_cex - f_cex) < epsilon):
+            if np.abs(nn_cex - f_cex)[j] < epsilon:
                 split_dim = np.argmax(L_max[j, :] * delta)
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, [sample_left, sample_right])
@@ -237,9 +237,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
             network.additionalEquList.clear()
-            nn_cex = network.evaluateWithMarabou([cex])[0]
+            nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
-            if np.all(np.abs(nn_cex - f_cex) < epsilon):
+            if np.abs(nn_cex - f_cex)[j] < epsilon:
                 split_dimensions = np.argsort(-np.abs(df_c_lower)[j, :] * delta)
                 split_dim = [
                     sd for sd in split_dimensions
@@ -280,9 +280,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
             ), "The counterexample violates the bound, this is not a valid counterexample"
 
             network.additionalEquList.clear()
-            nn_cex = network.evaluateWithMarabou([cex])[0]
+            nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
-            if np.all(np.abs(nn_cex - f_cex) < epsilon):
+            if np.abs(nn_cex - f_cex)[j] < epsilon:
                 split_dimensions = np.argsort(-np.abs(df_c_upper)[j, :] * delta)
                 split_dim = [
                     sd for sd in split_dimensions
