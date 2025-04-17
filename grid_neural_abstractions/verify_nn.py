@@ -10,7 +10,7 @@ from maraboupy import Marabou
 from .dynamics import VanDerPolOscillator
 
 from .verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
-from .certification_results import Region
+from .certification_results import CertificationRegion
 from .visualization import DynamicsPlotter  # Import the new plotter
 
 from .train_nn import generate_data
@@ -85,9 +85,12 @@ def verify_nn(
 
     partial_process_sample = partial(process_sample, strategy, dynamics_model, epsilon)
 
+    delta = np.full(input_dim, delta)
     X_train, _ = generate_data(input_dim, dynamics_model.input_domain, delta=delta, grid=True, device="cpu")
+    output_dim = dynamics_model.output_dim
     samples = [
-        Region(x.double().numpy(), np.full_like(x.double(), delta)) for x in X_train
+        CertificationRegion(x.double().numpy(), delta, j)
+        for x in X_train for j in range(output_dim)
     ]
 
     initializer = partial(read_onnx_into_local, onnx_path)

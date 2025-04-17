@@ -2,15 +2,16 @@ import abc
 import numpy as np
 
 
-class Region:
-    def __init__(self, center: np.array, radius: np.array):
+class CertificationRegion:
+    def __init__(self, center: np.array, radius: np.array, ouput_dim: int = None):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
         self.radius = radius
+        self.output_dim = ouput_dim
 
     def __iter__(self):
-        return iter((self.center, self.radius))
+        return iter((self.center, self.radius, self.output_dim))
 
     def lebesguemeasure(self):
         """
