@@ -5,11 +5,11 @@ import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 
 
-class DynamicsPlotter:
+class DynamicsNetworkPlotter:
     """
     Class for visualizing 1D and 2D dynamics and verification results.
     """
-    def __init__(self, dynamics_model, resolution=100):
+    def __init__(self, dynamics_model, network, resolution=100):
         """
         Initialize the plotter with a dynamics model.
         
@@ -18,6 +18,7 @@ class DynamicsPlotter:
             resolution: Number of points to plot for the dynamics function
         """
         self.dynamics_model = dynamics_model
+        self.network = network
         self.resolution = resolution
         self.input_dim = dynamics_model.input_dim
         self.output_dim = dynamics_model.output_dim
@@ -53,8 +54,9 @@ class DynamicsPlotter:
         self.certified_regions = [[] for _ in range(self.output_dim)]
         self.uncertified_regions = [[] for _ in range(self.output_dim)]
         
-        # Initialize plot with the dynamics function
+        # Initialize plot with the dynamics and network function
         self.plot_dynamics()
+        self.plot_network()
     
     def _init_2d_plot(self):
         """Initialize plot for 2D dynamics"""
@@ -83,6 +85,7 @@ class DynamicsPlotter:
         
         # Initialize plot with the dynamics function
         self.plot_dynamics()
+        self.plot_network()
         
     def plot_dynamics(self):
         """Plot the dynamics function."""
@@ -131,6 +134,55 @@ class DynamicsPlotter:
                                      linewidth=0, antialiased=True)
         
         self.z_min, self.z_max = ax.get_zlim()
+        
+    def plot_network(self):
+        """Plot the network function."""
+        if self.input_dim == 1:
+            self._plot_1d_network()
+        elif self.input_dim == 2:
+            self._plot_2d_network()
+    
+    def _plot_1d_network(self):
+        """Plot 1D network function"""
+        domain = self.dynamics_model.input_domain
+        x = np.linspace(domain[0][0], domain[0][1], self.resolution)
+        
+        # Reshape for the network model input
+        x_input = np.array([x_val for x_val in x]).reshape(-1, 1)
+        y_outputs = np.array([self.network.evaluateWithoutMarabou([x_val])[0].flatten() for x_val in x_input])
+        
+        # Plot each output dimension
+        for i, ax in enumerate(self.axes):
+            y = y_outputs[:, i] if y_outputs.ndim > 1 else y_outputs
+            ax.plot(x, y, 'r-', label='network')
+            ax.legend()
+    
+    def _plot_2d_network(self):
+        """Plot 2D network function as a surface"""
+        domain = self.dynamics_model.input_domain
+        
+        # Create grid points for each dimension
+        grid_points_per_dim = [
+            np.linspace(domain[i][0], domain[i][1], self.resolution)
+            for i in range(self.input_dim)
+        ]
+        
+        # Create mesh grid
+        mesh = np.meshgrid(*grid_points_per_dim)
+        
+        # Reshape inputs for vectorized evaluation
+        X = np.vstack(list(map(np.ravel, mesh)))
+        Y = [self.network.evaluateWithoutMarabou([X[:, i]])[0].flatten() for i in range(X.shape[-1])]
+        Y = np.stack(Y, axis=1)
+
+        # Plot each output dimension
+        for i, ax in enumerate(self.axes):
+            Z = Y[i].reshape(mesh[0].shape)
+            # Use single color (blue) instead of colormap and remove colorbar
+            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='red', alpha=0.6, 
+                                     linewidth=0, antialiased=True)
+        
+        self.z_min, self.z_max = ax.get_zlim()
     
     def update_figure(self, result):
         """
@@ -158,6 +210,7 @@ class DynamicsPlotter:
         """Update 1D figure with verification results"""
         center = result.sample.center
         radius = result.sample.radius
+        output_dim = result.sample.output_dim
         
         # Extract center and radius for 1D case
         x_center = center[0]
@@ -168,22 +221,24 @@ class DynamicsPlotter:
         width = 2 * x_radius
         
         # Create rectangle patch for each output dimension
-        for i, ax in enumerate(self.axes):
-            y_range = ax.get_ylim()
-            y_min = y_range[0]
-            height = y_range[1] - y_range[0]
-            
-            # Create rectangle patch with alpha transparency
-            if result.issat():
-                color = 'green'
-                rect = Rectangle((x_min, y_min), width, height, 
-                                color=color, alpha=0.2, label='Certified')
-                ax.add_patch(rect)
-            elif result.isunsat():
-                color = 'red'
-                rect = Rectangle((x_min, y_min), width, height, 
-                                color=color, alpha=0.2, label='Counterexample')
-                ax.add_patch(rect)
+        ax = self.axes[output_dim]
+        y_range = ax.get_ylim()
+        y_min = y_range[0]
+        height = y_range[1] - y_range[0]
+        
+        # Create rectangle patch with alpha transparency
+        if result.issat():
+            color = 'green'
+            rect = Rectangle((x_min, y_min), width, height, 
+                            color=color, alpha=0.2, label='Certified')
+            ax.add_patch(rect)
+        elif result.isunsat():
+            color = 'red'
+            rect = Rectangle((x_min, y_min), width, height, 
+                            color=color, alpha=0.2, label='Counterexample')
+            ax.add_patch(rect)
+        else:
+            return
         
         # Redraw the figure
         self.fig.canvas.draw()
@@ -193,6 +248,7 @@ class DynamicsPlotter:
         """Update 2D figure with verification results"""
         center = result.sample.center
         radius = result.sample.radius
+        output_dim = result.sample.output_dim
         
         # Extract center and radius for 2D case
         x_center, y_center = center
@@ -202,58 +258,59 @@ class DynamicsPlotter:
         x_min, x_max = x_center - x_radius, x_center + x_radius
         y_min, y_max = y_center - y_radius, y_center + y_radius
         
-        # Create a rectangle in each subplot
-        for i, ax in enumerate(self.axes):
-            # Get z range for the current axis
-            if self.z_min is None or self.z_max is None:
-                # If z limits are not set, use the default limits of the axis
-                z_min, z_max = ax.get_zlim()
-            else:
-                # Use the z limits set during initialization
-                z_min, z_max = self.z_min, self.z_max
+        # Create a rectangle in the correct subplot
+        ax = self.axes[output_dim]
+
+        # Get z range for the current axis
+        if self.z_min is None or self.z_max is None:
+            # If z limits are not set, use the default limits of the axis
+            z_min, z_max = ax.get_zlim()
+        else:
+            # Use the z limits set during initialization
+            z_min, z_max = self.z_min, self.z_max
+        
+        # Define the vertices of the rectangular prism
+        # Use actual z-axis limits to determine the height of the polygon
+        corners = np.array([
+            [x_min, y_min, z_min],
+            [x_max, y_min, z_min],
+            [x_max, y_max, z_min],
+            [x_min, y_max, z_min],
+            [x_min, y_min, z_max],
+            [x_max, y_min, z_max],
+            [x_max, y_max, z_max],
+            [x_min, y_max, z_max]
+        ])
+        
+        # Define the faces of the rectangular prism
+        faces = [
+            [corners[0], corners[1], corners[2], corners[3]],  # bottom
+            [corners[4], corners[5], corners[6], corners[7]],  # top
+            [corners[0], corners[1], corners[5], corners[4]],  # front
+            [corners[2], corners[3], corners[7], corners[6]],  # back
+            [corners[0], corners[3], corners[7], corners[4]],  # left
+            [corners[1], corners[2], corners[6], corners[5]]   # right
+        ]
+        
+        # Create a collection of polygons
+        if result.issat():
+            color = 'green'
+            alpha = 0.15
+        elif result.isunsat():
+            color = 'red'
+            alpha = 0.15
+        else:
+            return
             
-            # Define the vertices of the rectangular prism
-            # Use actual z-axis limits to determine the height of the polygon
-            corners = np.array([
-                [x_min, y_min, z_min],
-                [x_max, y_min, z_min],
-                [x_max, y_max, z_min],
-                [x_min, y_max, z_min],
-                [x_min, y_min, z_max],
-                [x_max, y_min, z_max],
-                [x_max, y_max, z_max],
-                [x_min, y_max, z_max]
-            ])
-            
-            # Define the faces of the rectangular prism
-            faces = [
-                [corners[0], corners[1], corners[2], corners[3]],  # bottom
-                [corners[4], corners[5], corners[6], corners[7]],  # top
-                [corners[0], corners[1], corners[5], corners[4]],  # front
-                [corners[2], corners[3], corners[7], corners[6]],  # back
-                [corners[0], corners[3], corners[7], corners[4]],  # left
-                [corners[1], corners[2], corners[6], corners[5]]   # right
-            ]
-            
-            # Create a collection of polygons
-            if result.issat():
-                color = 'green'
-                alpha = 0.15
-            elif result.isunsat():
-                color = 'red'
-                alpha = 0.15
-            else:
-                continue
-                
-            # Use Poly3DCollection instead of PolyCollection for 3D plots
-            from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-            
-            # Create and add 3D polygon collection with proper z-height
-            pc = Poly3DCollection([face for face in faces], 
-                                  alpha=alpha, 
-                                  facecolor=color, 
-                                  edgecolor=None)
-            ax.add_collection3d(pc)
+        # Use Poly3DCollection instead of PolyCollection for 3D plots
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+        
+        # Create and add 3D polygon collection with proper z-height
+        pc = Poly3DCollection([face for face in faces], 
+                                alpha=alpha, 
+                                facecolor=color, 
+                                edgecolor=None)
+        ax.add_collection3d(pc)
         
         # Redraw the figure
         self.fig.canvas.draw()

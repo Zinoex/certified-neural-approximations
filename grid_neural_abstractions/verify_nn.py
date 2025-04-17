@@ -11,7 +11,7 @@ from .dynamics import VanDerPolOscillator
 
 from .verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
 from .certification_results import CertificationRegion
-from .visualization import DynamicsPlotter  # Import the new plotter
+from .visualization import DynamicsNetworkPlotter  # Import the new plotter
 
 from .train_nn import generate_data
 
@@ -98,7 +98,7 @@ def verify_nn(
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
     if visualize and input_dim in [1, 2]:
-        plotter = DynamicsPlotter(dynamics_model)
+        plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))
         print(f"Initialized visualization for {input_dim}D dynamics")
 
     if num_workers == 1:
