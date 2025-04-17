@@ -174,32 +174,11 @@ class MarabouTaylorStrategy(VerificationStrategy):
         r_upper = taylor_pol_upper[2]  # Maximum remainder term
 
         # Check if we need to split based on remainder bounds
-        step = np.dot(np.abs(df_c_lower[j]), delta)
-        if np.any(step > epsilon):
-            # Find the dimension that contributes most to the remainder
-            split_dimensions = np.argsort(-np.abs(df_c_lower[j]) * delta)  # Sort in descending order
-            split_dim = [
-                sd for sd in split_dimensions
-                if delta[sd] > min_delta and np.abs(df_c_upper)[j, sd] * delta[sd] > splitting_threshold
-            ]
-            if split_dim:
-                split_dim = split_dim[0]
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, [sample_left, sample_right])
-
         if r_upper[j] - r_lower[j] > epsilon:
             # Try and see if splitting the input_dimension is helpful
-            for dim, _ in enumerate(inputVars):
-                delta_tmp = delta.copy()
-                delta_tmp[dim] = delta_tmp[dim] / 2 
-                taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
-                    dynamics, sample, delta_tmp
-                )
-                if np.abs(r_upper - r_lower)[j] > np.abs(taylor_pol_lower[2] - taylor_pol_upper[2])[j]:
-                    split_dim = dim
-                    if delta[split_dim] > min_delta:
-                        sample_left, sample_right = split_sample(data, delta, split_dim)
-                        return SampleResultMaybe(data, [sample_left, sample_right])
+            split_dim = data.nextsplitdim()
+            sample_left, sample_right = split_sample(data, delta, split_dim)
+            return SampleResultMaybe(data, [sample_left, sample_right])
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
