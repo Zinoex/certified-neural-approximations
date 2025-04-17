@@ -90,7 +90,7 @@ def verify_nn(
     output_dim = dynamics_model.output_dim
     samples = [
         CertificationRegion(x.double().numpy(), delta, j)
-        for x in X_train for j in range(output_dim)
+        for j in range(output_dim) for x in X_train
     ]
 
     initializer = partial(read_onnx_into_local, onnx_path)

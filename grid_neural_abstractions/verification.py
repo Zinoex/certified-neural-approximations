@@ -11,10 +11,13 @@ def split_sample(data, delta, split_dim):
     sample_left = deepcopy(data)
     sample_left.center[split_dim] -= split_radius
     sample_left.radius[split_dim] = split_radius
+    sample_left.incrementsplitdim()
 
     sample_right = deepcopy(data)
     sample_right.center[split_dim] += split_radius
     sample_right.radius[split_dim] = split_radius
+    sample_right.incrementsplitdim()
+
     return sample_left, sample_right
 
 
@@ -150,9 +153,6 @@ class MarabouTaylorStrategy(VerificationStrategy):
         prepare_taylor_expansion(dynamics.input_dim)
 
     def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
-        min_delta = 1e-3
-        splitting_threshold = 1e-3
-
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         options = Marabou.createOptions(verbosity=0)
@@ -219,15 +219,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dimensions = np.argsort(-np.abs(df_c_lower)[j, :] * delta)
-                split_dim = [
-                    sd for sd in split_dimensions
-                    if delta[sd] > min_delta and np.abs(df_c_upper)[j, sd] * delta[sd] > splitting_threshold
-                ]
-                if split_dim:
-                    split_dim = split_dim[0]
-                    sample_left, sample_right = split_sample(data, delta, split_dim)
-                    return SampleResultMaybe(data, [sample_left, sample_right])
+                split_dim = data.nextsplitdim()
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return SampleResultMaybe(data, [sample_left, sample_right])
 
             return SampleResultUNSAT(data, [cex])
 
@@ -262,15 +256,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dimensions = np.argsort(-np.abs(df_c_upper)[j, :] * delta)
-                split_dim = [
-                    sd for sd in split_dimensions
-                    if delta[sd] > min_delta and np.abs(df_c_upper)[j, sd] * delta[sd] > splitting_threshold
-                ]
-                if split_dim:
-                    split_dim = split_dim[0]
-                    sample_left, sample_right = split_sample(data, delta, split_dim)
-                    return SampleResultMaybe(data, [sample_left, sample_right])
+                split_dim = data.nextsplitdim()
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return SampleResultMaybe(data, [sample_left, sample_right])
 
             return SampleResultUNSAT(data, [cex])
 
