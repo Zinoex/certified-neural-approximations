@@ -89,6 +89,51 @@ class TestDynamicsModels(unittest.TestCase):
             
             # Just report the result
             print(f"Verification result for {name}: {'Passed' if verification_result is None else 'Failed'}")
+    
+    def test_sine2d_system(self):
+        """Test specifically for the Sine2D system."""
+        from grid_neural_abstractions.dynamics import Sine2D
+        
+        # Create models directory if it doesn't exist
+        model_dir = Path(__file__).parent.parent / "data"
+        model_dir.mkdir(exist_ok=True)
+        
+        # Test with default frequencies
+        self._test_sine2d_with_freq(model_dir, 1.0, 1.0, "sine2d")
+        
+        # Test with custom frequencies
+        self._test_sine2d_with_freq(model_dir, 2.0, 0.5, "sine2d_custom_freq")
+    
+    def _test_sine2d_with_freq(self, model_dir, freq_x, freq_y, model_name):
+        """Helper method to test Sine2D with specific frequencies."""
+        from grid_neural_abstractions.dynamics import Sine2D
+        
+        # Model file path
+        model_path = model_dir / f"{model_name}_model.onnx"
+        
+        # Initialize the dynamics model with specified frequencies
+        dynamics_instance = Sine2D(freq_x=freq_x, freq_y=freq_y)
+        
+        print(f"\nTesting Sine2D system with freq_x={freq_x}, freq_y={freq_y}")
+        
+        # Check if model exists or train one
+        if not model_path.exists():
+            print(f"Training model for Sine2D...")
+            
+            # Generate data and train the neural network
+            model = train_nn(dynamics_model=dynamics_instance)
+            
+            # Save the model
+            save_onnx_model(model, str(model_path))
+        else:
+            print(f"Using existing model: {model_path}")
+        
+        # Verify the model
+        verification_result = verify_dynamics_model(str(model_path), dynamics_instance)
+        
+        # Report the result
+        print(f"Verification result for Sine2D (freq_x={freq_x}, freq_y={freq_y}): {'Passed' if verification_result else 'Failed'}")
+        self.assertTrue(verification_result, f"Sine2D model with freq_x={freq_x}, freq_y={freq_y} verification should pass")
 
 
 if __name__ == "__main__":
