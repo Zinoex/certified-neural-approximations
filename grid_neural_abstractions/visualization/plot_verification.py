@@ -131,7 +131,7 @@ class DynamicsNetworkPlotter:
         for i, ax in enumerate(self.axes):
             Z = Y[i].reshape(mesh[0].shape)
             # Use single color (blue) instead of colormap and remove colorbar
-            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='blue', alpha=0.8, 
+            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='blue', alpha=0.6, 
                                      linewidth=0, antialiased=True)
         
     
