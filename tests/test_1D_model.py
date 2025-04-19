@@ -135,6 +135,43 @@ class Test1DModels(unittest.TestCase):
             
             # Just report the result
             print(f"Verification result for {name}: {'Passed' if verification_result is None else 'Failed'}")
+    
+    def test_watertank(self):
+        """
+        Test specifically for the water tank model.
+        This test focuses only on the water tank dynamics system.
+        """
+        print("\nTesting Water Tank dynamics system")
+        
+        # Initialize the WaterTank dynamics model
+        dynamics_instance = WaterTank()
+        name = "WaterTank"
+        
+        # Model file path
+        model_path = self.model_dir / f"{name.lower()}_model.onnx"
+        
+        # Plot the dynamics
+        plot_path = self.plot_dir / f"{name.lower()}_dynamics.png"
+        plot_1D_dynamics(dynamics_instance, str(plot_path))
+        print(f"Plot saved to {plot_path}")
+        
+        # Check if model exists or train one
+        if not model_exists(name):
+            print(f"Training model for {name}...")
+            
+            # Using the train_nn function with the water tank dynamics model
+            model = train_nn(dynamics_model=dynamics_instance)
+            
+            # Save the model with the specific name
+            save_onnx_model(model, str(model_path))
+        else:
+            print(f"Using existing model: {model_path}")
+        
+        # Verify the model
+        verification_result = verify_dynamics_model(str(model_path), dynamics_instance)
+        
+        # Report the result
+        print(f"Verification result for {name}: {'Passed' if verification_result is None else 'Failed'}")
 
 
 if __name__ == "__main__":

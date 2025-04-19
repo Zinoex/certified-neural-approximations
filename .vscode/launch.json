@@ -14,10 +14,11 @@
             "cwd": "${workspaceFolder}"
         },
         {
-            "name": "1D Model Tests",
+            "name": "Water Tank",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/tests/test_1D_model.py",
+            "args": ["-k", "test_watertank"],
             "console": "integratedTerminal",
             "justMyCode": true,
             "env": {

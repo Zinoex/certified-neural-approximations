@@ -167,7 +167,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
     def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
-        options = Marabou.createOptions(verbosity=0)
+        options = Marabou.createOptions(verbosity=0, produceProofs=True)
 
         sample, delta, j = data  # Unpack the data tuple
 
@@ -203,6 +203,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Reset the query
         network.additionalEquList.clear()
 
+        # Found a counterexample to f(x) - N(x) <= epsilon
         # x df_c - nn_output >= epsilon + c df_c - f(c) - r_upper
         equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         for i, inputVar in enumerate(inputVars):
@@ -242,7 +243,8 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Reset the query
         network.additionalEquList.clear()
 
-        # x df_c - nn_output >= -epsilon - c df_c + f(c) + r_lower
+        # Found a counterexample to f(x) - N(x) >= -epsilon
+        # x df_c - nn_output >= -epsilon + c df_c - f(c) - r_lower
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         for i, inputVar in enumerate(inputVars):
             # j is the output dimension, i is the input dimension, thus df_c[j, i] is the partial derivative of the j-th output with respect to the i-th input

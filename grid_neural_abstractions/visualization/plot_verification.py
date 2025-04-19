@@ -235,7 +235,7 @@ class DynamicsNetworkPlotter:
         x_vals = np.linspace(x_min, x_min + width, self.resolution)
         y_vals = [self.dynamics_model(np.array([[x]]))[0][output_dim] for x in x_vals]
         height = max(y_vals) - min(y_vals)
-        y_min = f[output_dim] - height/2
+        y_min = min(y_vals)
         
         # Create rectangle patch with alpha transparency
         if result.issat():
@@ -287,8 +287,7 @@ class DynamicsNetworkPlotter:
         # Calculate the height based on the maximum dynamics value over the corners
         corner_values = [self.dynamics_model(np.array([x, y])).flatten()[output_dim] for x, y in [
             (x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]]
-        height = max(corner_values) - min(corner_values)
-        z_min, z_max = f[output_dim] - height/2, f[output_dim] + height/2
+        z_min, z_max = min(corner_values), max(corner_values)
         
         # Define the vertices of the rectangular prism
         # Use actual z-axis limits to determine the height of the polygon
