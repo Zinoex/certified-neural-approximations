@@ -82,13 +82,11 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
         # TODO: Add other equation types
 
         # Add new input variables
-        joint_network.inputVars[0] = [
-            np.arange(joint_network.numVars, joint_network.numVars + small_network_inputVars[0].shape[0], dtype=np.int64).view(1, -1)
-        ]
+        joint_network.inputVars[0] = np.arange(joint_network.numVars, joint_network.numVars + small_network_inputVars.shape[0], dtype=np.int64).reshape((1, -1))
         joint_network_inputVars = joint_network.inputVars[0].flatten()
-        joint_network.numVars += small_network_inputVars[0].shape[0]
+        joint_network.numVars += small_network_inputVars.shape[0]
 
-        for i in range(small_network_inputVars[0].shape[0]):
+        for i in range(small_network_inputVars.shape[0]):
             equation_large = MarabouUtils.Equation(MarabouCore.Equation.EQ)
             equation_large.addAddend(1, joint_network_inputVars[i])
             equation_large.addAddend(-1, large_network_inputVars[i])
@@ -102,10 +100,7 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
             joint_network.addEquation(equation_small)
 
         # Give both output variables
-        joint_network.outputVars[0] = [
-            np.concatenate((large_network_outputVars, small_network_outputVars)).view(1, -1)
-        ]
-
+        joint_network.outputVars[0] = np.concatenate((large_network_outputVars, small_network_outputVars)).reshape((1, -1))
 
         return joint_network, large_network_outputVars, small_network_outputVars
 
