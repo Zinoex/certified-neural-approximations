@@ -2,7 +2,7 @@ import numpy as np  # Add numpy for grid generation
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from .dynamics import VanDerPolOscillator, Quadcopter
+from grid_neural_abstractions.dynamics import VanDerPolOscillator, Quadcopter
 
 
 # Define the neural network
@@ -88,21 +88,22 @@ def generate_data(input_size, input_domain, delta=0.01, grid=False, batch_size=2
 
 
 # Train the neural network
-def train_nn(dynamics_model=None):
+def train_nn(dynamics_model=None, hidden_sizes=None, learning_rate=0.001):
     if dynamics_model is None:
         dynamics_model = Quadcopter()
     
     input_size = dynamics_model.input_dim
-    hidden_sizes = [128, 128, 128]  # Adjust hidden layer sizes
+    if hidden_sizes is None:  # Do not use lists as default values, as they are mutable
+        hidden_sizes = [128, 128, 128]  # Adjust hidden layer sizes
     output_size = dynamics_model.output_dim  # Update output size to match target size
     input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
     num_epochs = 50000
-    learning_rate = 0.001  # Reduced learning rate
+    # learning_rate = 0.001  # Reduced learning rate
     batch_size = 2048
     
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
-    patience = 5
+    patience = 1000
     best_loss = float('inf')
     patience_counter = 0
 
@@ -110,7 +111,7 @@ def train_nn(dynamics_model=None):
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-5)  # Use AdamW optimizer
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.9, patience=1000, min_lr=1e-6
+        optimizer, mode='min', factor=0.9, patience=200, min_lr=1e-7
     )
 
     # Load data

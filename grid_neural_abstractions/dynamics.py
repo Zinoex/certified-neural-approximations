@@ -1,5 +1,7 @@
 from .translators import TorchTranslator, NumpyTranslator
 import numpy as np
+import torch
+
 class DynamicalSystem:
     """Base class for dynamical systems."""
     
@@ -369,3 +371,32 @@ class Sine2D(DynamicalSystem):
         dy = -translator.sin(self.freq_x * x[0])
         
         return translator.stack([dx, dy])
+
+
+class NNDynamics(DynamicalSystem):
+    """A class representing the dynamics of a neural network."""
+
+    def __init__(self, network, input_domain):
+        super().__init__()
+        self.network = network
+        self.input_dim = network.network[0].in_features
+        self.output_dim = self.input_dim
+        self.input_domain = input_domain
+
+    def compute_dynamics(self, x, translator):
+        """
+        Compute the dynamics for the neural network.
+        
+        Args:
+            x: The state tensor with shape [input_dim, batch_size]
+            
+        Returns:
+            The derivatives of the system with shape [output_dim, batch_size]
+        """
+        assert isinstance(translator, TorchTranslator), "NNDynamics only supports TorchTranslator"
+
+        if not torch.is_tensor(x):
+            x = torch.tensor(x, dtype=torch.float32)
+
+        # Forward pass through the neural network
+        return self.network(x.T).T
