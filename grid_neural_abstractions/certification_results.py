@@ -9,7 +9,7 @@ class CertificationRegion:
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
         self.radius = radius
         self.output_dim = output_dim
-        self.min_radius = 1e-4
+        self.min_radius = 1e-4 * self.radius
 
         if split_dim is None:
             split_dim = center.shape[0] - 1
@@ -37,15 +37,14 @@ class CertificationRegion:
         :return: The dimension index with the highest approximation error
         """
         sample, delta = self.center, self.radius  # Unpack the data tuple
-        random_offset = 2 * np.random.random() - 1
         error = 0.0
         split_dim = None
         approximation_error = taylor_approximation(sample)[self.output_dim] - dynamics(sample).flatten()[self.output_dim]
         for i, delta_i in enumerate(delta):
-            if delta_i < self.min_radius:
+            if delta_i < self.min_radius[i]:
                 continue
             random_point = sample.copy()
-            random_point[i] += random_offset * delta_i
+            random_point[i] += 0.1 * delta_i
             # Calculate the Taylor approximation at the random point (corrected by the error from the centre)
             approx = taylor_approximation(random_point)[self.output_dim]-approximation_error
             true_value = dynamics(random_point).flatten()[self.output_dim]
