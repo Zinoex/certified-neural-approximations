@@ -20,7 +20,7 @@ def split_sample(data, delta, split_dim):
 
     return sample_left, sample_right
 
-def taylor_approximation(x, taylor_pol, c):
+def taylor_approximation(x, taylor_pol_upper, taylor_pol_lower, c):
     """
     Evaluate the Taylor approximation at a given point x.
 
@@ -29,7 +29,11 @@ def taylor_approximation(x, taylor_pol, c):
     :return: The value of the polynomial at x.
     """
     # Unpack the Taylor polynomial components
-    f_c, df_c, r = taylor_pol
+    f_c_upper, df_c_upper, r_upper = taylor_pol_upper
+    f_c_lower, df_c_lower, r_lower = taylor_pol_lower
+    f_c = (f_c_upper + f_c_lower) / 2
+    df_c = (df_c_upper + df_c_lower) / 2
+    r = (r_upper + r_lower) / 2
     return f_c + np.dot(df_c, (x-c)) + r
 
 
@@ -188,9 +192,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Check if we need to split based on remainder bounds
         if r_upper[j] - r_lower[j] > epsilon:
             # Try and see if splitting the input_dimension is helpful
-            split_dim = data.nextsplitdim()
-            sample_left, sample_right = split_sample(data, delta, split_dim)
-            return SampleResultMaybe(data, [sample_left, sample_right])
+            split_dim = data.nextsplitdim(lambda x: taylor_approximation(x, taylor_pol_upper, taylor_pol_lower, sample), dynamics)
+            if split_dim is not None:
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return SampleResultMaybe(data, [sample_left, sample_right])
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -231,9 +236,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dim = data.nextsplitdim()
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, [sample_left, sample_right])
+                split_dim = data.nextsplitdim(lambda x: taylor_approximation(x, taylor_pol_upper, taylor_pol_lower, sample), dynamics)
+                if split_dim is not None:
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    return SampleResultMaybe(data, [sample_left, sample_right])
 
             return SampleResultUNSAT(data, [cex])
 
@@ -268,9 +274,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dim = data.nextsplitdim()
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, [sample_left, sample_right])
+                split_dim = data.nextsplitdim(lambda x: taylor_approximation(x, taylor_pol_upper, taylor_pol_lower, sample), dynamics)
+                if split_dim is not None:
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    return SampleResultMaybe(data, [sample_left, sample_right])
 
             return SampleResultUNSAT(data, [cex])
 

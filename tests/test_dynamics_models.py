@@ -44,7 +44,7 @@ def verify_dynamics_model(model_path, dynamics_model):
     print(f"Verifying model: {model_path}")
     # Use a larger delta and epsilon for faster verification in tests
     delta = [(high - low) / 2 for low, high in dynamics_model.input_domain]
-    epsilon = 0.2
+    epsilon = 0.05
     try:
         # Update verify_nn function to accept dynamics_model parameter
         verify_nn(model_path, delta=delta, epsilon=epsilon, num_workers=1, dynamics_model=dynamics_model)

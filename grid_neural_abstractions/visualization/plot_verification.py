@@ -22,7 +22,7 @@ class DynamicsNetworkPlotter:
         self.resolution = resolution
         self.input_dim = dynamics_model.input_dim
         self.output_dim = dynamics_model.output_dim
-        self.alpha = 0.3 # Transparency for the patches
+        self.alpha = 0.4 # Transparency for the patches
         
         # Initialize figure based on input dimension
         if self.input_dim == 1:
@@ -131,7 +131,7 @@ class DynamicsNetworkPlotter:
         for i, ax in enumerate(self.axes):
             Z = Y[i].reshape(mesh[0].shape)
             # Use single color (blue) instead of colormap and remove colorbar
-            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='blue', alpha=0.8, 
+            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='blue', alpha=self.alpha, 
                                      linewidth=0, antialiased=True)
         
     
@@ -180,7 +180,7 @@ class DynamicsNetworkPlotter:
         for i, ax in enumerate(self.axes):
             Z = Y[i].reshape(mesh[0].shape)
             # Use single color (blue) instead of colormap and remove colorbar
-            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='red', alpha=0.6, 
+            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='red', alpha=self.alpha, 
                                      linewidth=0, antialiased=True)
         
         self.z_min, self.z_max = ax.get_zlim()
@@ -205,7 +205,18 @@ class DynamicsNetworkPlotter:
             self._update_2d_figure(result)
     
     def _update_1d_figure(self, result):
-        """Update 1D figure with verification results"""
+        """
+        Update the 1D figure with verification results by adding colored rectangles.
+        
+        For certified regions (result.issat()), green rectangles are added.
+        For counterexample regions (result.isunsat()), red rectangles are added.
+        The rectangle width corresponds to the input domain of the region,
+        and the height covers the range of output values within that region.
+        
+        Args:
+            result: Verification result object containing sample information
+                    (center point, radius, and output dimension)
+        """
         center = result.sample.center
         radius = result.sample.radius
         output_dim = result.sample.output_dim
@@ -221,8 +232,9 @@ class DynamicsNetworkPlotter:
         
         # Create rectangle patch for each output dimension
         ax = self.axes[output_dim]
-        y_range = ax.get_ylim()
-        height = (y_range[1] - y_range[0])*0.05
+        x_vals = np.linspace(x_min, x_min + width, self.resolution)
+        y_vals = [self.dynamics_model(np.array([[x]]))[0][output_dim] for x in x_vals]
+        height = max(y_vals) - min(y_vals)
         y_min = f[output_dim] - height/2
         
         # Create rectangle patch with alpha transparency
@@ -244,11 +256,21 @@ class DynamicsNetworkPlotter:
         self.fig.canvas.flush_events()
     
     def _update_2d_figure(self, result):
-        """Update 2D figure with verification results"""
+        """
+        Update the 2D figure with verification results by adding colored 3D rectangular prisms.
+        
+        For certified regions (result.issat()), green prisms are added.
+        For counterexample regions (result.isunsat()), red prisms are added.
+        The prism base corresponds to the 2D input domain of the region,
+        and the height represents the range of output values within that region.
+        
+        Args:
+            result: Verification result object containing sample information
+                    (center point, radius, and output dimension)
+        """
         center = result.sample.center
         radius = result.sample.radius
         output_dim = result.sample.output_dim
-        f = self.dynamics_model(center).flatten()
         
         # Extract center and radius for 2D case
         x_center, y_center = center
@@ -261,9 +283,10 @@ class DynamicsNetworkPlotter:
         # Create a rectangle in the correct subplot
         ax = self.axes[output_dim]
 
-        z_range = ax.get_ylim()
-        height = (z_range[1] - z_range[0])*0.05
-        z_min, z_max = f[output_dim] - height/2, f[output_dim] + height/2
+        # Calculate the height based on the maximum dynamics value over the corners
+        corner_values = [self.dynamics_model(np.array([x, y])).flatten()[output_dim] for x, y in [
+            (x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]]
+        z_min, z_max = min(corner_values), max(corner_values) 
         
         # Define the vertices of the rectangular prism
         # Use actual z-axis limits to determine the height of the polygon
@@ -305,7 +328,7 @@ class DynamicsNetworkPlotter:
         pc = Poly3DCollection([face for face in faces], 
                                 alpha=alpha, 
                                 facecolor=color, 
-                                edgecolor=None)
+                                edgecolor='black')
         ax.add_collection3d(pc)
         
         # Redraw the figure
