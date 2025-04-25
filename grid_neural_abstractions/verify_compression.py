@@ -64,17 +64,17 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
 
         joint_network.numVars += small_network.numVars
 
-        for i in range(small_network.reluList):
+        for i in range(len(small_network.reluList)):
             v1, v2 = small_network.reluList[i]
             joint_network.addRelu(v1 + variable_offset, v2 + variable_offset)
 
-        for i in range(small_network.leakyReluList):
+        for i in range(len(small_network.leakyReluList)):
             v1, v2 = small_network.leakyReluList[i]
             joint_network.addLeakyRelu(v1 + variable_offset, v2 + variable_offset)
 
-        for i in range(small_network.equList):
+        for i in range(len(small_network.equList)):
             eq = copy.deepcopy(small_network.equList[i])
-            for j in range(eq.addendList):
+            for j in range(len(eq.addendList)):
                 c, x = eq.addendList[j]
                 eq.addendList[j] = (c, x + variable_offset)
             joint_network.addEquation(eq)
