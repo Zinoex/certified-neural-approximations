@@ -379,7 +379,7 @@ class NNDynamics(DynamicalSystem):
     def __init__(self, network, input_domain):
         super().__init__()
         self.network = network
-        self.input_dim = network.network[0].in_features
+        self.input_dim = len(input_domain)
         self.output_dim = self.input_dim
         self.input_domain = input_domain
 
