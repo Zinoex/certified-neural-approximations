@@ -22,7 +22,7 @@ class DynamicsNetworkPlotter:
         self.resolution = resolution
         self.input_dim = dynamics_model.input_dim
         self.output_dim = dynamics_model.output_dim
-        self.alpha = 0.6 # Transparency for the patches
+        self.alpha = 0.4 # Transparency for the patches
         
         # Initialize figure based on input dimension
         if self.input_dim == 1:
@@ -131,7 +131,7 @@ class DynamicsNetworkPlotter:
         for i, ax in enumerate(self.axes):
             Z = Y[i].reshape(mesh[0].shape)
             # Use single color (blue) instead of colormap and remove colorbar
-            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='blue', alpha=0.6, 
+            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='blue', alpha=self.alpha, 
                                      linewidth=0, antialiased=True)
         
     
@@ -180,7 +180,7 @@ class DynamicsNetworkPlotter:
         for i, ax in enumerate(self.axes):
             Z = Y[i].reshape(mesh[0].shape)
             # Use single color (blue) instead of colormap and remove colorbar
-            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='red', alpha=0.6, 
+            surface = ax.plot_surface(mesh[0], mesh[1], Z, color='red', alpha=self.alpha, 
                                      linewidth=0, antialiased=True)
         
         self.z_min, self.z_max = ax.get_zlim()
@@ -271,7 +271,6 @@ class DynamicsNetworkPlotter:
         center = result.sample.center
         radius = result.sample.radius
         output_dim = result.sample.output_dim
-        f = self.dynamics_model(center).flatten()
         
         # Extract center and radius for 2D case
         x_center, y_center = center
@@ -287,8 +286,7 @@ class DynamicsNetworkPlotter:
         # Calculate the height based on the maximum dynamics value over the corners
         corner_values = [self.dynamics_model(np.array([x, y])).flatten()[output_dim] for x, y in [
             (x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]]
-        height = max(corner_values) - min(corner_values)
-        z_min, z_max = f[output_dim] - height/2, f[output_dim] + height/2
+        z_min, z_max = min(corner_values), max(corner_values) 
         
         # Define the vertices of the rectangular prism
         # Use actual z-axis limits to determine the height of the polygon
@@ -330,7 +328,7 @@ class DynamicsNetworkPlotter:
         pc = Poly3DCollection([face for face in faces], 
                                 alpha=alpha, 
                                 facecolor=color, 
-                                edgecolor=None)
+                                edgecolor='black')
         ax.add_collection3d(pc)
         
         # Redraw the figure
