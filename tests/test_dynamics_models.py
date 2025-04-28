@@ -160,7 +160,7 @@ class TestDynamicsModels(unittest.TestCase):
             model = train_nn(
                 dynamics_model=dynamics_instance,
                 hidden_sizes=[15,15],
-                epsilon=epsilon*0.9
+                epsilon=epsilon/2,  # Use a smaller epsilon for training
             )
             
             # Save the model

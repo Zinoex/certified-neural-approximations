@@ -133,8 +133,8 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     return SampleResultMaybe(data, [sample_left, sample_right])
                 else:
                     print("No split dimension found, returning UNSAT")
-            else:
-                print("Counterexample found |N(cex) - f(cex)! > epsilon")
+            #else:
+            #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
             return SampleResultUNSAT(data, [cex])
 
@@ -175,8 +175,8 @@ class MarabouTaylorStrategy(VerificationStrategy):
                     return SampleResultMaybe(data, [sample_left, sample_right])
                 else:
                     print("No split dimension found, returning UNSAT")
-            else:
-                print("Counterexample found |N(cex) - f(cex)! > epsilon")
+            #else:
+            #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
             return SampleResultUNSAT(data, [cex])
 
