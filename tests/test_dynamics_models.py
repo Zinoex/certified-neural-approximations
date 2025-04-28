@@ -37,14 +37,13 @@ def model_exists(dynamics_name):
     return model_path.exists()
 
 
-def verify_dynamics_model(model_path, dynamics_model):
+def verify_dynamics_model(model_path, dynamics_model, epsilon=0.05):
     """
     Verify the trained model against the dynamics system.
     """
     print(f"Verifying model: {model_path}")
     # Use a larger delta and epsilon for faster verification in tests
     delta = [(high - low) / 2 for low, high in dynamics_model.input_domain]
-    epsilon = 0.05
     try:
         # Update verify_nn function to accept dynamics_model parameter
         verify_nn(model_path, delta=delta, epsilon=epsilon, num_workers=1, dynamics_model=dynamics_model)
@@ -134,6 +133,47 @@ class TestDynamicsModels(unittest.TestCase):
         # Report the result
         print(f"Verification result for Sine2D (freq_x={freq_x}, freq_y={freq_y}): {'Passed' if verification_result else 'Failed'}")
         self.assertTrue(verification_result, f"Sine2D model with freq_x={freq_x}, freq_y={freq_y} verification should pass")
+    
+    def test_jet_engine(self):
+        """Test specifically for the JetEngine system."""
+        from grid_neural_abstractions.dynamics import JetEngine
+        
+        # Create models directory if it doesn't exist
+        model_dir = Path(__file__).parent.parent / "data"
+        model_dir.mkdir(exist_ok=True)
+        
+        # Model file path
+        model_path = model_dir / f"jetengine_model.onnx"
+        
+        # Initialize the dynamics model
+        dynamics_instance = JetEngine()
+        epsilon = 0.05
+
+        print(f"\nTesting Jet Engine system")
+        
+        # Check if model exists or train one
+        if not model_path.exists():
+            print(f"Training model for Jet Engine...")
+            
+            # Generate data and train the neural network
+            # Use a specific network architecture for the Jet Engine
+            model = train_nn(
+                dynamics_model=dynamics_instance,
+                hidden_sizes=[15,15],
+                epsilon=epsilon*0.9
+            )
+            
+            # Save the model
+            save_onnx_model(model, str(model_path))
+        else:
+            print(f"Using existing model: {model_path}")
+        
+        # Verify the model
+        verification_result = verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
+        
+        # Report the result
+        print(f"Verification result for Jet Engine: {'Passed' if verification_result else 'Failed'}")
+        self.assertTrue(verification_result, "Jet Engine model verification should pass")
 
 
 if __name__ == "__main__":
