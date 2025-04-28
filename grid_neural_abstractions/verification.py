@@ -55,115 +55,6 @@ class VerificationStrategy(ABC):
         )
 
 
-class MarabouLipschitzStrategy(VerificationStrategy):
-    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
-        outputVars = network.outputVars[0].flatten()
-        inputVars = network.inputVars[0].flatten()
-        options = Marabou.createOptions(verbosity=0)
-
-        sample, delta, j = data  # Unpack the data tuple
-        dynamics_value = dynamics(sample).flatten()
-
-        L_max = dynamics.max_gradient_norm(sample, delta)
-        # That we sum over delta comes from the Lagrange remainder term
-        # in the 1st order multivariate Taylor expansion.
-        # (Bound the higher order derivate + bound the norm in a closed region)
-        # https://en.wikipedia.org/wiki/Taylor%27s_theorem#Taylor's_theorem_for_multivariate_functions
-
-        # delta * L 
-        L_step = np.dot(L_max[j], delta)
-
-        if L_step[j] > epsilon:
-            # consider the largest term of L_step and the delta that affects this, this is the delta we need to reduce.
-            split_dim = np.argmax(L_max[j, :] * delta)
-            sample_left, sample_right = split_sample(data, delta, split_dim)
-
-            return SampleResultMaybe(data, [sample_left, sample_right])
-
-        # Set the input variables to the sampled point
-        for i, inputVar in enumerate(inputVars):
-            network.setLowerBound(inputVar, sample[i] - delta[i])
-            network.setUpperBound(inputVar, sample[i] + delta[i])
-
-        # We need to verify that for all x: |nn_output - f| < delta * L  (along output dimension j)
-        # To find a counterexample, we look for x where: |nn_output - f| >= delta * L
-        # Which means nn_output - f >= delta * L OR nn_output - f <= delta * L
-        outputVar = outputVars[j]
-
-        # Reset the query
-        network.additionalEquList.clear()
-
-        # nn_output >= delta * L + f
-        equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
-        equation_GE.addAddend(1, outputVar)
-        equation_GE.setScalar(dynamics_value[j] + L_step[j].item())
-        network.addEquation(equation_GE, isProperty=True)
-
-        # Find a counterexample for lower bound
-        res, vals, _ = network.solve(verbose=False, options=options)
-        if res == "sat":
-            cex = np.empty(len(inputVars))
-            for i, inputVar in enumerate(inputVars):
-                cex[i] = vals[inputVar]
-                assert cex[i] + precision >= sample[i].item() - delta[i]
-                assert cex[i] - precision <= sample[i].item() + delta[i]
-
-            violation_found = (
-                vals[outputVar] + precision >= dynamics_value[j] + L_step[j].item()
-            )
-
-            assert (
-                violation_found
-            ), "The counterexample violates the bound, this is not a valid counterexample"
-
-            network.additionalEquList.clear()
-            nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
-            f_cex = dynamics(cex).flatten()
-            if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dim = np.argmax(L_max[j, :] * delta)
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, [sample_left, sample_right])
-
-            return SampleResultUNSAT(data, [cex])
-
-        # Reset the query
-        network.additionalEquList.clear()
-
-        # nn_output <= -delta * L + f
-        equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
-        equation_LE.addAddend(1, outputVar)
-        equation_LE.setScalar(dynamics_value[j] - L_step[j].item())
-        network.addEquation(equation_LE, isProperty=True)
-
-        # Find a counterexample for lower bound
-        res, vals, _ = network.solve(verbose=False, options=options)
-        if res == "sat":
-            cex = np.empty(len(inputVars))
-            for i, inputVar in enumerate(inputVars):
-                cex[i] = vals[inputVar]
-                assert cex[i] + precision >= sample[i].item() - delta[i]
-                assert cex[i] - precision <= sample[i].item() + delta[i]
-            violation_found = (
-                vals[outputVar] - precision
-                <= dynamics_value[j] - L_step[j].item()
-            )
-            assert (
-                violation_found
-            ), "The counterexample violates the bound, this is not a valid counterexample"
-
-            network.additionalEquList.clear()
-            nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
-            f_cex = dynamics(cex).flatten()
-            if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dim = np.argmax(L_max[j, :] * delta)
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, [sample_left, sample_right])
-
-            return SampleResultUNSAT(data, [cex])
-
-        return SampleResultSAT(data)  # No counterexample found, return the original sample
-
-
 class MarabouTaylorStrategy(VerificationStrategy):
     def __init__(self, dynamics):
         prepare_taylor_expansion(dynamics.input_dim)
@@ -240,6 +131,8 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
                     return SampleResultMaybe(data, [sample_left, sample_right])
+            else:
+                print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
             return SampleResultUNSAT(data, [cex])
 
@@ -278,6 +171,8 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
                     return SampleResultMaybe(data, [sample_left, sample_right])
+            else:
+                print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
             return SampleResultUNSAT(data, [cex])
 

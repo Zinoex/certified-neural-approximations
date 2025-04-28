@@ -9,7 +9,7 @@ from .executors import (
 from maraboupy import Marabou
 from .dynamics import VanDerPolOscillator
 
-from .verification import MarabouLipschitzStrategy, MarabouTaylorStrategy
+from .verification import MarabouTaylorStrategy
 from .certification_results import CertificationRegion
 from .visualization import DynamicsNetworkPlotter  # Import the new plotter
 
