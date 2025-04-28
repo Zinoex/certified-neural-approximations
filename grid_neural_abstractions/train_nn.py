@@ -133,6 +133,8 @@ def train_nn(dynamics_model=None, epsilon = 0.05, hidden_sizes=[128,128,128], le
             )
             
         # Early stopping logic
+        # Use max_loss for early stopping to ensure the maximum error across all predictions is minimized,
+        # which is critical for applications requiring strict error bounds.
         if max_loss < best_loss:
             best_loss = max_loss
             if best_loss > epsilon:
