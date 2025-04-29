@@ -130,7 +130,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
         self.bound_network = None
 
-    def verify(self, large_network_dynamics, small_network, epsilon, delta, precision=1e-6, batch_size=100, plotter=None):
+    def verify(self, large_network_dynamics, small_network, epsilon, delta, precision=1e-6, batch_size=10, plotter=None):
         # self.pool._check_running()
         factory = BoundModelFactory()
         self.bound_network = factory.build(large_network_dynamics.network.network)
