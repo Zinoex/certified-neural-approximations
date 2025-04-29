@@ -53,11 +53,16 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
             equation1.setScalar(epsilon)
             joint_network.addEquation(equation1, isProperty=True)
 
-        options = Marabou.createOptions(verbosity=2)
+        options = Marabou.createOptions(verbosity=0)
         res, vals, _ = joint_network.solve(options, verbose=False)
 
-        return res == 'sat'
-
+        if res == 'sat':
+            return SampleResultSAT(large_network_dynamics.input_domain)
+        elif res == 'unsat':
+            # This sort of query does not return a counterexample.
+            # If we change the query to sat if counterexample found, we can
+            # return the counterexample.
+            return SampleResultUNSAT(large_network_dynamics.input_domain, [])
 
     def merge_networks(self, large_network, small_network):
         """
