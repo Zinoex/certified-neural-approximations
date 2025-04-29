@@ -88,17 +88,13 @@ def generate_data(input_size, input_domain, delta=0.01, grid=False, batch_size=2
 
 
 # Train the neural network
-def train_nn(dynamics_model=None):
+def train_nn(dynamics_model=None, epsilon = 0.05, hidden_sizes=[128,128,128], learning_rate = 0.001, num_epochs = 50000, batch_size = 4096):
     if dynamics_model is None:
         dynamics_model = Quadcopter()
     
     input_size = dynamics_model.input_dim
-    hidden_sizes = [128, 128, 128]  # Adjust hidden layer sizes
     output_size = dynamics_model.output_dim  # Update output size to match target size
     input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
-    num_epochs = 50000
-    learning_rate = 0.001  # Reduced learning rate
-    batch_size = 2048
     
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
@@ -119,6 +115,7 @@ def train_nn(dynamics_model=None):
 
         model.train()
         outputs = model(X_train.T)
+        max_loss = torch.max(torch.abs(outputs - y_train.T))
         loss = criterion(outputs, y_train.T)
             
         optimizer.zero_grad()
@@ -132,18 +129,21 @@ def train_nn(dynamics_model=None):
 
         if (epoch + 1) % 100 == 0:
             print(
-                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, LR: {optimizer.param_groups[0]['lr']:.6f}"
+                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, Max: {max_loss.item():.6f},LR: {optimizer.param_groups[0]['lr']:.6f}"
             )
             
         # Early stopping logic
-        if loss.item() < best_loss:
-            best_loss = loss.item()
-            patience_counter = 0
+        # Use max_loss for early stopping to ensure the maximum error across all predictions is minimized,
+        # which is critical for applications requiring strict error bounds.
+        if max_loss < best_loss:
+            best_loss = max_loss
+            if best_loss > epsilon:
+                patience_counter = 0
         else:
             patience_counter += 1
             
-        if patience_counter >= patience and best_loss < 0.001:
-            print(f"Early stopping triggered at epoch {epoch+1}. Best loss: {best_loss:.6f}")
+        if patience_counter >= patience and best_loss < epsilon:
+            print(f"Early stopping triggered at epoch {epoch+1}. Max loss: {best_loss:.6f}")
             break
 
     return model
