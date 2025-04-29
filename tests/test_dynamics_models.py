@@ -37,14 +37,13 @@ def model_exists(dynamics_name):
     return model_path.exists()
 
 
-def verify_dynamics_model(model_path, dynamics_model):
+def verify_dynamics_model(model_path, dynamics_model, epsilon=0.05):
     """
     Verify the trained model against the dynamics system.
     """
     print(f"Verifying model: {model_path}")
     # Use a larger delta and epsilon for faster verification in tests
     delta = [(high - low) / 2 for low, high in dynamics_model.input_domain]
-    epsilon = 0.2
     try:
         # Update verify_nn function to accept dynamics_model parameter
         verify_nn(model_path, delta=delta, epsilon=epsilon, num_workers=1, dynamics_model=dynamics_model)
@@ -63,6 +62,10 @@ class TestDynamicsModels(unittest.TestCase):
         
         dynamics_systems = get_all_dynamics_systems()
         
+        # Define default parameters for training and verification
+        hidden_sizes = [20, 20]
+        epsilon = 0.05
+        
         for name, dynamics_class in dynamics_systems:
             print(f"\nTesting dynamics system: {name}")
             
@@ -77,7 +80,11 @@ class TestDynamicsModels(unittest.TestCase):
                 print(f"Training model for {name}...")
                 
                 # Using the train_nn function but with the specific dynamics model
-                model = train_nn(dynamics_model=dynamics_instance)
+                model = train_nn(
+                    dynamics_model=dynamics_instance,
+                    hidden_sizes=hidden_sizes,
+                    epsilon=epsilon/2  # Use a smaller epsilon for training
+                )
                 
                 # Save the model with the specific name
                 save_onnx_model(model, str(model_path))
@@ -85,10 +92,14 @@ class TestDynamicsModels(unittest.TestCase):
                 print(f"Using existing model: {model_path}")
             
             # Verify the model
-            verification_result = verify_dynamics_model(str(model_path), dynamics_instance)
+            verification_result = verify_dynamics_model(
+                str(model_path), 
+                dynamics_instance, 
+                epsilon=epsilon
+            )
             
             # Just report the result
-            print(f"Verification result for {name}: {'Passed' if verification_result is None else 'Failed'}")
+            print(f"Verification result for {name}: {'Passed' if verification_result else 'Failed'}")
     
     def test_sine2d_system(self):
         """Test specifically for the Sine2D system."""
@@ -108,6 +119,10 @@ class TestDynamicsModels(unittest.TestCase):
         """Helper method to test Sine2D with specific frequencies."""
         from grid_neural_abstractions.dynamics import Sine2D
         
+        # Define default parameters for training and verification
+        hidden_sizes = [10, 10]
+        epsilon = 0.05
+        
         # Model file path
         model_path = model_dir / f"{model_name}_model.onnx"
         
@@ -121,7 +136,11 @@ class TestDynamicsModels(unittest.TestCase):
             print(f"Training model for Sine2D...")
             
             # Generate data and train the neural network
-            model = train_nn(dynamics_model=dynamics_instance)
+            model = train_nn(
+                dynamics_model=dynamics_instance,
+                hidden_sizes=hidden_sizes,
+                epsilon=epsilon/2  # Use a smaller epsilon for training
+            )
             
             # Save the model
             save_onnx_model(model, str(model_path))
@@ -129,11 +148,56 @@ class TestDynamicsModels(unittest.TestCase):
             print(f"Using existing model: {model_path}")
         
         # Verify the model
-        verification_result = verify_dynamics_model(str(model_path), dynamics_instance)
+        verification_result = verify_dynamics_model(
+            str(model_path), 
+            dynamics_instance, 
+            epsilon=epsilon
+        )
         
         # Report the result
         print(f"Verification result for Sine2D (freq_x={freq_x}, freq_y={freq_y}): {'Passed' if verification_result else 'Failed'}")
         self.assertTrue(verification_result, f"Sine2D model with freq_x={freq_x}, freq_y={freq_y} verification should pass")
+    
+    def test_jet_engine(self):
+        """Test specifically for the JetEngine system."""        
+        from grid_neural_abstractions.dynamics import JetEngine
+        
+        # Create models directory if it doesn't exist
+        model_dir = Path(__file__).parent.parent / "data"
+        model_dir.mkdir(exist_ok=True)
+        
+        # Model file path
+        model_path = model_dir / f"jetengine_model.onnx"
+        
+        # Initialize the dynamics model
+        dynamics_instance = JetEngine()
+        epsilon = 0.05
+
+        print(f"\nTesting Jet Engine system")
+        
+        # Check if model exists or train one
+        if not model_path.exists():
+            print(f"Training model for Jet Engine...")
+            
+            # Generate data and train the neural network
+            # Use a specific network architecture for the Jet Engine
+            model = train_nn(
+                dynamics_model=dynamics_instance,
+                hidden_sizes=[15,15],
+                epsilon=epsilon/2,  # Use a smaller epsilon for training
+            )
+            
+            # Save the model
+            save_onnx_model(model, str(model_path))
+        else:
+            print(f"Using existing model: {model_path}")
+        
+        # Verify the model
+        verification_result = verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
+        
+        # Report the result
+        print(f"Verification result for Jet Engine: {'Passed' if verification_result else 'Failed'}")
+        self.assertTrue(verification_result, "Jet Engine model verification should pass")
 
 
 if __name__ == "__main__":
