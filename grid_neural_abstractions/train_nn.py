@@ -168,6 +168,16 @@ def save_onnx_model(model, file_name="data/simple_nn.onnx"):
     print(f"Model saved as {file_name}")
 
 
+def save_torch_model(model, file_name="data/simple_nn.pth"):
+    torch.save(model.state_dict(), file_name)
+    print(f"Model saved as {file_name}")
+
+
+def save_model(model, file_name="data/simple_nn.onnx"):
+    save_onnx_model(model, file_name)
+    save_torch_model(model, file_name.replace(".onnx", ".pth"))
+
+
 # Load the ONNX model for Marabou
 def load_onnx_model(file_name="data/simple_nn.onnx"):
     from maraboupy import Marabou
@@ -177,8 +187,15 @@ def load_onnx_model(file_name="data/simple_nn.onnx"):
     return network
 
 
+def load_torch_model(file_name="data/simple_nn.pth", input_size=3, hidden_sizes=[128, 128, 128], output_size=3):
+    model = SimpleNN(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size)
+    model.load_state_dict(torch.load(file_name))
+    print(f"PyTorch model {file_name} loaded")
+    return model
+
+
 if __name__ == "__main__":
     model = train_nn()  # Use the correct input_size from the dynamics model
-    
+
     # Save the trained model
-    save_onnx_model(model)
+    save_model(model)
