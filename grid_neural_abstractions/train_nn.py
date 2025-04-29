@@ -188,7 +188,7 @@ def load_onnx_model(file_name="data/simple_nn.onnx"):
 
 def load_torch_model(file_name="data/simple_nn.pth", input_size=3, hidden_sizes=[128, 128, 128], output_size=3):
     model = SimpleNN(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size)
-    model.load_state_dict(torch.load(file_name))
+    model.load_state_dict(torch.load(file_name), map_location=torch.device('cpu'))
     print(f"PyTorch model {file_name} loaded")
     return model
 
