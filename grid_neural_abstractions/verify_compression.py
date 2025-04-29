@@ -1,10 +1,20 @@
 
 from abc import ABC, abstractmethod
 import copy
+from functools import partial
+from multiprocessing.pool import Pool
+from queue import LifoQueue
 import numpy as np
+import torch
+from tqdm import tqdm
+from bound_propagation import HyperRectangle, BoundModelFactory
 
 from maraboupy import Marabou, MarabouCore, MarabouUtils
+from grid_neural_abstractions.certification_results import SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
 from grid_neural_abstractions.dynamics import NNDynamics, Quadcopter
+from grid_neural_abstractions.train_nn import load_onnx_model, load_torch_model
+from grid_neural_abstractions.verification import split_sample
+from grid_neural_abstractions.verify_nn import aggregate
 
 
 class CompressionVerificationStrategy(ABC):
@@ -105,15 +115,195 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
         return joint_network, large_network_outputVars, small_network_outputVars
 
 
+class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrategy):
+    def __init__(self, num_workers=None):
+        super().__init__()
+        self.pool = Pool(num_workers)
+        self.bound_network = None
+
+    def verify(self, large_network_dynamics, small_network, epsilon, precision=1e-6, batch_size=100, plotter=None):
+        self.pool._check_running()
+        factory = BoundModelFactory()
+        self.bound_network = factory.build(large_network_dynamics.network)
+
+        samples = []
+
+        # Calculate the total domain size
+        total_domain_size = sum(sample.lebesguemeasure() for sample in samples)
+        certified_domain_size = 0.0
+        uncertified_domain_size = 0.0
+
+        queue = LifoQueue()
+        for sample in samples:
+            queue.put(sample)
+
+        agg = None
+
+        with tqdm(desc="Overall Progress", smoothing=0.1) as pbar:
+            while not queue.empty():
+                batch = [
+                    queue.get() for _ in range(min(batch_size, queue.qsize()))
+                ]
+
+                # Execute the batches
+                results = self.verify_batch(large_network_dynamics, small_network, batch, epsilon, precision)
+
+                for result in results:
+                    if result.issat():
+                        # Sample was succesfully verified, no new samples to process
+                        # Update certified domain size in a thread-safe manner
+                        certified_domain_size += result.lebesguemeasure()
+                        # Update visualization if plotter is provided
+                        if plotter is not None:
+                            plotter.update_figure(result)
+
+                    if result.isunsat():
+                        # Sample was not verified, add to the uncertified domain size
+                        uncertified_domain_size += result.lebesguemeasure()
+                        # Update visualization if plotter is provided
+                        if plotter is not None:
+                            plotter.update_figure(result)
+
+                    agg = aggregate(agg, result)
+
+                    if result.hasnewsamples():
+                        # Get the new samples
+                        new_samples = result.newsamples()
+
+                        # Put the new samples back into the queue
+                        for new_sample in new_samples:
+                            queue.put(new_sample)
+
+                pbar.update(len(results))
+                certified_percentage = (certified_domain_size / total_domain_size) * 100
+                uncertified_percentage = (uncertified_domain_size / total_domain_size) * 100
+
+                pbar.set_description_str(
+                    f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.2f}%, uncertified: {uncertified_percentage:.2f}%)"
+                )
+
+        return agg
+
+    def verify_batch(self, large_network_dynamics, small_network, batch, epsilon, precision=1e-6):
+        linear_bounds = self.taylor_expansion(large_network_dynamics.network, batch)
+
+        process_sample = partial(self.verify_single, large_network_dynamics, small_network, epsilon, precision=precision)
+        results = self.pool.starmap(lambda i, sample: process_sample(sample, linear_bounds[i]), enumerate(batch))
+
+        return results
+
+    def verify_sample(self, large_network_dynamics, small_network, epsilon, sample, linear_bounds, precision=1e-6):
+        inputVars = small_network.inputVars[0].flatten()
+        outputVars = small_network.outputVars[0].flatten()
+        options = Marabou.createOptions(verbosity=0)
+
+        # Add input constraints
+        input_dim = large_network_dynamics.input_dim
+        region = linear_bounds.region
+        for i in range(input_dim):
+            small_network.setLowerBound(inputVars[i], region.lower[i])
+            small_network.setUpperBound(inputVars[i], region.upper[i])
+
+        # Add output constraints
+        output_dim = large_network_dynamics.output_dim
+        for j in range(output_dim):
+            outputVar = outputVars[j]
+
+            # Reset the query
+            small_network.additionalEquList.clear()
+
+            # A_upper @ x - nn_output >= epsilon - b_upper
+            equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
+            for i, inputVar in enumerate(inputVars):
+                equation_GE.addAddend(linear_bounds.upper[0][j, i].item(), inputVar)
+            equation_GE.addAddend(-1, outputVar)
+            equation_GE.setScalar(epsilon - linear_bounds.upper[1][j].item())
+            small_network.addEquation(equation_GE, isProperty=True)
+
+            # Find a counterexample for upper bound
+            res, vals, _ = small_network.solve(verbose=False, options=options)
+            if res == "sat":
+                cex = np.empty(len(inputVars))
+                for i, inputVar in enumerate(inputVars):
+                    cex[i] = vals[inputVar]
+                    assert cex[i] + precision >= region.lower[i]
+                    assert cex[i] - precision <= region.upper[i]
+
+                violation_found = (
+                    np.dot(linear_bounds.upper[0][j], cex) - vals[outputVar] + precision >= epsilon - linear_bounds.upper[1][j]
+                )
+
+                assert (
+                    violation_found
+                ), "The counterexample violates the bound, this is not a valid counterexample"
+
+                small_network.additionalEquList.clear()
+                nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
+                f_cex = large_network_dynamics(cex).flatten()
+                if np.abs(nn_cex - f_cex)[j] < epsilon:
+                    split_dim = sample.nextsplitdim()
+                    sample_left, sample_right = split_sample(sample, sample.delta, split_dim)
+                    return SampleResultMaybe(sample, [sample_left, sample_right])
+
+                return SampleResultUNSAT(sample, [cex])
+
+            # A_lower @ x - nn_output <= -epsilon - b_lower
+            equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
+            for i, inputVar in enumerate(inputVars):
+                equation_LE.addAddend(linear_bounds.lower[0][j, i].item(), inputVar)
+            equation_LE.addAddend(-1, outputVar)
+            equation_LE.setScalar(-epsilon - linear_bounds.lower[1][j].item())
+            small_network.addEquation(equation_LE, isProperty=True)
+
+            # Find a counterexample for lower bound
+            res, vals, _ = small_network.solve(verbose=False, options=options)
+            if res == "sat":
+                cex = np.empty(len(inputVars))
+                for i, inputVar in enumerate(inputVars):
+                    cex[i] = vals[inputVar]
+                    assert cex[i] + precision >= region.lower[i]
+                    assert cex[i] - precision <= region.upper[i]
+                violation_found = (
+                    np.dot(linear_bounds.lower[0][j], cex) - vals[outputVar] - precision <= -epsilon - linear_bounds.lower[1][j]
+                )
+                assert (
+                    violation_found
+                ), "The counterexample violates the bound, this is not a valid counterexample"
+
+                small_network.additionalEquList.clear()
+                nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
+                f_cex = large_network_dynamics(cex).flatten()
+                if np.abs(nn_cex - f_cex)[j] < epsilon:
+                    split_dim = sample.nextsplitdim()
+                    sample_left, sample_right = split_sample(sample, sample.delta, split_dim)
+                    return SampleResultMaybe(sample, [sample_left, sample_right])
+
+                return SampleResultUNSAT(sample, [cex])
+
+        return SampleResultSAT(sample)   # No counterexample found, return the original sample
+
+    def taylor_expansion(self, network, batch):
+        lower = torch.stack([torch.as_tensor(sample.center - sample.delta) for sample in batch])
+        upper = torch.stack([torch.as_tensor(sample.center + sample.delta) for sample in batch])
+
+        input_region = HyperRectangle(lower, upper)
+        linear_bounds = self.bound_network.crown(input_region)
+
+        return linear_bounds
+
+
 if __name__ == "__main__":
     dynamics_model = Quadcopter()
 
     # Example usage
-    large_network = Marabou.read_onnx("data/compression_ground_truth.onnx")
+    large_network = load_torch_model("data/compression_ground_truth.pth",
+                                     input_size=dynamics_model.input_dim,
+                                     hidden_sizes=[1024, 1024, 1024, 1024, 1024],
+                                     output_size=dynamics_model.output_dim)
     large_network_dynamics = NNDynamics(large_network, dynamics_model.input_domain)
-    small_network = Marabou.read_onnx("data/compression_compressed.onnx")
+    small_network = load_onnx_model("data/compression_compressed.onnx")
 
-    strategy = MarabouOnlyCompressionVerificationStrategy()
+    strategy = TaylorMarabouCompressionVerificationStrategy(num_workers=4)
     epsilon = 0.01
     precision = 1e-6
 
