@@ -183,6 +183,90 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Verify the model
         verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
+    
+    def test_quadcopter(self):
+        """Test specifically for the Quadcopter system."""        
+        from grid_neural_abstractions.dynamics import Quadcopter
+        
+        import torch
+        # Check if CUDA is available
+        print("Cuda device available:", torch.cuda.is_available())
+
+        # Create models directory if it doesn't exist
+        model_dir = Path(__file__).parent.parent / "data"
+        model_dir.mkdir(exist_ok=True)
+        
+        # Model file path
+        model_path = model_dir / f"quadcopter_model.onnx"
+        
+        # Initialize the dynamics model
+        dynamics_instance = Quadcopter()
+        epsilon = 0.1  # Use a slightly larger epsilon due to system complexity
+
+        print(f"\nTesting Quadcopter system")
+        
+        # Check if model exists or train one
+        if not model_path.exists():
+            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            print(f"Training model for Quadcopter...")
+            
+            # Use a larger network for the complex 12D dynamics
+            model = train_nn(
+                dynamics_model=dynamics_instance,
+                hidden_sizes=[1024, 1024, 1024],
+                epsilon=epsilon/2,  # Use a smaller epsilon for training
+                batch_size=1024,    # Larger batch size for stability
+                num_epochs=5000000     # More epochs for convergence
+            )
+            
+            # Save the model
+            save_onnx_model(model, str(model_path))
+        else:
+            print(f"Using existing model: {model_path}")
+        
+        # Verify the model
+        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon, nr_initial_samples=2)
+    
+    def test_aircraft(self):
+        """Test specifically for the Aircraft system."""        
+        from grid_neural_abstractions.dynamics import Aircraft
+        
+        # Create models directory if it doesn't exist
+        model_dir = Path(__file__).parent.parent / "data"
+        model_dir.mkdir(exist_ok=True)
+        
+        # Model file path
+        model_path = model_dir / f"aircraft_model.onnx"
+        
+        # Initialize the dynamics model
+        dynamics_instance = Aircraft()
+        
+        # Use a larger epsilon for this complex system
+        epsilon = 0.08
+
+        print(f"\nTesting Aircraft system")
+        
+        # Check if model exists or train one
+        if not model_path.exists():
+            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            print(f"Training model for Aircraft...")
+            
+            # Use a deep network for this complex 12D to 9D system
+            model = train_nn(
+                dynamics_model=dynamics_instance,
+                hidden_sizes=[128, 256, 256],
+                epsilon=epsilon/2,  # Use a smaller epsilon for training
+                batch_size=2048,    # Larger batch size for stability
+                num_epochs=25000    # More epochs for convergence
+            )
+            
+            # Save the model
+            save_onnx_model(model, str(model_path))
+        else:
+            print(f"Using existing model: {model_path}")
+        
+        # Verify the model
+        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
 
 
 if __name__ == "__main__":

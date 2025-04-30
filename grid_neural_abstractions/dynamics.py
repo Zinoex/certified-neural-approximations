@@ -131,7 +131,7 @@ class VanDerPolOscillator(DynamicalSystem):
 
 
 class Quadcopter(DynamicalSystem):
-    """A class representing the 10D dynamics of a quadcopter."""
+    """A class representing the 12D dynamics of a quadcopter."""
 
     def __init__(
         self,
@@ -151,31 +151,52 @@ class Quadcopter(DynamicalSystem):
         self.moment_inertia_y = moment_inertia_y
         self.moment_inertia_z = moment_inertia_z
 
-        self.input_dim = 3  # 3D state: roll, pitch, yaw
-        self.output_dim = 3  # 3D derivatives
-        self.input_domain = [(-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5)]  # Typical domain for angles in radians
+        self.input_dim = 12  # 12D state: position (3), velocity (3), orientation (3), 3 Inputs: angular velocity (3)
+        self.output_dim = 9  # 12D derivatives
+        
+        # Typical domains for each state dimension
+        self.input_domain = [
+            (-10.0, 10.0), (-10.0, 10.0), (-10.0, 10.0),  # x, y, z position
+            (-3.0, 3.0), (-3.0, 3.0), (-3.0, 3.0),        # vx, vy, vz velocity
+            (-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5),        # roll, pitch, yaw
+            (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)         # angular velocity (wx, wy, wz)
+        ]
 
     def compute_dynamics(self, x, translator):
         """
-        Compute quadcopter dynamics.
+        Compute full 12D quadcopter dynamics.
         
         Args:
-            x: Input tensor with shape [3, batch_size]
+            x: Input tensor with shape [12, batch_size]
             translator: The translator for mathematical operations
             
         Returns:
-            Tensor of shape [3, batch_size] with the dynamics
+            Tensor of shape [12, batch_size] with the dynamics
         """
         # Extract state variables
+        # Position
+        px, py, pz = x[0], x[1], x[2]
+        
+        # Linear velocity
+        vx, vy, vz = x[3], x[4], x[5]
+        
         # Orientation: roll, pitch, yaw
-        roll, pitch, yaw = x[0], x[1], x[2]
+        roll, pitch, yaw = x[6], x[7], x[8]
+        
+        # Angular velocity (full 3D)
+        wx, wy, wz = x[9], x[10], x[11]
 
         # Simplified thrust and control inputs (can be replaced with actual control inputs)
         # Here using a hover thrust and small attitude corrections
         thrust = self.mass * self.gravity
 
+        # Position derivatives (from velocity)
+        dpx = vx
+        dpy = vy
+        dpz = vz
+
         # Velocity derivatives (from forces)
-        # Simplified model assuming small angles and considering yaw
+        # Simplified model assuming small angles
         dvx = (
             (
                 translator.sin(pitch) * translator.cos(yaw)
@@ -193,11 +214,18 @@ class Quadcopter(DynamicalSystem):
             / self.mass
         )
         dvz = (
-            translator.cos(roll) * translator.cos(pitch) * thrust
-        ) / self.mass - self.gravity
+            translator.cos(roll) * translator.cos(pitch) * thrust / self.mass
+            - self.gravity
+        )
+
+        # Orientation derivatives from angular velocities using Euler angle rates
+        # These equations relate angular velocities in the body frame to Euler angle rates
+        droll = wx + wy * translator.sin(roll) * translator.tan(pitch) + wz * translator.cos(roll) * translator.tan(pitch)
+        dpitch = wy * translator.cos(roll) - wz * translator.sin(roll)
+        dyaw = wy * translator.sin(roll) / translator.cos(pitch) + wz * translator.cos(roll) / translator.cos(pitch)
 
         # Combine all derivatives
-        derivatives = translator.stack([dvx, dvy, dvz])
+        derivatives = translator.stack([dpx, dpy, dpz, dvx, dvy, dvz, droll, dpitch, dyaw])
 
         return derivatives
 

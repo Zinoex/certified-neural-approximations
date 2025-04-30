@@ -14,11 +14,10 @@ class SimpleNN(nn.Module):
         prev_size = input_size
         for hidden_size in hidden_sizes:
             layers.append(nn.Linear(prev_size, hidden_size, device=self.device))  # Create layer on device
-            layers.append(nn.ReLU())
+            layers.append(nn.LeakyReLU())
             prev_size = hidden_size
         layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
         self.network = nn.Sequential(*layers)
-        self._initialize_weights()  # Add weight initialization
 
     def forward(self, x):
         return self.network(x)
@@ -45,21 +44,23 @@ def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learnin
 
     model = SimpleNN(input_size, hidden_sizes, output_size)
     criterion = nn.MSELoss()
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-5)  # Use AdamW optimizer
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)  # Use AdamW optimizer
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.9, patience=200, min_lr=1e-7
+        optimizer, mode='min', factor=0.90, patience=200, min_lr=1e-6
     )
 
     # Load data
     for epoch in range(num_epochs):
-        X_train, y_train = generate_data(input_size, input_domain, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
+        if epoch % 50 == 0:
+            X_train, y_train = generate_data(input_size, input_domain, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
 
         model.train()
         outputs = model(X_train.T)
         max_loss = torch.max(torch.abs(outputs - y_train.T))
-        loss = criterion(outputs, y_train.T)
+        avg_loss = criterion(outputs, y_train.T)
+        loss = avg_loss + 0.001 * max_loss  # Add max loss to the MSE loss
             
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         loss.backward()
         
         # Apply gradient clipping to prevent explosion
@@ -70,7 +71,7 @@ def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learnin
 
         if (epoch + 1) % 100 == 0:
             print(
-                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, Max: {max_loss.item():.6f},LR: {optimizer.param_groups[0]['lr']:.6f}"
+                f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {avg_loss.item():.6f}, Max: {max_loss.item():.6f},LR: {optimizer.param_groups[0]['lr']:.6f}"
             )
             
         # Early stopping logic

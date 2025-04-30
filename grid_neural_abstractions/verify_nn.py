@@ -121,7 +121,3 @@ def verify_nn(
 
     print(f"Number of counterexamples found: {num_cex}")
     print("Finished")
-    
-    # Keep the plot window open if we're visualizing
-    if plotter is not None:
-        pause(30)  # Keep the plot open for 30 seconds

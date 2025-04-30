@@ -50,6 +50,19 @@
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Quadcopter Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/test_dynamics_models.py",
+            "args": ["-k", "test_quadcopter"],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
