@@ -3,7 +3,7 @@ from grid_neural_abstractions.train_nn import train_nn, save_model
 
 
 def train_compression(dynamics_model=None):
-    model = train_nn(dynamics_model, hidden_sizes=[1024, 1024, 1024, 1024, 1024], learning_rate=1e-4)
+    model = train_nn(dynamics_model, hidden_sizes=[1024, 1024, 1024, 1024], learning_rate=1e-4)
     save_model(model, "data/compression_ground_truth.onnx")
 
     nn_dynamics = NNDynamics(model, dynamics_model.input_domain)

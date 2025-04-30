@@ -336,10 +336,10 @@ if __name__ == "__main__":
     # Example usage
     large_network = load_torch_model("data/compression_ground_truth.pth",
                                      input_size=dynamics_model.input_dim,
-                                     hidden_sizes=[1024, 1024, 1024, 1024, 1024],
+                                     hidden_sizes=[1024, 1024, 1024, 1024],
                                      output_size=dynamics_model.output_dim)
     large_network_dynamics = NNDynamics(large_network, dynamics_model.input_domain)
-    large_network_dynamics.torch_params = ("data/compression_ground_truth.pth", dynamics_model.input_dim, [1024, 1024, 1024, 1024, 1024], dynamics_model.output_dim)
+    large_network_dynamics.torch_params = ("data/compression_ground_truth.pth", dynamics_model.input_dim, [1024, 1024, 1024, 1024], dynamics_model.output_dim)
     small_network = load_onnx_model("data/compression_compressed.onnx")
 
     strategy = TaylorMarabouCompressionVerificationStrategy(num_workers=8)
