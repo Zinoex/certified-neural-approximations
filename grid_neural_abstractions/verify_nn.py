@@ -72,11 +72,16 @@ def aggregate(agg, result):
     return agg + result.counterexamples()
 
 
+def sequential(func1, func2, local):
+    func1(local)
+    func2(local)
+
+
 def verify_nn(
-    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=1, visualize=True
+    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=16, visualize=True
 ):
     
-    strategy = MarabouTaylorStrategy(dynamics_model)
+    strategy = MarabouTaylorStrategy()
 
     input_dim = dynamics_model.input_dim
     onnx_input_dim = onnx_input_shape(onnx_path)
@@ -93,11 +98,14 @@ def verify_nn(
         for j in range(output_dim) for x in X_train
     ]
 
-    initializer = partial(read_onnx_into_local, onnx_path)
+    read_network = partial(read_onnx_into_local, onnx_path)
+    prepare_strategy = partial(strategy.prepare_strategy, dynamics_model)
+    initializer = partial(sequential, read_network, prepare_strategy)
 
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
-    if visualize and input_dim in [1, 2]:
+    if visualize and input_dim in [1, 2] and num_workers == 1:
+        # Create a plotter for 1D or 2D dynamics
         plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))
         print(f"Initialized visualization for {input_dim}D dynamics")
 
