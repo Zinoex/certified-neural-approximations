@@ -6,8 +6,7 @@ from queue import LifoQueue
 class SinglethreadExecutor:
     def execute(self, initializer, process_sample, aggregate, samples, plotter=None):
         agg = None
-        local = types.SimpleNamespace()
-        initializer(local)
+        initializer()
 
         # Calculate the total domain size
         total_domain_size = sum(sample.lebesguemeasure() for sample in samples)
@@ -22,7 +21,7 @@ class SinglethreadExecutor:
                 sample = queue.get()
 
                 # Execute the batches
-                result = process_sample(local, sample)
+                result = process_sample(sample)
                 
                 if result.issat():
                     # Sample was succesfully verified, no new samples to process
