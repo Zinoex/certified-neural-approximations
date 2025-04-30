@@ -76,7 +76,7 @@ def sequential(func1, func2, local):
 
 
 def verify_nn(
-    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=16, visualize=True
+    onnx_path, dynamics_model, num_workers=16, visualize=True
 ):
     
     strategy = MarabouTaylorStrategy()
@@ -86,13 +86,12 @@ def verify_nn(
     assert len(onnx_input_dim) == 1, f"Only 1D input dims are supported, was {len(onnx_input_dim)}"
     assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
 
-    partial_process_sample = partial(process_sample, strategy, dynamics_model, epsilon)
+    partial_process_sample = partial(process_sample, strategy, dynamics_model, dynamics_model.epsilon)
 
-    delta = np.full(input_dim, delta)
-    X_train, _ = generate_grid(input_dim, dynamics_model.input_domain, delta=delta)
+    X_train, _ = generate_grid(input_dim, dynamics_model.input_domain, delta=dynamics_model.delta)
     output_dim = dynamics_model.output_dim
     samples = [
-        CertificationRegion(x, delta, j)
+        CertificationRegion(x, dynamics_model.delta, j)
         for j in range(output_dim) for x in X_train
     ]
 

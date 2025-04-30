@@ -7,6 +7,9 @@ class DynamicalSystem:
         self.input_dim = None  # State dimension
         self.output_dim = None  # Derivative dimension
         self.input_domain = None  # Domain for each input dimension [(min_1, max_1), ..., (min_n, max_n)]
+        self.hidden_sizes = None
+        self.delta = None
+        self.epsilon = None
     
     def __call__(self, x, translator=None):
         """
@@ -210,6 +213,9 @@ class WaterTank(DynamicalSystem):
         self.input_dim = 1
         self.output_dim = 1
         self.input_domain = [(0.1, 10.0)]  # Water level should be positive
+        self.hidden_sizes = [12]
+        self.delta = np.array([10.1 / 2])
+        self.epsilon = 0.05
         
     def compute_dynamics(self, x, translator):
         # ẋ = 1.5 - √x
@@ -224,6 +230,9 @@ class JetEngine(DynamicalSystem):
         self.input_dim = 2
         self.output_dim = 2
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for jet engine state variables
+        self.hidden_sizes = [10, 16]
+        self.delta = np.array([2.0, 2.0])
+        self.epsilon = 0.05
         
     def compute_dynamics(self, x, translator):
         # ẋ = -y - 1.5x² - 0.5x³ - 0.1
@@ -242,6 +251,9 @@ class SteamGovernor(DynamicalSystem):
         self.input_dim = 3
         self.output_dim = 3
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for steam governor
+        self.hidden_sizes = [12]
+        self.delta = np.array([2.0, 2.0, 2.0])
+        self.epsilon = 0.05
         
     def compute_dynamics(self, x, translator):
         # ẋ = y
@@ -263,6 +275,9 @@ class Exponential(DynamicalSystem):
         self.input_dim = 2
         self.output_dim = 2
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Restricted domain to avoid extremely large values
+        self.hidden_sizes = [14, 14]
+        self.delta = np.array([2.0, 2.0])
+        self.epsilon = 0.05
         
     def compute_dynamics(self, x, translator):
         # ẋ = -sin(exp(y³ + 1)) - y²
@@ -282,6 +297,9 @@ class NonLipschitzVectorField1(DynamicalSystem):
         self.input_dim = 2
         self.output_dim = 2
         self.input_domain = [(0.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
+        self.hidden_sizes = [10]
+        self.delta = np.array([1.0, 2.0])
+        self.epsilon = 0.06
         
     def compute_dynamics(self, x, translator):
         # ẋ = y
@@ -301,6 +319,9 @@ class NonLipschitzVectorField2(DynamicalSystem):
         self.input_dim = 2
         self.output_dim = 2
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
+        self.hidden_sizes = [12, 10]
+        self.delta = np.array([2.0, 2.0])
+        self.epsilon = 0.03
         
     def compute_dynamics(self, x, translator):
         # ẋ = x² + y
