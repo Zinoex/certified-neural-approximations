@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 class DynamicalSystem:
@@ -10,6 +11,7 @@ class DynamicalSystem:
         self.hidden_sizes = None
         self.delta = None
         self.epsilon = None
+        self.system_name = None  # Name of the system
     
     def __call__(self, x, translator=None):
         """
@@ -57,6 +59,10 @@ class VanDerPolOscillator(DynamicalSystem):
         self.input_dim = 2  # Van der Pol oscillator state dimension
         self.output_dim = 2  # Van der Pol oscillator derivative dimension
         self.input_domain = [(-3.0, 3.0), (-3.0, 3.0)]  # Typical domain for Van der Pol oscillator
+        self.hidden_sizes = [128, 128, 128]
+        self.delta = np.array([6.0, 6.0])  # Domain size for the input
+        self.epsilon = 1.9  # 10% of the derivative range
+        self.system_name = "VanDerPolOscillator"
 
     def compute_dynamics(self, x, translator):
         """
@@ -157,6 +163,10 @@ class Quadcopter(DynamicalSystem):
         self.input_dim = 3  # 3D state: roll, pitch, yaw
         self.output_dim = 3  # 3D derivatives
         self.input_domain = [(-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5)]  # Typical domain for angles in radians
+        self.hidden_sizes = [128, 128, 128]
+        self.delta = None
+        self.epsilon = None
+        self.system_name = "Quadcopter"
 
     def compute_dynamics(self, x, translator):
         """
@@ -216,6 +226,7 @@ class WaterTank(DynamicalSystem):
         self.hidden_sizes = [12]
         self.delta = np.array([10.1 / 2])
         self.epsilon = 0.05
+        self.system_name = "WaterTank"
         
     def compute_dynamics(self, x, translator):
         # ẋ = 1.5 - √x
@@ -233,6 +244,7 @@ class JetEngine(DynamicalSystem):
         self.hidden_sizes = [10, 16]
         self.delta = np.array([2.0, 2.0])
         self.epsilon = 0.05
+        self.system_name = "JetEngine"
         
     def compute_dynamics(self, x, translator):
         # ẋ = -y - 1.5x² - 0.5x³ - 0.1
@@ -254,6 +266,7 @@ class SteamGovernor(DynamicalSystem):
         self.hidden_sizes = [12]
         self.delta = np.array([2.0, 2.0, 2.0])
         self.epsilon = 0.05
+        self.system_name = "SteamGovernor"
         
     def compute_dynamics(self, x, translator):
         # ẋ = y
@@ -278,6 +291,7 @@ class Exponential(DynamicalSystem):
         self.hidden_sizes = [14, 14]
         self.delta = np.array([2.0, 2.0])
         self.epsilon = 0.05
+        self.system_name = "Exponential"
         
     def compute_dynamics(self, x, translator):
         # ẋ = -sin(exp(y³ + 1)) - y²
@@ -300,6 +314,7 @@ class NonLipschitzVectorField1(DynamicalSystem):
         self.hidden_sizes = [10]
         self.delta = np.array([1.0, 2.0])
         self.epsilon = 0.06
+        self.system_name = "NonLipschitzVectorField1"
         
     def compute_dynamics(self, x, translator):
         # ẋ = y
@@ -322,6 +337,7 @@ class NonLipschitzVectorField2(DynamicalSystem):
         self.hidden_sizes = [12, 10]
         self.delta = np.array([2.0, 2.0])
         self.epsilon = 0.03
+        self.system_name = "NonLipschitzVectorField2"
         
     def compute_dynamics(self, x, translator):
         # ẋ = x² + y
@@ -345,6 +361,10 @@ class NonlinearOscillator(DynamicalSystem):
         self.input_dim = 1  # 1D system
         self.output_dim = 1  # 1D output
         self.input_domain = [(-3.0, 3.0)]  # Typical domain for oscillator
+        self.hidden_sizes = [128, 128, 128]
+        self.delta = np.array([6.0])
+        self.epsilon = 0.1 * 0.3 * (55 - math.sin(3.0))  # 10% of the derivative range
+        self.system_name = "NonlinearOscillator"
     
     def compute_dynamics(self, x, translator):
         """
@@ -374,6 +394,10 @@ class Sine2D(DynamicalSystem):
         self.input_dim = 2  # 2D system
         self.output_dim = 2  # 2D output
         self.input_domain = [(-2.0, 2.0), (-2.0, 2.0)]  # Domain for both dimensions
+        self.hidden_sizes = [128, 128, 128]
+        self.delta = np.array([4.0, 4.0])
+        self.epsilon = 0.1  # 10% of the derivative range
+        self.system_name = "Sine2D"
     
     def compute_dynamics(self, x, translator):
         """
@@ -403,6 +427,7 @@ class NNDynamics(DynamicalSystem):
         self.input_dim = len(input_domain)
         self.output_dim = self.input_dim
         self.input_domain = input_domain
+        self.system_name = "NNDynamics"
 
     def compute_dynamics(self, x, translator):
         """
