@@ -1,6 +1,5 @@
 import torch
 
-
 class TorchTranslator:
     def __init__(self, device=None):
         self.device = device

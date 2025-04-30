@@ -1,4 +1,3 @@
-from .translators import TorchTranslator, NumpyTranslator
 import numpy as np
 class DynamicalSystem:
     """Base class for dynamical systems."""
@@ -22,8 +21,10 @@ class DynamicalSystem:
         if translator is None:
             if isinstance(x, np.ndarray):
                 # Use NumpyTranslator if x is a NumPy array
+                from .translators.numpy_translator import NumpyTranslator
                 translator = NumpyTranslator()
             else:
+                from .translators.torch_translator import TorchTranslator
                 translator = TorchTranslator()
         
         return self.compute_dynamics(x, translator)

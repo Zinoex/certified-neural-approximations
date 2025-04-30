@@ -1,6 +1,5 @@
-from .translators import JuliaTranslator
+from .translators.julia_translator import JuliaTranslator
 import numpy as np
-
 
 def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     """
