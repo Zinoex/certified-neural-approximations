@@ -41,6 +41,9 @@ def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learnin
     patience = 1000
     best_loss = float('inf')
     patience_counter = 0
+    
+    # Add variable to store the best model state
+    best_model_state = None
 
     model = SimpleNN(input_size, hidden_sizes, output_size)
     criterion = nn.MSELoss()
@@ -74,19 +77,24 @@ def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learnin
                 f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {avg_loss.item():.6f}, Max: {max_loss.item():.6f},LR: {optimizer.param_groups[0]['lr']:.6f}"
             )
             
-        # Early stopping logic
-        # Use max_loss for early stopping to ensure the maximum error across all predictions is minimized,
-        # which is critical for applications requiring strict error bounds.
-        if max_loss < best_loss:
+        # Early stopping logic and best model tracking
+        if max_loss < best_loss and epoch > 2500:
             best_loss = max_loss
+            # Save the best model state
+            best_model_state = model.state_dict().copy()
             if best_loss > epsilon:
                 patience_counter = 0
         else:
             patience_counter += 1
             
         if patience_counter >= patience and best_loss < epsilon:
-            print(f"Early stopping triggered at epoch {epoch+1}. Max loss: {best_loss:.6f}")
+            print(f"Early stopping triggered at epoch {epoch+1}. Best max loss: {best_loss:.6f}")
             break
+
+    # Restore the best model if we found one during training
+    if best_model_state is not None:
+        print(f"Restoring best model with max loss: {best_loss:.6f}")
+        model.load_state_dict(best_model_state)
 
     return model
 

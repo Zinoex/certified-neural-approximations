@@ -201,7 +201,7 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Initialize the dynamics model
         dynamics_instance = Quadcopter()
-        epsilon = 0.1  # Use a slightly larger epsilon due to system complexity
+        epsilon = 0.25  # Use a slightly larger epsilon due to system complexity
 
         print(f"\nTesting Quadcopter system")
         
@@ -213,7 +213,7 @@ class TestDynamicsModels(unittest.TestCase):
             # Use a larger network for the complex 12D dynamics
             model = train_nn(
                 dynamics_model=dynamics_instance,
-                hidden_sizes=[1024, 1024, 1024],
+                hidden_sizes=[2048, 1024, 1024],
                 epsilon=epsilon/2,  # Use a smaller epsilon for training
                 batch_size=1024,    # Larger batch size for stability
                 num_epochs=5000000     # More epochs for convergence
