@@ -107,7 +107,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         equation_GE.setScalar((epsilon + np.dot(sample, df_c_upper[j]) - f_c_upper[j] - r_upper[j]).item())
         network.addEquation(equation_GE, isProperty=True)
 
-        # Find a counterexample for lower bound
+        # Find a counterexample for upper bound
         res, vals, _ = network.solve(verbose=False, options=options)
         if res == "sat":
             cex = np.empty(len(inputVars))
@@ -142,7 +142,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Reset the query
         network.additionalEquList.clear()
 
-        # x df_c - nn_output >= -epsilon - c df_c + f(c) + r_lower
+        # x df_c - nn_output <= -epsilon + c df_c - f(c) - r_lower
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         for i, inputVar in enumerate(inputVars):
             # j is the output dimension, i is the input dimension, thus df_c[j, i] is the partial derivative of the j-th output with respect to the i-th input

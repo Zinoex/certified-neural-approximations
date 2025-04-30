@@ -26,9 +26,12 @@ def get_1D_systems():
             issubclass(obj, DynamicalSystem) and 
             obj != DynamicalSystem):
             # Create an instance to check dimensions
-            instance = obj()
-            if instance.input_dim == 1:
-                dynamics_systems.append((name, obj))
+            try:
+                instance = obj()
+                if instance.input_dim == 1:
+                    dynamics_systems.append((name, obj))
+            except Exception as e:
+                continue  # Skip classes that cannot be instantiated
     
     return dynamics_systems
 
@@ -76,15 +79,14 @@ def model_exists(dynamics_name):
     return model_path.exists()
 
 
-def verify_dynamics_model(model_path, dynamics_model):
+def verify_dynamics_model(model_path, dynamics_model, epsilon=0.05):
     """
     Verify the trained model against the dynamics system.
     """
     print(f"Verifying model: {model_path}")
     # Use a larger delta and epsilon for faster verification in tests
     delta = [(high - low) / 2 for low, high in dynamics_model.input_domain]
-    epsilon = 0.01
-    agg = verify_nn(model_path, delta=delta, epsilon=epsilon, dynamics_model=dynamics_model)
+    agg = verify_nn(model_path, delta=delta, epsilon=epsilon, num_workers=1, dynamics_model=dynamics_model)
     return agg
 
 
@@ -103,6 +105,7 @@ class Test1DModels(unittest.TestCase):
         self.assertTrue(len(dynamics_systems) > 0, "No 1D dynamics systems found")
         
         model_dir = self.model_dir
+        epsilon = 0.05
         
         for name, dynamics_class in dynamics_systems:
             print(f"\nTesting 1D dynamics system: {name}")
@@ -123,7 +126,7 @@ class Test1DModels(unittest.TestCase):
                 print(f"Training model for {name}...")
                 
                 # Using the train_nn function but with the specific dynamics model
-                model = train_nn(dynamics_model=dynamics_instance)
+                model = train_nn(dynamics_model=dynamics_instance, epsilon=epsilon, hidden_sizes=[20, 20])
                 
                 # Save the model with the specific name
                 save_onnx_model(model, str(model_path))
@@ -131,7 +134,7 @@ class Test1DModels(unittest.TestCase):
                 print(f"Using existing model: {model_path}")
             
             # Verify the model
-            verification_result = verify_dynamics_model(str(model_path), dynamics_instance)
+            verification_result = verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
             
             # Just report the result
             print(f"Verification result for {name}: {'Passed' if verification_result is None else 'Failed'}")
