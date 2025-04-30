@@ -269,6 +269,9 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
                 return SampleResultUNSAT(sample, [cex])
 
+            # Reset the query
+            small_network.additionalEquList.clear()
+
             # A_lower @ x - nn_output <= -epsilon - b_lower
             equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
             for i, inputVar in enumerate(inputVars):
