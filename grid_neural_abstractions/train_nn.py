@@ -18,7 +18,7 @@ class SimpleNN(nn.Module):
             prev_size = hidden_size
         layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
         self.network = nn.Sequential(*layers)
-        self._initialize_weights()  # Add weight initialization
+        # self._initialize_weights()  # Add weight initialization
 
     def forward(self, x):
         return self.network(x)
