@@ -335,7 +335,7 @@ class NonLipschitzVectorField2(DynamicalSystem):
         self.output_dim = 2
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
         self.hidden_sizes = [12, 10]
-        self.delta = np.array([1.0, 1.0])
+        self.delta = np.array([0.5, 1.0])
         self.epsilon = 0.081
         self.system_name = "NonLipschitzVectorField2"
         
