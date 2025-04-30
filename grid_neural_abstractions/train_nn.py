@@ -41,7 +41,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
     
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
-    patience = 1000
+    patience = 5000
     best_loss = float('inf')
     patience_counter = 0
 
