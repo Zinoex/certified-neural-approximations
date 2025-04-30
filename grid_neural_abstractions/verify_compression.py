@@ -263,7 +263,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                 nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
                 f_cex = large_network_dynamics(torch.as_tensor(cex, dtype=torch.float32).view(-1, 1)).flatten().numpy()
                 if np.abs(nn_cex - f_cex)[j] < epsilon:
-                    split_dim = sample.nextsplitdim()
+                    split_dim = sample.incrementsplitdim()
                     sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
                     return SampleResultMaybe(sample, [sample_left, sample_right])
 
@@ -297,7 +297,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                 nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
                 f_cex = large_network_dynamics(torch.as_tensor(cex, dtype=torch.float32).view(-1, 1)).flatten().numpy()
                 if np.abs(nn_cex - f_cex)[j] < epsilon:
-                    split_dim = sample.nextsplitdim()
+                    split_dim = sample.incrementsplitdim()
                     sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
                     return SampleResultMaybe(sample, [sample_left, sample_right])
 
