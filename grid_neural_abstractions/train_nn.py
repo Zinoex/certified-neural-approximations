@@ -61,7 +61,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
         max_loss = torch.max(torch.abs(outputs - y_train.T))
         loss = criterion(outputs, y_train.T)
             
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         loss.backward()
         
         # Apply gradient clipping to prevent explosion
@@ -72,7 +72,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
 
         if (epoch + 1) % 100 == 0:
             print(
-                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, Max: {max_loss.item():.6f},LR: {optimizer.param_groups[0]['lr']:.6f}"
+                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, Max: {max_loss.item():.6f}, LR: {optimizer.param_groups[0]['lr']:.6f}"
             )
             
         # Early stopping logic
@@ -80,8 +80,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
         # which is critical for applications requiring strict error bounds.
         if max_loss < best_loss:
             best_loss = max_loss
-            if best_loss > epsilon:
-                patience_counter = 0
+            patience_counter = 0
         else:
             patience_counter += 1
             
