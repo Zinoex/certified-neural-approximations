@@ -1,9 +1,8 @@
+import torch
 
 class TorchTranslator:
     def __init__(self, device=None):
         self.device = device
-        import torch as torch
-        self.torch = torch
 
     def matrix_vector(self, a, b):
         """
@@ -14,7 +13,7 @@ class TorchTranslator:
 
         :return: torch.tensor of floats [n]
         """
-        return self.torch.matmul(a, b.unsqueeze(1)).squeeze(1)
+        return torch.matmul(a, b.unsqueeze(1)).squeeze(1)
     
     def sin(self, a):
         """
@@ -24,7 +23,7 @@ class TorchTranslator:
 
         :return: torch.tensor of floats
         """
-        return self.torch.sin(a)
+        return torch.sin(a)
     
     def cos(self, a):
         """
@@ -34,7 +33,7 @@ class TorchTranslator:
 
         :return: torch.tensor of floats
         """
-        return self.torch.cos(a)
+        return torch.cos(a)
     
     def tan(self, a):
         """
@@ -44,7 +43,7 @@ class TorchTranslator:
 
         :return: torch.tensor of floats
         """
-        return self.torch.tan(a)
+        return torch.tan(a)
     
     def exp(self, a):
         """
@@ -54,7 +53,7 @@ class TorchTranslator:
 
         :return: torch.tensor of floats
         """
-        return self.torch.exp(a)
+        return torch.exp(a)
     
     def log(self, a):
         """
@@ -64,7 +63,7 @@ class TorchTranslator:
 
         :return: torch.tensor of floats
         """
-        return self.torch.log(a)
+        return torch.log(a)
 
     def sqrt(self, a):
         """
@@ -74,7 +73,7 @@ class TorchTranslator:
 
         :return: torch.tensor of floats
         """
-        return self.torch.sqrt(a)
+        return torch.sqrt(a)
 
     def pow(self, a, b):
         """
@@ -85,7 +84,7 @@ class TorchTranslator:
 
         :return: torch.tensor of floats
         """
-        return self.torch.pow(a, b)
+        return torch.pow(a, b)
 
     def min(self, a):
         """
@@ -95,7 +94,7 @@ class TorchTranslator:
 
         :return: float
         """
-        return self.torch.min(a)
+        return torch.min(a)
 
     def max(self, a):
         """
@@ -105,7 +104,7 @@ class TorchTranslator:
 
         :return: float
         """
-        return self.torch.max(a)
+        return torch.max(a)
 
     def stack(self, a):
         """
@@ -115,7 +114,7 @@ class TorchTranslator:
 
         :return: torch.tensor
         """
-        return self.torch.stack(a)
+        return torch.stack(a)
 
     def hstack(self, a):
         """
@@ -125,7 +124,7 @@ class TorchTranslator:
 
         :return: torch.tensor
         """
-        return self.torch.stack(a, dim=1)
+        return torch.stack(a, dim=1)
 
     def to_numpy(self, a):
         """
@@ -145,4 +144,4 @@ class TorchTranslator:
 
         :return: torch.tensor
         """
-        return self.torch.as_tensor(a, dtype=torch.float32, device=self.device)
+        return torch.as_tensor(a, dtype=torch.float32, device=self.device)
