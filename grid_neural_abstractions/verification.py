@@ -57,10 +57,11 @@ class VerificationStrategy(ABC):
 
 class MarabouTaylorStrategy(VerificationStrategy):
     @staticmethod
-    def prepare_strategy(dynamics, local):
+    def prepare_strategy(dynamics):
         prepare_taylor_expansion(dynamics.input_dim)
 
-    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
+    @staticmethod
+    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         options = Marabou.createOptions(verbosity=0)

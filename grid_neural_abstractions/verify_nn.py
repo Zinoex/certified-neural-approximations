@@ -1,9 +1,10 @@
 from functools import partial
 
 import numpy as np
+
+from grid_neural_abstractions.train_nn import load_onnx_model
 from .executors import (
     MultiprocessExecutor,
-    MultithreadExecutor,
     SinglethreadExecutor,
 )
 from maraboupy import Marabou
@@ -13,42 +14,6 @@ from .certification_results import CertificationRegion
 
 from .generate_data import generate_grid
 
-def process_sample(
-    strategy,
-    dynamics_model,
-    epsilon,
-    local,
-    data,
-    precision=1e-6
-):
-    """
-    Process a sample to check for counterexamples.
-
-    Args:
-        strategy: The verification strategy to use.
-        dynamics_model: The dynamics model being verified.
-        epsilon: The perturbation bound for verification.
-        local: Local instance for the network.
-        data: The input data sample.
-        precision: The precision for verification.
-
-    Returns:
-        The result of the verification process.
-    """
-    network = local.network
-    return strategy.verify(
-        network,
-        dynamics_model,
-        data,
-        epsilon=epsilon,
-        precision=precision
-    )
-
-
-# This function has to be in the global scope to be pickled for multiprocessing
-def read_onnx_into_local(onnx_path, local):
-    network = Marabou.read_onnx(onnx_path)
-    local.network = network
 
 
 def onnx_input_shape(onnx_path):
@@ -70,13 +35,8 @@ def aggregate(agg, result):
     return agg + result.counterexamples()
 
 
-def sequential(func1, func2, local):
-    func1(local)
-    func2(local)
-
-
 def verify_nn(
-    onnx_path, dynamics_model, num_workers=16, visualize=True
+    onnx_path, dynamics_model, num_workers=8, visualize=True
 ):
     
     strategy = MarabouTaylorStrategy()
@@ -86,7 +46,8 @@ def verify_nn(
     assert len(onnx_input_dim) == 1, f"Only 1D input dims are supported, was {len(onnx_input_dim)}"
     assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
 
-    partial_process_sample = partial(process_sample, strategy, dynamics_model, dynamics_model.epsilon)
+    network = load_onnx_model(onnx_path)
+    partial_process_sample = partial(strategy.verify, network, dynamics_model, epsilon=dynamics_model.epsilon)
 
     X_train, _ = generate_grid(input_dim, dynamics_model.input_domain, delta=dynamics_model.delta)
     output_dim = dynamics_model.output_dim
@@ -95,9 +56,7 @@ def verify_nn(
         for j in range(output_dim) for x in X_train
     ]
 
-    read_network = partial(read_onnx_into_local, onnx_path)
     prepare_strategy = partial(strategy.prepare_strategy, dynamics_model)
-    initializer = partial(sequential, read_network, prepare_strategy)
 
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
@@ -110,11 +69,11 @@ def verify_nn(
     if num_workers == 1:
         executor = SinglethreadExecutor()
         # Pass the plotter to the executor
-        cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples, plotter)
+        cex_list = executor.execute(prepare_strategy, partial_process_sample, aggregate, samples, plotter)
     elif num_workers > 1:
         executor = MultiprocessExecutor(num_workers)
         # Note: Visualization is not supported in multiprocessing mode
-        cex_list = executor.execute(initializer, partial_process_sample, aggregate, samples)
+        cex_list = executor.execute(prepare_strategy, partial_process_sample, aggregate, samples)
 
     num_cex = len(cex_list) if cex_list else 0
 
