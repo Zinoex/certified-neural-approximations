@@ -1,6 +1,4 @@
-from .translators import TorchTranslator, NumpyTranslator
 import numpy as np
-import torch
 
 class DynamicalSystem:
     """Base class for dynamical systems."""
@@ -24,8 +22,10 @@ class DynamicalSystem:
         if translator is None:
             if isinstance(x, np.ndarray):
                 # Use NumpyTranslator if x is a NumPy array
+                from .translators.numpy_translator import NumpyTranslator
                 translator = NumpyTranslator()
             else:
+                from .translators.torch_translator import TorchTranslator
                 translator = TorchTranslator()
         
         return self.compute_dynamics(x, translator)
@@ -393,9 +393,11 @@ class NNDynamics(DynamicalSystem):
         Returns:
             The derivatives of the system with shape [output_dim, batch_size]
         """
+        from .translators.torch_translator import TorchTranslator
         assert isinstance(translator, TorchTranslator), "NNDynamics only supports TorchTranslator"
-
-        if not torch.is_tensor(x):
+        
+        if isinstance(x, np.ndarray):
+            import torch
             x = torch.tensor(x, dtype=torch.float32)
 
         # Forward pass through the neural network

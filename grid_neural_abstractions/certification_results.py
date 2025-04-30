@@ -1,7 +1,6 @@
 import abc
 import numpy as np
 
-
 class CertificationRegion:
     def __init__(self, center: np.array, radius: np.array, output_dim: int = None, split_dim: int = None):
         self.center = center

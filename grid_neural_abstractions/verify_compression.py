@@ -13,9 +13,10 @@ from bound_propagation import HyperRectangle, BoundModelFactory
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 from grid_neural_abstractions.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
 from grid_neural_abstractions.dynamics import NNDynamics, Quadcopter
-from grid_neural_abstractions.train_nn import generate_data, load_onnx_model, load_torch_model
+from grid_neural_abstractions.train_nn import load_onnx_model, load_torch_model
 from grid_neural_abstractions.verification import split_sample
 from grid_neural_abstractions.verify_nn import aggregate
+from grid_neural_abstractions.generate_data import generate_grid
 
 
 class CompressionVerificationStrategy(ABC):
@@ -144,10 +145,10 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
         # Generate initial set of samples
         delta = np.full(large_network_dynamics.input_dim, delta)
-        X_train, _ = generate_data(large_network_dynamics.input_dim, dynamics_model.input_domain, delta=delta, grid=True, device="cpu")
+        X_train, _ = generate_grid(large_network_dynamics.input_dim, dynamics_model.input_domain, delta=delta)
         output_dim = dynamics_model.output_dim
         samples = [
-            CertificationRegion(x.double().numpy(), delta, j)
+            CertificationRegion(x, delta, j)
             for j in range(output_dim) for x in X_train
         ]
 

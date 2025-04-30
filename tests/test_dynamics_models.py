@@ -7,7 +7,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from grid_neural_abstractions.dynamics import DynamicalSystem
-from grid_neural_abstractions.train_nn import train_nn, save_onnx_model, generate_data
 from grid_neural_abstractions.verify_nn import verify_nn
 
 
@@ -44,13 +43,7 @@ def verify_dynamics_model(model_path, dynamics_model, epsilon=0.05):
     print(f"Verifying model: {model_path}")
     # Use a larger delta and epsilon for faster verification in tests
     delta = [(high - low) / 2 for low, high in dynamics_model.input_domain]
-    try:
-        # Update verify_nn function to accept dynamics_model parameter
-        verify_nn(model_path, delta=delta, epsilon=epsilon, dynamics_model=dynamics_model)
-        return True
-    except Exception as e:
-        print(f"Verification failed: {str(e)}")
-        return False
+    verify_nn(model_path, delta=delta, epsilon=epsilon, dynamics_model=dynamics_model)
 
 
 class TestDynamicsModels(unittest.TestCase):
@@ -77,6 +70,7 @@ class TestDynamicsModels(unittest.TestCase):
             
             # Check if model exists or train one
             if not model_exists(name):
+                from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
                 print(f"Training model for {name}...")
                 
                 # Using the train_nn function but with the specific dynamics model
@@ -92,14 +86,11 @@ class TestDynamicsModels(unittest.TestCase):
                 print(f"Using existing model: {model_path}")
             
             # Verify the model
-            verification_result = verify_dynamics_model(
+            verify_dynamics_model(
                 str(model_path), 
                 dynamics_instance, 
                 epsilon=epsilon
             )
-            
-            # Just report the result
-            print(f"Verification result for {name}: {'Passed' if verification_result else 'Failed'}")
     
     def test_sine2d_system(self):
         """Test specifically for the Sine2D system."""
@@ -133,6 +124,7 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Check if model exists or train one
         if not model_path.exists():
+            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
             print(f"Training model for Sine2D...")
             
             # Generate data and train the neural network
@@ -148,15 +140,11 @@ class TestDynamicsModels(unittest.TestCase):
             print(f"Using existing model: {model_path}")
         
         # Verify the model
-        verification_result = verify_dynamics_model(
+        verify_dynamics_model(
             str(model_path), 
             dynamics_instance, 
             epsilon=epsilon
         )
-        
-        # Report the result
-        print(f"Verification result for Sine2D (freq_x={freq_x}, freq_y={freq_y}): {'Passed' if verification_result else 'Failed'}")
-        self.assertTrue(verification_result, f"Sine2D model with freq_x={freq_x}, freq_y={freq_y} verification should pass")
     
     def test_jet_engine(self):
         """Test specifically for the JetEngine system."""        
@@ -177,6 +165,7 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Check if model exists or train one
         if not model_path.exists():
+            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
             print(f"Training model for Jet Engine...")
             
             # Generate data and train the neural network
@@ -193,11 +182,7 @@ class TestDynamicsModels(unittest.TestCase):
             print(f"Using existing model: {model_path}")
         
         # Verify the model
-        verification_result = verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
-        
-        # Report the result
-        print(f"Verification result for Jet Engine: {'Passed' if verification_result else 'Failed'}")
-        self.assertTrue(verification_result, "Jet Engine model verification should pass")
+        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
 
 
 if __name__ == "__main__":

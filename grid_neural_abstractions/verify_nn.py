@@ -7,13 +7,11 @@ from .executors import (
     SinglethreadExecutor,
 )
 from maraboupy import Marabou
-from .dynamics import VanDerPolOscillator
 
 from .verification import MarabouTaylorStrategy
 from .certification_results import CertificationRegion
-from .visualization import DynamicsNetworkPlotter  # Import the new plotter
 
-from .train_nn import generate_data
+from .generate_data import generate_grid
 
 def process_sample(
     strategy,
@@ -91,10 +89,10 @@ def verify_nn(
     partial_process_sample = partial(process_sample, strategy, dynamics_model, epsilon)
 
     delta = np.full(input_dim, delta)
-    X_train, _ = generate_data(input_dim, dynamics_model.input_domain, delta=delta, grid=True, device="cpu")
+    X_train, _ = generate_grid(input_dim, dynamics_model.input_domain, delta=delta)
     output_dim = dynamics_model.output_dim
     samples = [
-        CertificationRegion(x.double().numpy(), delta, j)
+        CertificationRegion(x, delta, j)
         for j in range(output_dim) for x in X_train
     ]
 
@@ -105,6 +103,7 @@ def verify_nn(
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
     if visualize and input_dim in [1, 2] and num_workers == 1:
+        from .visualization import DynamicsNetworkPlotter  # Import the new plotter
         # Create a plotter for 1D or 2D dynamics
         plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))
         print(f"Initialized visualization for {input_dim}D dynamics")
@@ -125,12 +124,4 @@ def verify_nn(
     
     # Keep the plot window open if we're visualizing
     if plotter is not None:
-        input("Press Enter to close the visualization...")
-
-
-if __name__ == "__main__":
-    verify_nn(
-        "data/simple_nn.onnx",
-        VanDerPolOscillator(),
-        delta=0.1
-    )
+        pause(30)  # Keep the plot open for 30 seconds
