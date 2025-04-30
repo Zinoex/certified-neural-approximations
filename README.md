@@ -61,7 +61,7 @@ Awesome grid_neural_abstractions created by Zinoex
 ## Install it from PyPI
 
 ```bash
-pip install grid_neural_abstractions
+pip install -e .
 ```
 
 ## Usage

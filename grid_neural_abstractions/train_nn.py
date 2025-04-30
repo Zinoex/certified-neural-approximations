@@ -2,7 +2,6 @@ import numpy as np  # Add numpy for grid generation
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from .dynamics import VanDerPolOscillator, Quadcopter
 from .generate_data import generate_data
 
 # Define the neural network
@@ -32,9 +31,7 @@ class SimpleNN(nn.Module):
 
 
 # Train the neural network
-def train_nn(dynamics_model=None, epsilon = 0.05, hidden_sizes=[128,128,128], learning_rate = 0.001, num_epochs = 50000, batch_size = 4096):
-    if dynamics_model is None:
-        dynamics_model = Quadcopter()
+def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learning_rate = 0.001, num_epochs = 50000, batch_size = 4096):
     
     input_size = dynamics_model.input_dim
     output_size = dynamics_model.output_dim  # Update output size to match target size
@@ -42,7 +39,7 @@ def train_nn(dynamics_model=None, epsilon = 0.05, hidden_sizes=[128,128,128], le
     
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
-    patience = 5
+    patience = 1000
     best_loss = float('inf')
     patience_counter = 0
 
@@ -50,7 +47,7 @@ def train_nn(dynamics_model=None, epsilon = 0.05, hidden_sizes=[128,128,128], le
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-5)  # Use AdamW optimizer
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.9, patience=1000, min_lr=1e-6
+        optimizer, mode='min', factor=0.9, patience=200, min_lr=1e-7
     )
 
     # Load data
@@ -111,6 +108,16 @@ def save_onnx_model(model, file_name="data/simple_nn.onnx"):
     print(f"Model saved as {file_name}")
 
 
+def save_torch_model(model, file_name="data/simple_nn.pth"):
+    torch.save(model.state_dict(), file_name)
+    print(f"Model saved as {file_name}")
+
+
+def save_model(model, file_name="data/simple_nn.onnx"):
+    save_onnx_model(model, file_name)
+    save_torch_model(model, file_name.replace(".onnx", ".pth"))
+
+
 # Load the ONNX model for Marabou
 def load_onnx_model(file_name="data/simple_nn.onnx"):
     from maraboupy import Marabou
@@ -120,8 +127,15 @@ def load_onnx_model(file_name="data/simple_nn.onnx"):
     return network
 
 
+def load_torch_model(file_name="data/simple_nn.pth", input_size=3, hidden_sizes=[128, 128, 128], output_size=3):
+    model = SimpleNN(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size)
+    model.load_state_dict(torch.load(file_name, map_location=torch.device('cpu')))
+    print(f"PyTorch model {file_name} loaded")
+    return model
+
+
 if __name__ == "__main__":
     model = train_nn()  # Use the correct input_size from the dynamics model
-    
+
     # Save the trained model
-    save_onnx_model(model)
+    save_model(model)
