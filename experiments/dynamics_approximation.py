@@ -31,35 +31,39 @@ NEW_SYSTEMS = [
 
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS
 
+def train_models():
+    for dynamics_cls in SYSTEMS:
+        dynamics = dynamics_cls()
 
-def train_and_verify_dynamics_model(dynamics_cls):
-    dynamics = dynamics_cls()
+        print(f"\nTraining {dynamics.system_name} system")
+        model = train_nn(dynamics_model=dynamics)
+        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_simple_nn.onnx")
 
-    print(f"\nTraining and verifying {dynamics.system_name} system")
-    model = train_nn(dynamics_model=dynamics)
-    path = os.path.join(DATA_DIR, f"{dynamics.system_name}_simple_nn.onnx")
+        save_model(model, path)
 
-    save_model(model, path)
+        print(f"Done training for {dynamics.system_name}")
 
-    print("Verifying model...")
-    t1 = time.time()
-    verify_nn(
-        onnx_path=path,
-        dynamics_model=dynamics,
-        visualize=False
-    )
-    t2 = time.time()
-    print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds")
+
+def verify_models():
+    for dynamics_cls in SYSTEMS:
+        dynamics = dynamics_cls()
+
+        print(f"Verifying model {dynamics.system_name}")
+        t1 = time.time()
+        verify_nn(
+            onnx_path=path,
+            dynamics_model=dynamics,
+            visualize=False
+        )
+        t2 = time.time()
+        print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds")
 
 
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    for dynamics_cls in SYSTEMS:
-        try:
-            train_and_verify_dynamics_model(dynamics_cls)
-        except Exception as e:
-            print(f"Error processing {dynamics_cls.__name__}: {e}")
+    train_models()
+    # verify_models()
 
 
 if __name__ == "__main__":
