@@ -84,7 +84,7 @@ def verify_dynamics_model(model_path, dynamics_model):
     # Use a larger delta and epsilon for faster verification in tests
     delta = [(high - low) / 2 for low, high in dynamics_model.input_domain]
     epsilon = 0.01
-    agg = verify_nn(model_path, delta=delta, epsilon=epsilon, num_workers=1, dynamics_model=dynamics_model)
+    agg = verify_nn(model_path, delta=delta, epsilon=epsilon, dynamics_model=dynamics_model)
     return agg
 
 

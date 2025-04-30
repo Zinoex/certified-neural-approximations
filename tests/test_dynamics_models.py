@@ -46,7 +46,7 @@ def verify_dynamics_model(model_path, dynamics_model, epsilon=0.05):
     delta = [(high - low) / 2 for low, high in dynamics_model.input_domain]
     try:
         # Update verify_nn function to accept dynamics_model parameter
-        verify_nn(model_path, delta=delta, epsilon=epsilon, num_workers=1, dynamics_model=dynamics_model)
+        verify_nn(model_path, delta=delta, epsilon=epsilon, dynamics_model=dynamics_model)
         return True
     except Exception as e:
         print(f"Verification failed: {str(e)}")

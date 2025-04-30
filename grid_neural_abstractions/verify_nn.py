@@ -78,7 +78,7 @@ def sequential(func1, func2, local):
 
 
 def verify_nn(
-    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=1, visualize=True
+    onnx_path, dynamics_model, delta=0.01, epsilon=0.1, num_workers=16, visualize=True
 ):
     
     strategy = MarabouTaylorStrategy()
@@ -104,7 +104,8 @@ def verify_nn(
 
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
-    if visualize and input_dim in [1, 2]:
+    if visualize and input_dim in [1, 2] and num_workers == 1:
+        # Create a plotter for 1D or 2D dynamics
         plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))
         print(f"Initialized visualization for {input_dim}D dynamics")
 
