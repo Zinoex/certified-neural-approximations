@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 
 class DynamicalSystem:
     """Base class for dynamical systems."""
@@ -395,6 +394,7 @@ class NNDynamics(DynamicalSystem):
             The derivatives of the system with shape [output_dim, batch_size]
         """
         assert isinstance(translator, TorchTranslator), "NNDynamics only supports TorchTranslator"
+        import torch
 
         if not torch.is_tensor(x):
             x = torch.tensor(x, dtype=torch.float32)
