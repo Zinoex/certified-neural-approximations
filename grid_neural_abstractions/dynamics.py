@@ -393,6 +393,7 @@ class NNDynamics(DynamicalSystem):
         Returns:
             The derivatives of the system with shape [output_dim, batch_size]
         """
+        from .translators.torch_translator import TorchTranslator
         assert isinstance(translator, TorchTranslator), "NNDynamics only supports TorchTranslator"
         
         if isinstance(x, np.ndarray):
