@@ -135,7 +135,7 @@ class SampleResultUNSAT(SampleResult):
 
 class SampleResultMaybe(SampleResult):
     def __init__(self, sample, computation_time, new_samples):
-        super().__init__(sample)
+        super().__init__(sample, computation_time)
         self._new_samples = new_samples
 
     def issat(self) -> bool:
