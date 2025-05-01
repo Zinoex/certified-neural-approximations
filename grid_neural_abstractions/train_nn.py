@@ -18,18 +18,6 @@ class LinearResidual(nn.Module):
         return self.linear(self.act(x)) + x
 
 
-class ReLUResidual(nn.Module):
-    def __init__(self, leaky_relu=False):
-        super().__init__()
-        if leaky_relu:
-            self.act = nn.LeakyReLU()
-        else:
-            self.act = nn.ReLU()
-
-    def forward(self, x):
-        return self.act(x) + x
-
-
 # Define the neural network
 class SimpleNN(nn.Module):
     def __init__(self, input_size, hidden_sizes, output_size, leaky_relu=False, residual=False):
@@ -39,13 +27,12 @@ class SimpleNN(nn.Module):
         if residual:
             common_hidden_size = hidden_sizes[0]
 
-            layers = [nn.Linear(input_size, common_hidden_size)]
+            layers = [nn.Linear(input_size, common_hidden_size, device=self.device)]
 
             for hidden_size in hidden_sizes:
                 assert hidden_size == common_hidden_size
-                layers.append(LinearResidual(hidden_size, device=self.device))  # Create layer on device
+                layers.append(LinearResidual(hidden_size, leaky_relu=leaky_relu, device=self.device))  # Create layer on device
 
-            layers.append(ReLUResidual())
             layers.append(nn.Linear(common_hidden_size, output_size, device=self.device))  # Create layer on device
             self.network = nn.Sequential(*layers)
         else:
@@ -66,7 +53,7 @@ class SimpleNN(nn.Module):
 
 
 # Train the neural network
-def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_size = 4096):
+def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_size = 4096, residual=False, leaky_relu=False):
     
     input_size = dynamics_model.input_dim
     hidden_sizes = dynamics_model.hidden_sizes  # Get hidden sizes from dynamics model
@@ -83,7 +70,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
     # Add variable to store the best model state
     best_model_state = None
 
-    model = SimpleNN(input_size, hidden_sizes, output_size)
+    model = SimpleNN(input_size, hidden_sizes, output_size, residual=residual, leaky_relu=leaky_relu)
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)  # Use AdamW optimizer
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
