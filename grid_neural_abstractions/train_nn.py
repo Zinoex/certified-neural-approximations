@@ -1,23 +1,52 @@
 import numpy as np  # Add numpy for grid generation
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from .generate_data import generate_data
 
+
+class LinearResidual(nn.Module):
+    def __init__(self, size, device=None):
+        super().__init__()
+        self.linear = nn.Linear(size, size, device=device)
+
+    def forward(self, x):
+        return self.linear(F.relu(x)) + x
+
+
+class ReLUResidual(nn.Module):
+    def forward(self, x):
+        return F.relu(x) + x
+
+
 # Define the neural network
 class SimpleNN(nn.Module):
-    def __init__(self, input_size, hidden_sizes, output_size):
+    def __init__(self, input_size, hidden_sizes, output_size, residual=False):
         super(SimpleNN, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        layers = []
-        prev_size = input_size
-        for hidden_size in hidden_sizes:
-            layers.append(nn.Linear(prev_size, hidden_size, device=self.device))  # Create layer on device
-            layers.append(nn.ReLU())
-            prev_size = hidden_size
-        layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
-        self.network = nn.Sequential(*layers)
+
+        if residual:
+            common_hidden_size = hidden_sizes[0]
+
+            layers = [nn.Linear(input_size, common_hidden_size)]
+
+            for hidden_size in hidden_sizes:
+                assert hidden_size == common_hidden_size
+                layers.append(LinearResidual(hidden_size, device=self.device))  # Create layer on device
+
+            layers.append(ReLUResidual())
+            layers.append(nn.Linear(common_hidden_size, output_size, device=self.device))  # Create layer on device
+            self.network = nn.Sequential(*layers)
+        else:
+            layers = []
+            prev_size = input_size
+            for hidden_size in hidden_sizes:
+                layers.append(nn.Linear(prev_size, hidden_size, device=self.device))  # Create layer on device
+                layers.append(nn.ReLU())
+                prev_size = hidden_size
+            layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
+            self.network = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.network(x)
@@ -52,7 +81,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
         model.train()
         outputs = model(X_train.T)
         max_loss = torch.max(torch.abs(outputs - y_train.T))
-        loss = criterion(outputs, y_train.T)
+        loss = criterion(outputs, y_train.T) + 0.001 * max_loss
             
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
