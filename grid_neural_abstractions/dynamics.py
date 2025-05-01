@@ -140,7 +140,7 @@ class VanDerPolOscillator(DynamicalSystem):
 
 
 class Quadcopter(DynamicalSystem):
-    """A class representing the 10D dynamics of a quadcopter."""
+    """A class representing the 9D dynamics of a quadcopter (including velocity)."""
 
     def __init__(
         self,
@@ -160,57 +160,85 @@ class Quadcopter(DynamicalSystem):
         self.moment_inertia_y = moment_inertia_y
         self.moment_inertia_z = moment_inertia_z
 
-        self.input_dim = 3  # 3D state: roll, pitch, yaw
-        self.output_dim = 3  # 3D derivatives
-        self.input_domain = [(-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5)]  # Typical domain for angles in radians
+        self.input_dim = 9  # 9D states: orientation (3), angular velocity (3), linear velocity (3)
+        self.output_dim = 6  # 9D derivatives
+        
+        # Typical domains for each state dimension (including velocities)
+        self.input_domain = [
+            (-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5),        # roll, pitch, yaw
+            (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0),        # angular velocity (wx, wy, wz)
+            (-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0)         # linear velocity (vx, vy, vz)
+        ]
         self.hidden_sizes = [128, 128, 128]
-        self.delta = None
-        self.epsilon = None
+        self.delta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 1.0])  # Domain size for the input
+        self.epsilon = 0.1
         self.system_name = "Quadcopter"
 
     def compute_dynamics(self, x, translator):
         """
-        Compute quadcopter dynamics.
+        Compute 9D quadcopter dynamics (including velocity).
         
         Args:
-            x: Input tensor with shape [3, batch_size]
+            x: Input tensor with shape [9, batch_size]
             translator: The translator for mathematical operations
             
         Returns:
-            Tensor of shape [3, batch_size] with the dynamics
+            Tensor of shape [6, batch_size] with the dynamics
         """
-        # Extract state variables
+        # Extract state variables      
+        
         # Orientation: roll, pitch, yaw
         roll, pitch, yaw = x[0], x[1], x[2]
+        
+        # Angular velocity (full 3D)
+        wx, wy, wz = x[3], x[4], x[5]
+        
+        # Linear velocity
+        vx, vy, vz = x[6], x[7], x[8]
 
         # Simplified thrust and control inputs (can be replaced with actual control inputs)
         # Here using a hover thrust and small attitude corrections
         thrust = self.mass * self.gravity
 
+        sin_pitch = translator.sin(pitch)
+        cos_pitch = translator.cos(pitch)
+        sin_roll = translator.sin(roll)
+        cos_roll = translator.cos(roll)
+        sin_yaw = translator.sin(yaw)
+        cos_yaw = translator.cos(yaw)
+        tan_pitch = translator.tan(pitch)
+
         # Velocity derivatives (from forces)
-        # Simplified model assuming small angles and considering yaw
+        # Simplified model assuming small angles
         dvx = (
             (
-                translator.sin(pitch) * translator.cos(yaw)
-                + translator.sin(roll) * translator.cos(pitch) * translator.sin(yaw)
+            sin_pitch * cos_yaw
+            + sin_roll * cos_pitch * sin_yaw
             )
             * thrust
             / self.mass
         )
         dvy = (
             (
-                translator.sin(pitch) * translator.sin(yaw)
-                - translator.sin(roll) * translator.cos(pitch) * translator.cos(yaw)
+            sin_pitch * sin_yaw
+            - sin_roll * cos_pitch * cos_yaw
             )
             * thrust
             / self.mass
         )
         dvz = (
-            translator.cos(roll) * translator.cos(pitch) * thrust
-        ) / self.mass - self.gravity
+            cos_roll * cos_pitch * thrust / self.mass
+            - self.gravity
+        )
 
-        # Combine all derivatives
-        derivatives = translator.stack([dvx, dvy, dvz])
+        # Orientation derivatives from angular velocities using Euler angle rates
+        # These equations relate angular velocities in the body frame to Euler angle rates
+        droll = wx + wy * sin_roll * tan_pitch + wz * cos_roll * tan_pitch
+        dpitch = wy * cos_roll - wz * sin_roll
+        dyaw = wy * sin_roll / cos_pitch + wz * cos_roll / cos_pitch
+
+        # Combine all derivatives (including velocity derivatives)
+        derivatives = translator.stack([droll, dpitch, dyaw, dvx, dvy, dvz])
 
         return derivatives
 
@@ -416,6 +444,116 @@ class Sine2D(DynamicalSystem):
         dy = -translator.sin(self.freq_x * x[0])
         
         return translator.stack([dx, dy])
+
+
+class VortexShedding3D(DynamicalSystem):
+    """
+    A 3D vortex shedding dynamical system that models fluid-structure interaction phenomena.
+    This is a simplified model capturing the key features of vortex shedding behavior in 3D.
+    """
+    
+    def __init__(self, strouhal=0.2, reynolds=100.0, amplitude=1.0):
+        super().__init__()
+        # Parameters that control the vortex shedding behavior
+        self.strouhal = strouhal      # Strouhal number: dimensionless frequency
+        self.reynolds = reynolds      # Reynolds number: ratio of inertial to viscous forces
+        self.amplitude = amplitude    # Amplitude of oscillation
+        
+        self.input_dim = 3            # 3D system
+        self.output_dim = 3           # 3D output
+        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0)]  # Domain for all dimensions
+        self.hidden_sizes = [64, 64]  # Define hidden sizes for neural network
+        self.delta = np.array([0.5, 0.5, 0.5])  # Delta for each dimension
+        self.epsilon = 0.05           # Precision for verification
+        self.system_name = "VortexShedding3D"
+    
+    def compute_dynamics(self, x, translator):
+        """
+        Compute 3D vortex shedding dynamics.
+        The system exhibits limit cycle behavior with frequency based on Strouhal number
+        and amplitude affected by Reynolds number.
+        
+        Args:
+            x: Input tensor with shape [3, batch_size]
+            translator: The translator for mathematical operations
+            
+        Returns:
+            Tensor of shape [3, batch_size] with the dynamics
+        """
+        # Extract state variables
+        x1, x2, x3 = x[0], x[1], x[2]
+        
+        # Parameters derived from Reynolds and Strouhal numbers
+        damping = 0.5 / self.reynolds
+        frequency = self.strouhal * 2.0
+        
+        # Dynamics inspired by coupled oscillators with nonlinear damping
+        # This creates a limit cycle behavior characteristic of vortex shedding
+        dx1 = x2
+        dx2 = -frequency**2 * x1 - damping * x2 * (translator.pow(x1, 2) + translator.pow(x3, 2))
+        dx3 = -damping * x3 + self.amplitude * translator.sin(frequency * x1)
+        
+        return translator.stack([dx1, dx2, dx3])
+
+
+class VortexShedding4D(DynamicalSystem):
+    """
+    A 4D vortex shedding dynamical system that models more complex fluid-structure interaction.
+    This extended model captures additional features like vortex stretching and twisting,
+    which are important phenomena in 3D fluid flows with a fourth variable representing
+    vortex intensity/strength.
+    """
+    
+    def __init__(self, strouhal=0.2, reynolds=100.0, amplitude=1.0, coupling=0.3):
+        super().__init__()
+        # Parameters that control the vortex shedding behavior
+        self.strouhal = strouhal      # Strouhal number: dimensionless frequency
+        self.reynolds = reynolds      # Reynolds number: ratio of inertial to viscous forces
+        self.amplitude = amplitude    # Amplitude of oscillation
+        self.coupling = coupling      # Coupling strength between spatial variables and vortex intensity
+        
+        self.input_dim = 4            # 4D system (3D space + intensity)
+        self.output_dim = 4           # 4D output
+        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0), (-1.0, 1.0)]  # Domain for all dimensions
+        self.hidden_sizes = [96, 96]  # Define hidden sizes for neural network
+        self.delta = np.array([0.5, 0.5, 0.5, 0.25])  # Delta for each dimension
+        self.epsilon = 0.05           # Precision for verification
+        self.system_name = "VortexShedding4D"
+    
+    def compute_dynamics(self, x, translator):
+        """
+        Compute 4D vortex shedding dynamics with vortex intensity as fourth dimension.
+        The system exhibits limit cycle behavior with stretching and folding characteristic
+        of vortex structures in fluid dynamics.
+        
+        Args:
+            x: Input tensor with shape [4, batch_size]
+            translator: The translator for mathematical operations
+            
+        Returns:
+            Tensor of shape [4, batch_size] with the dynamics
+        """
+        # Extract state variables
+        x1, x2, x3, x4 = x[0], x[1], x[2], x[3]
+        
+        # Parameters derived from Reynolds and Strouhal numbers
+        damping = 0.5 / self.reynolds
+        frequency = self.strouhal * 2.0
+        
+        # Dynamics inspired by coupled oscillators with nonlinear damping and vortex stretching
+        dx1 = x2
+        dx2 = -frequency**2 * x1 - damping * x2 * (translator.pow(x1, 2) + translator.pow(x3, 2))
+        dx3 = -damping * x3 + self.amplitude * translator.sin(frequency * x1) + self.coupling * x4
+        
+        # Fourth dimension: vortex intensity dynamics influenced by spatial variables
+        # The intensity equation models vortex stretching and folding behavior
+        dx4 = -damping * x4 + self.coupling * (
+            translator.sin(x1 * x3) - 
+            0.5 * x2 * translator.pow(x3, 2) +
+            0.2 * translator.cos(frequency * x2)
+        )
+        
+        return translator.stack([dx1, dx2, dx3, dx4])
 
 
 class NNDynamics(DynamicalSystem):
