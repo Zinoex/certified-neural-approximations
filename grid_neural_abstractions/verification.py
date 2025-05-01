@@ -165,7 +165,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             network.additionalEquList.clear()
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
-            if np.abs(nn_cex - f_cex)[j] < epsilon:
+            if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -207,7 +207,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             network.additionalEquList.clear()
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
-            if np.abs(nn_cex - f_cex)[j] < epsilon:
+            if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
