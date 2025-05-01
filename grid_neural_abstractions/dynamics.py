@@ -344,7 +344,7 @@ class NonLipschitzVectorField2(DynamicalSystem):
         # ẏ = (x²)^(1/3) - x
         
         dx = translator.pow(x[0], 2) + x[1]
-        dy = translator.pow(translator.pow(x[0], 2), 1/3) - x[0]
+        dy = translator.cbrt(translator.pow(x[0], 2)) - x[0]
         
         return translator.stack([dx, dy])
 
