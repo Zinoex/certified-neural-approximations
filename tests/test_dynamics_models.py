@@ -222,6 +222,84 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Verify the model
         verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon, nr_initial_samples=1)
+    
+    def test_vortex_shedding(self):
+        """Test specifically for the VortexShedding3D system."""
+        from grid_neural_abstractions.dynamics import VortexShedding3D
+        
+        # Create models directory if it doesn't exist
+        model_dir = Path(__file__).parent.parent / "data"
+        model_dir.mkdir(exist_ok=True)
+        
+        # Model file path
+        model_path = model_dir / f"vortexshedding3d_model.onnx"
+        
+        # Initialize the dynamics model
+        dynamics_instance = VortexShedding3D()
+        epsilon = 0.05  # Precision for verification
+        
+        print(f"\nTesting VortexShedding3D system")
+        
+        # Check if model exists or train one
+        if not model_path.exists():
+            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            print(f"Training model for VortexShedding3D...")
+            
+            # Generate data and train the neural network
+            model = train_nn(
+                dynamics_model=dynamics_instance,
+                hidden_sizes=[64, 64],
+                epsilon=epsilon/2,  # Use a smaller epsilon for training
+                batch_size=512     # Reasonable batch size for 3D system
+            )
+            
+            # Save the model
+            save_onnx_model(model, str(model_path))
+        else:
+            print(f"Using existing model: {model_path}")
+        
+        # Verify the model
+        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
+        
+    def test_vortex_shedding_4d(self):
+        """Test specifically for the VortexShedding4D system."""
+        from grid_neural_abstractions.dynamics import VortexShedding4D
+        
+        # Create models directory if it doesn't exist
+        model_dir = Path(__file__).parent.parent / "data"
+        model_dir.mkdir(exist_ok=True)
+        
+        # Model file path
+        model_path = model_dir / f"vortexshedding4d_model.onnx"
+        
+        # Initialize the dynamics model
+        dynamics_instance = VortexShedding4D()
+        epsilon = 0.05
+        
+        print(f"\nTesting VortexShedding4D system")
+        
+        # Check if model exists or train one
+        if not model_path.exists():
+            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            print(f"Training model for VortexShedding4D...")
+            
+            # Generate data and train the neural network
+            # Use a larger network for the more complex 4D system
+            model = train_nn(
+                dynamics_model=dynamics_instance,
+                hidden_sizes=[96, 96],  # Larger network for 4D system
+                epsilon=epsilon/2,     # Use a smaller epsilon for training
+                batch_size=512,        # Good batch size for training
+                num_epochs=300000      # More epochs for convergence
+            )
+            
+            # Save the model
+            save_onnx_model(model, str(model_path))
+        else:
+            print(f"Using existing model: {model_path}")
+        
+        # Verify the model
+        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
 
 
 if __name__ == "__main__":
