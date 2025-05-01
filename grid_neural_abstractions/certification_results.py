@@ -39,7 +39,10 @@ class CertificationRegion:
         error = -0.1  # Initialize error to a negative value to ensure it gets updated
         split_dim = None
         approximation_error = taylor_approximation(sample)[self.output_dim] - dynamics(sample).flatten()[self.output_dim]
-        for i, delta_i in enumerate(delta):
+        i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
+        for j in range(len(delta)):
+            i = (i0 + j) % len(delta)
+            delta_i = delta[i]
             if delta_i < self.min_radius[i]:
                 continue
             random_point = sample.copy()
