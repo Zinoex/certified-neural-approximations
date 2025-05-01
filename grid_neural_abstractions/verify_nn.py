@@ -1,7 +1,5 @@
 from functools import partial
 
-import numpy as np
-
 from grid_neural_abstractions.train_nn import load_onnx_model
 from grid_neural_abstractions.executors import (
     MultiprocessExecutor,

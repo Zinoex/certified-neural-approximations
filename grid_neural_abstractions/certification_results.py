@@ -38,7 +38,7 @@ class CertificationRegion:
         sample, delta = self.center, self.radius  # Unpack the data tuple
         error = -0.1  # Initialize error to a negative value to ensure it gets updated
         split_dim = None
-        approximation_error = taylor_approximation(sample)[self.output_dim] - dynamics(sample).flatten()[self.output_dim]
+        approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
         i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
         for j in range(len(delta)):
             i = (i0 + j) % len(delta)

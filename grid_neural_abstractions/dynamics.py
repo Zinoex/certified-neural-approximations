@@ -458,6 +458,10 @@ class VortexShedding3D(DynamicalSystem):
         self.input_dim = 3            # 3D system
         self.output_dim = 3           # 3D output
         self.input_domain = [(-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0)]  # Domain for all dimensions
+        self.hidden_sizes = [64, 64]  # Define hidden sizes for neural network
+        self.delta = np.array([0.5, 0.5, 0.5])  # Delta for each dimension
+        self.epsilon = 0.05           # Precision for verification
+        self.system_name = "VortexShedding3D"
     
     def compute_dynamics(self, x, translator):
         """
@@ -507,6 +511,10 @@ class VortexShedding4D(DynamicalSystem):
         self.input_dim = 4            # 4D system (3D space + intensity)
         self.output_dim = 4           # 4D output
         self.input_domain = [(-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0), (-1.0, 1.0)]  # Domain for all dimensions
+        self.hidden_sizes = [96, 96]  # Define hidden sizes for neural network
+        self.delta = np.array([0.5, 0.5, 0.5, 0.25])  # Delta for each dimension
+        self.epsilon = 0.05           # Precision for verification
+        self.system_name = "VortexShedding4D"
     
     def compute_dynamics(self, x, translator):
         """

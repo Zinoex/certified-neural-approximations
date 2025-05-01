@@ -36,15 +36,13 @@ def model_exists(dynamics_name):
     return model_path.exists()
 
 
-def verify_dynamics_model(model_path, dynamics_model, epsilon=0.05):
+def verify_dynamics_model(model_path, dynamics_model):
     """
     Verify the trained model against the dynamics system.
     """
     print(f"Verifying model: {model_path}")
     # Use a larger delta and epsilon for faster verification in tests
-    delta = [(high - low) / 2 for low, high in dynamics_model.input_domain]
-    verify_nn(model_path, delta=delta, epsilon=epsilon, dynamics_model=dynamics_model)
-
+    verify_nn(model_path, dynamics_model=dynamics_model)
 
 class TestDynamicsModels(unittest.TestCase):
     
@@ -54,10 +52,6 @@ class TestDynamicsModels(unittest.TestCase):
         model_dir.mkdir(exist_ok=True)
         
         dynamics_systems = get_all_dynamics_systems()
-        
-        # Define default parameters for training and verification
-        hidden_sizes = [20, 20]
-        epsilon = 0.05
         
         for name, dynamics_class in dynamics_systems:
             print(f"\nTesting dynamics system: {name}")
@@ -76,8 +70,9 @@ class TestDynamicsModels(unittest.TestCase):
                 # Using the train_nn function but with the specific dynamics model
                 model = train_nn(
                     dynamics_model=dynamics_instance,
-                    hidden_sizes=hidden_sizes,
-                    epsilon=epsilon/2  # Use a smaller epsilon for training
+                    learning_rate=0.001,
+                    num_epochs=50000,
+                    batch_size=4096
                 )
                 
                 # Save the model with the specific name
@@ -88,8 +83,7 @@ class TestDynamicsModels(unittest.TestCase):
             # Verify the model
             verify_dynamics_model(
                 str(model_path), 
-                dynamics_instance, 
-                epsilon=epsilon
+                dynamics_instance
             )
     
     def test_sine2d_system(self):
@@ -110,10 +104,6 @@ class TestDynamicsModels(unittest.TestCase):
         """Helper method to test Sine2D with specific frequencies."""
         from grid_neural_abstractions.dynamics import Sine2D
         
-        # Define default parameters for training and verification
-        hidden_sizes = [10, 10]
-        epsilon = 0.05
-        
         # Model file path
         model_path = model_dir / f"{model_name}_model.onnx"
         
@@ -130,8 +120,9 @@ class TestDynamicsModels(unittest.TestCase):
             # Generate data and train the neural network
             model = train_nn(
                 dynamics_model=dynamics_instance,
-                hidden_sizes=hidden_sizes,
-                epsilon=epsilon/2  # Use a smaller epsilon for training
+                learning_rate=0.001,
+                num_epochs=50000,
+                batch_size=4096
             )
             
             # Save the model
@@ -142,8 +133,7 @@ class TestDynamicsModels(unittest.TestCase):
         # Verify the model
         verify_dynamics_model(
             str(model_path), 
-            dynamics_instance, 
-            epsilon=epsilon
+            dynamics_instance
         )
     
     def test_jet_engine(self):
@@ -159,7 +149,6 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Initialize the dynamics model
         dynamics_instance = JetEngine()
-        epsilon = 0.05
 
         print(f"\nTesting Jet Engine system")
         
@@ -172,8 +161,9 @@ class TestDynamicsModels(unittest.TestCase):
             # Use a specific network architecture for the Jet Engine
             model = train_nn(
                 dynamics_model=dynamics_instance,
-                hidden_sizes=[15,15],
-                epsilon=epsilon/2,  # Use a smaller epsilon for training
+                learning_rate=0.001,
+                num_epochs=50000,
+                batch_size=4096
             )
             
             # Save the model
@@ -182,7 +172,7 @@ class TestDynamicsModels(unittest.TestCase):
             print(f"Using existing model: {model_path}")
         
         # Verify the model
-        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
+        verify_dynamics_model(str(model_path), dynamics_instance)
     
     def test_quadcopter(self):
         """Test specifically for the Quadcopter system."""        
@@ -197,7 +187,6 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Initialize the dynamics model
         dynamics_instance = Quadcopter()
-        epsilon = 0.25  # Use a slightly larger epsilon due to system complexity
 
         print(f"\nTesting Quadcopter system")
         
@@ -209,10 +198,9 @@ class TestDynamicsModels(unittest.TestCase):
             # Use a larger network for the complex 12D dynamics
             model = train_nn(
                 dynamics_model=dynamics_instance,
-                hidden_sizes=[2048, 1024, 1024],
-                epsilon=epsilon/2,  # Use a smaller epsilon for training
+                learning_rate=0.001,
                 batch_size=1024,    # Larger batch size for stability
-                num_epochs=5000000     # More epochs for convergence
+                num_epochs=5000000  # More epochs for convergence
             )
             
             # Save the model
@@ -221,7 +209,7 @@ class TestDynamicsModels(unittest.TestCase):
             print(f"Using existing model: {model_path}")
         
         # Verify the model
-        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon, nr_initial_samples=1)
+        verify_dynamics_model(str(model_path), dynamics_instance)
     
     def test_vortex_shedding(self):
         """Test specifically for the VortexShedding3D system."""
@@ -236,7 +224,6 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Initialize the dynamics model
         dynamics_instance = VortexShedding3D()
-        epsilon = 0.05  # Precision for verification
         
         print(f"\nTesting VortexShedding3D system")
         
@@ -248,8 +235,8 @@ class TestDynamicsModels(unittest.TestCase):
             # Generate data and train the neural network
             model = train_nn(
                 dynamics_model=dynamics_instance,
-                hidden_sizes=[64, 64],
-                epsilon=epsilon/2,  # Use a smaller epsilon for training
+                learning_rate=0.001,
+                num_epochs=50000,
                 batch_size=512     # Reasonable batch size for 3D system
             )
             
@@ -259,7 +246,7 @@ class TestDynamicsModels(unittest.TestCase):
             print(f"Using existing model: {model_path}")
         
         # Verify the model
-        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
+        verify_dynamics_model(str(model_path), dynamics_instance)
         
     def test_vortex_shedding_4d(self):
         """Test specifically for the VortexShedding4D system."""
@@ -274,7 +261,6 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Initialize the dynamics model
         dynamics_instance = VortexShedding4D()
-        epsilon = 0.05
         
         print(f"\nTesting VortexShedding4D system")
         
@@ -287,10 +273,9 @@ class TestDynamicsModels(unittest.TestCase):
             # Use a larger network for the more complex 4D system
             model = train_nn(
                 dynamics_model=dynamics_instance,
-                hidden_sizes=[96, 96],  # Larger network for 4D system
-                epsilon=epsilon/2,     # Use a smaller epsilon for training
-                batch_size=512,        # Good batch size for training
-                num_epochs=300000      # More epochs for convergence
+                learning_rate=0.001,
+                num_epochs=300000,      # More epochs for convergence
+                batch_size=512        # Good batch size for training
             )
             
             # Save the model
@@ -299,7 +284,7 @@ class TestDynamicsModels(unittest.TestCase):
             print(f"Using existing model: {model_path}")
         
         # Verify the model
-        verify_dynamics_model(str(model_path), dynamics_instance, epsilon=epsilon)
+        verify_dynamics_model(str(model_path), dynamics_instance)
 
 
 if __name__ == "__main__":
