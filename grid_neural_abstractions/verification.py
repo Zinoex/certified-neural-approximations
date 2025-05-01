@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
+import time
 from grid_neural_abstractions.translators.bound_propagation_translator import BoundPropagationTranslator
 from bound_propagation import LinearBounds
 import numpy as np
@@ -67,6 +68,15 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
         sample, delta, j = data  # Unpack the data tuple
 
+        # Run the first-order Taylor expansion twice to not count the precompilation time
+        # as part of the verification time (the first run is for precompilation).
+        # This is a bit of a hack, but it works.
+        first_order_certified_taylor_expansion(
+            dynamics, sample, delta
+        )
+
+        start_time = time.time()
+
         taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
             dynamics, sample, delta
         )
@@ -124,7 +134,8 @@ class MarabouTaylorStrategy(VerificationStrategy):
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, [sample_left, sample_right])
+                end_time = time.time()
+                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -168,13 +179,15 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
-                    return SampleResultMaybe(data, [sample_left, sample_right])
+                    end_time = time.time()
+                    return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
                 else:
                     print("No split dimension found, returning UNSAT")
             #else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
-            return SampleResultUNSAT(data, [cex])
+            end_time = time.time()
+            return SampleResultUNSAT(data, end_time - start_time, [cex])
 
         # Reset the query
         network.additionalEquList.clear()
@@ -210,12 +223,15 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
-                    return SampleResultMaybe(data, [sample_left, sample_right])
+                    end_time = time.time()
+                    return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
                 else:
                     print("No split dimension found, returning UNSAT")
             #else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
-            return SampleResultUNSAT(data, [cex])
+            end_time = time.time()
+            return SampleResultUNSAT(data, end_time - start_time, [cex])
 
-        return SampleResultSAT(data)   # No counterexample found, return the original sample
+        end_time = time.time()
+        return SampleResultSAT(data, end_time - start_time)   # No counterexample found, return the original sample

@@ -12,6 +12,9 @@ class SinglethreadExecutor:
         total_domain_size = sum(sample.lebesguemeasure() for sample in samples)
         certified_domain_size = 0.0
         uncertified_domain_size = 0.0
+
+        computation_time = 0.0
+
         queue = LifoQueue()
         for sample in samples:
             queue.put(sample)
@@ -22,6 +25,8 @@ class SinglethreadExecutor:
 
                 # Execute the batches
                 result = process_sample(sample)
+
+                computation_time += result.computation_time
                 
                 if result.issat():
                     # Sample was succesfully verified, no new samples to process
@@ -56,4 +61,4 @@ class SinglethreadExecutor:
                     f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.2f}%, uncertified: {uncertified_percentage:.2f}%)"
                 )
 
-        return agg, certified_percentage, uncertified_percentage
+        return agg, certified_percentage, uncertified_percentage, computation_time

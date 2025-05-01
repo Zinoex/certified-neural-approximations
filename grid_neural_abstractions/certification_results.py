@@ -62,8 +62,9 @@ class CertificationRegion:
 
 
 class SampleResult(abc.ABC):
-    def __init__(self, sample):
+    def __init__(self, sample, computation_time):
         self.sample = sample
+        self.computation_time = computation_time
     
     @abc.abstractmethod
     def issat(self) -> bool:
@@ -109,8 +110,8 @@ class SampleResultSAT(SampleResult):
 
 
 class SampleResultUNSAT(SampleResult):
-    def __init__(self, sample, counterexamples):
-        super().__init__(sample)
+    def __init__(self, sample, computation_time, counterexamples):
+        super().__init__(sample, computation_time)
         self._counterexamples = counterexamples
 
     def issat(self) -> bool:
@@ -133,7 +134,7 @@ class SampleResultUNSAT(SampleResult):
     
 
 class SampleResultMaybe(SampleResult):
-    def __init__(self, sample, new_samples):
+    def __init__(self, sample, computation_time, new_samples):
         super().__init__(sample)
         self._new_samples = new_samples
 

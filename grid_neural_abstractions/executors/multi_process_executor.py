@@ -171,6 +171,8 @@ class MultiprocessExecutor:
         certified_domain_size = 0.0
         uncertified_domain_size = 0.0
 
+        computation_time = 0.0
+
         with ProcessPoolExecutor(max_workers=self.num_workers, initializer=initializer) as executor:
             executor._work_ids = LifoQueue()
 
@@ -185,6 +187,8 @@ class MultiprocessExecutor:
 
                 for future in waiter.as_completed():
                     result = future.result()
+
+                    computation_time += result.computation_time
                 
                     if result.issat():
                         # Sample was succesfully verified, no new samples to process
@@ -219,4 +223,4 @@ class MultiprocessExecutor:
                     pbar.set_description_str(
                         f"Overall Progress (remaining samples: {len(waiter)}, certified: {certified_percentage:.2f}%, uncertified: {uncertified_percentage:.2f}%)"
                     )
-        return agg, certified_percentage, uncertified_percentage
+        return agg, certified_percentage, uncertified_percentage, computation_time
