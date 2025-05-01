@@ -140,7 +140,7 @@ class VanDerPolOscillator(DynamicalSystem):
 
 
 class Quadcopter(DynamicalSystem):
-    """A class representing the 9D dynamics of a quadcopter (without position)."""
+    """A class representing the 9D dynamics of a quadcopter (including velocity)."""
 
     def __init__(
         self,
@@ -160,22 +160,23 @@ class Quadcopter(DynamicalSystem):
         self.moment_inertia_y = moment_inertia_y
         self.moment_inertia_z = moment_inertia_z
 
-        self.input_dim = 6  # 6D states: orientation (3), angular velocity inputs (3)
-        self.output_dim = 6  # 6D derivatives
+        self.input_dim = 9  # 9D states: orientation (3), angular velocity (3), linear velocity (3)
+        self.output_dim = 6  # 9D derivatives
         
-        # Typical domains for each state dimension (position removed)
+        # Typical domains for each state dimension (including velocities)
         self.input_domain = [
             (-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5),        # roll, pitch, yaw
-            (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)         # angular velocity (wx, wy, wz)
+            (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0),        # angular velocity (wx, wy, wz)
+            (-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0)         # linear velocity (vx, vy, vz)
         ]
         self.hidden_sizes = [128, 128, 128]
-        self.delta = None
-        self.epsilon = None
+        self.delta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 1.0])  # Domain size for the input
+        self.epsilon = 0.1
         self.system_name = "Quadcopter"
 
     def compute_dynamics(self, x, translator):
         """
-        Compute 6D quadcopter dynamics (without position).
+        Compute 9D quadcopter dynamics (including velocity).
         
         Args:
             x: Input tensor with shape [9, batch_size]
@@ -191,6 +192,9 @@ class Quadcopter(DynamicalSystem):
         
         # Angular velocity (full 3D)
         wx, wy, wz = x[3], x[4], x[5]
+        
+        # Linear velocity
+        vx, vy, vz = x[6], x[7], x[8]
 
         # Simplified thrust and control inputs (can be replaced with actual control inputs)
         # Here using a hover thrust and small attitude corrections
@@ -233,8 +237,8 @@ class Quadcopter(DynamicalSystem):
         dpitch = wy * cos_roll - wz * sin_roll
         dyaw = wy * sin_roll / cos_pitch + wz * cos_roll / cos_pitch
 
-        # Combine all derivatives (position derivatives removed)
-        derivatives = translator.stack([dvx, dvy, dvz, droll, dpitch, dyaw])
+        # Combine all derivatives (including velocity derivatives)
+        derivatives = translator.stack([droll, dpitch, dyaw, dvx, dvy, dvz])
 
         return derivatives
 
