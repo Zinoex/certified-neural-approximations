@@ -8,7 +8,7 @@ torch
 maraboupy
 onnx
 onnxruntime
-bound_propagation
+bound_propagation==0.4.4
 
 #Plotting
 matplotlib

@@ -73,6 +73,16 @@ class JuliaTranslator:
         :return: np.ndarray of floats
         """
         return self.jl.sqrt(a)
+    
+    def cbrt(self, a):
+        """
+        Element-wise cube root
+
+        :param a: np.ndarray of floats
+
+        :return: np.ndarray of floats
+        """
+        return self.jl.pow(a, 1/3)
 
     def pow(self, a, b):
         """

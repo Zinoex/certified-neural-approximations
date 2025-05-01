@@ -74,6 +74,16 @@ class TorchTranslator:
         :return: torch.tensor of floats
         """
         return torch.sqrt(a)
+    
+    def cbrt(self, a):
+        """
+        Element-wise cube root
+
+        :param a: torch.tensor of floats
+
+        :return: torch.tensor of floats
+        """
+        return torch.pow(a, 1/3)
 
     def pow(self, a, b):
         """
