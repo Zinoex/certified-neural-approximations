@@ -56,4 +56,4 @@ class SinglethreadExecutor:
                     f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.2f}%, uncertified: {uncertified_percentage:.2f}%)"
                 )
 
-        return agg
+        return agg, certified_percentage, uncertified_percentage

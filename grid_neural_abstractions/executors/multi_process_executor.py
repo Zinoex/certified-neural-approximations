@@ -219,4 +219,4 @@ class MultiprocessExecutor:
                     pbar.set_description_str(
                         f"Overall Progress (remaining samples: {len(waiter)}, certified: {certified_percentage:.2f}%, uncertified: {uncertified_percentage:.2f}%)"
                     )
-        return agg
+        return agg, certified_percentage, uncertified_percentage

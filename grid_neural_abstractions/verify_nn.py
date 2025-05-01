@@ -69,15 +69,16 @@ def verify_nn(
     if num_workers == 1:
         executor = SinglethreadExecutor()
         # Pass the plotter to the executor
-        cex_list = executor.execute(prepare_strategy, partial_process_sample, aggregate, samples, plotter)
+        cex_list, certified_percentage, uncertified_percentage = executor.execute(prepare_strategy, partial_process_sample, aggregate, samples, plotter)
     elif num_workers > 1:
         executor = MultiprocessExecutor(num_workers)
         # Note: Visualization is not supported in multiprocessing mode
-        cex_list = executor.execute(prepare_strategy, partial_process_sample, aggregate, samples)
+        cex_list, certified_percentage, uncertified_percentage = executor.execute(prepare_strategy, partial_process_sample, aggregate, samples)
 
     num_cex = len(cex_list) if cex_list else 0
 
     print(f"Number of counterexamples found: {num_cex}")
+    print(f"Certified percentage: {certified_percentage}, uncertified percentage: {uncertified_percentage}")
     print("Finished")
     
     # Keep the plot window open if we're visualizing
