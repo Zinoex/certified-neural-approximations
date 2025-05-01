@@ -14,11 +14,11 @@ REPO_DIR = os.path.dirname(BASE_DIR)
 DATA_DIR = os.path.join(REPO_DIR, "data")
 
 NA_SYSTEMS = [
-    # WaterTank,
-    # JetEngine,
-    # SteamGovernor,
-    # Exponential,
-    # NonLipschitzVectorField1,
+    WaterTank,
+    JetEngine,
+    SteamGovernor,
+    Exponential,
+    NonLipschitzVectorField1,
     NonLipschitzVectorField2,
 ]
 

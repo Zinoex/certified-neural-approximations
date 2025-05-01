@@ -38,14 +38,14 @@ class CertificationRegion:
         sample, delta = self.center, self.radius  # Unpack the data tuple
         error = -0.1  # Initialize error to a negative value to ensure it gets updated
         split_dim = None
-        approximation_error = taylor_approximation(sample)[self.output_dim] - dynamics(sample).flatten()[self.output_dim]
+        approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
         for i, delta_i in enumerate(delta):
             if delta_i < self.min_radius[i]:
                 continue
             random_point = sample.copy()
             random_point[i] += 0.1 * delta_i
             # Calculate the Taylor approximation at the random point (corrected by the error from the centre)
-            approx = taylor_approximation(random_point)[self.output_dim]-approximation_error
+            approx = taylor_approximation(random_point) - approximation_error
             true_value = dynamics(random_point).flatten()[self.output_dim]
             current_error = np.abs(approx - true_value)
             if current_error > error:

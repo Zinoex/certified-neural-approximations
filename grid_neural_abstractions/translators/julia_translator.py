@@ -82,7 +82,7 @@ class JuliaTranslator:
 
         :return: np.ndarray of floats
         """
-        return self.jl.pow(a, 1/3)
+        return self.pow(a, 1/3)
 
     def pow(self, a, b):
         """
