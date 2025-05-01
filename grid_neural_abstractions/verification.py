@@ -4,10 +4,10 @@ import time
 from grid_neural_abstractions.translators.bound_propagation_translator import BoundPropagationTranslator
 from bound_propagation import LinearBounds
 import numpy as np
-from maraboupy import Marabou, MarabouCore, MarabouUtils
+from maraboupy import MarabouCore, MarabouUtils
 
-from .taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
-from .certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
+from grid_neural_abstractions.taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
+from grid_neural_abstractions.certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2
@@ -39,7 +39,7 @@ def mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper):
 
 class VerificationStrategy(ABC):
     @abstractmethod
-    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
+    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-8):
         """
         Verify the neural network against the dynamics.
 
@@ -64,6 +64,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
     def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
+        from maraboupy import Marabou
         options = Marabou.createOptions(verbosity=0)
 
         sample, delta, j = data  # Unpack the data tuple
@@ -175,7 +176,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             network.additionalEquList.clear()
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
-            if np.abs(nn_cex - f_cex)[j] < epsilon:
+            if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
@@ -219,7 +220,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             network.additionalEquList.clear()
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
-            if np.abs(nn_cex - f_cex)[j] < epsilon:
+            if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)

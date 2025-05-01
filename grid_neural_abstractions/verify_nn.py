@@ -1,18 +1,15 @@
 from functools import partial
 
-import numpy as np
-
 from grid_neural_abstractions.train_nn import load_onnx_model
-from .executors import (
+from grid_neural_abstractions.executors import (
     MultiprocessExecutor,
     SinglethreadExecutor,
 )
-from maraboupy import Marabou
 
-from .verification import MarabouTaylorStrategy
-from .certification_results import CertificationRegion
+from grid_neural_abstractions.verification import MarabouTaylorStrategy
+from grid_neural_abstractions.certification_results import CertificationRegion
 
-from .generate_data import generate_grid
+from grid_neural_abstractions.generate_data import generate_grid
 
 
 
@@ -20,6 +17,8 @@ def onnx_input_shape(onnx_path):
     """
     Get the input shape of the ONNX model.
     """
+    
+    from maraboupy import Marabou
     network = Marabou.read_onnx(onnx_path)
     inputVars = network.inputVars
     return inputVars[0].shape[1:]
@@ -61,6 +60,7 @@ def verify_nn(
     plotter = None
     if visualize and input_dim in [1, 2] and num_workers == 1:
         from .visualization import DynamicsNetworkPlotter  # Import the new plotter
+        from maraboupy import Marabou
         # Create a plotter for 1D or 2D dynamics
         plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))
         print(f"Initialized visualization for {input_dim}D dynamics")
@@ -79,7 +79,3 @@ def verify_nn(
     print(f"Number of counterexamples found: {num_cex}")
     print(f"Certified percentage: {certified_percentage}%, uncertified percentage: {uncertified_percentage}%, computation time: {computation_time:.2f} seconds")
     print("Finished")
-    
-    # Keep the plot window open if we're visualizing
-    if plotter is not None:
-        pause(30)  # Keep the plot open for 30 seconds
