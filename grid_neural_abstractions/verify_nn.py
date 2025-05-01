@@ -1,17 +1,16 @@
 from functools import partial
 
 import numpy as np
-from .executors import (
+from grid_neural_abstractions.executors import (
     MultiprocessExecutor,
     MultithreadExecutor,
     SinglethreadExecutor,
 )
-from maraboupy import Marabou
 
-from .verification import MarabouTaylorStrategy
-from .certification_results import CertificationRegion
+from grid_neural_abstractions.verification import MarabouTaylorStrategy
+from grid_neural_abstractions.certification_results import CertificationRegion
 
-from .generate_data import generate_grid
+from grid_neural_abstractions.generate_data import generate_grid
 
 def process_sample(
     strategy,
@@ -47,6 +46,7 @@ def process_sample(
 
 # This function has to be in the global scope to be pickled for multiprocessing
 def read_onnx_into_local(onnx_path, local):
+    from maraboupy import Marabou
     network = Marabou.read_onnx(onnx_path)
     local.network = network
 
@@ -55,6 +55,8 @@ def onnx_input_shape(onnx_path):
     """
     Get the input shape of the ONNX model.
     """
+    
+    from maraboupy import Marabou
     network = Marabou.read_onnx(onnx_path)
     inputVars = network.inputVars
     return inputVars[0].shape[1:]
@@ -104,6 +106,7 @@ def verify_nn(
     plotter = None
     if visualize and input_dim in [1, 2] and num_workers == 1:
         from .visualization import DynamicsNetworkPlotter  # Import the new plotter
+        from maraboupy import Marabou
         # Create a plotter for 1D or 2D dynamics
         plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))
         print(f"Initialized visualization for {input_dim}D dynamics")

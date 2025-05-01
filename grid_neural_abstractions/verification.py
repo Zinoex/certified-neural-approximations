@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import numpy as np
-from maraboupy import Marabou, MarabouCore, MarabouUtils
+from maraboupy import MarabouCore, MarabouUtils
 
-from .taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
-from .certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
+from grid_neural_abstractions.taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
+from grid_neural_abstractions.certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2
@@ -63,6 +63,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
     def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
+        from maraboupy import Marabou
         options = Marabou.createOptions(verbosity=0)
 
         sample, delta, j = data  # Unpack the data tuple

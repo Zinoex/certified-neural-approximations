@@ -9,6 +9,8 @@ class SimpleNN(nn.Module):
     def __init__(self, input_size, hidden_sizes, output_size):
         super(SimpleNN, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch.cuda.is_available():
+            print(f"Using GPU: {torch.cuda.get_device_name(0)}")
         
         layers = []
         prev_size = input_size
