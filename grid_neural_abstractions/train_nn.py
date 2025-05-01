@@ -81,7 +81,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
 
         if (epoch + 1) % 100 == 0:
             print(
-                f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {avg_loss.item():.6f}, Max: {max_loss.item():.6f},LR: {optimizer.param_groups[0]['lr']:.6f}"
+                f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {avg_loss.item():.6f}, Max: {max_loss.item():.6f}, LR: {optimizer.param_groups[0]['lr']:.6f}"
             )
             
         # Early stopping logic and best model tracking
