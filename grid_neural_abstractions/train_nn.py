@@ -18,16 +18,9 @@ class SimpleNN(nn.Module):
             prev_size = hidden_size
         layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
         self.network = nn.Sequential(*layers)
-        # self._initialize_weights()  # Add weight initialization
 
     def forward(self, x):
         return self.network(x)
-
-    def _initialize_weights(self):  # Initialize weights for better training
-        for layer in self.network:
-            if isinstance(layer, nn.Linear):
-                nn.init.kaiming_uniform_(layer.weight, nonlinearity="relu")
-                nn.init.zeros_(layer.bias)
 
 
 # Train the neural network
