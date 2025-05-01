@@ -62,7 +62,7 @@ class VanDerPolOscillator(DynamicalSystem):
         self.input_domain = [(-3.0, 3.0), (-3.0, 3.0)]  # Typical domain for Van der Pol oscillator
         self.hidden_sizes = [128, 128, 128]
         self.delta = np.array([0.75, 1.5])  # Domain size for the input
-        self.epsilon = 1.9  # 10% of the derivative range
+        self.epsilon = 0.19  # 1% of the derivative range
         self.system_name = "VanDerPolOscillator"
 
     def compute_dynamics(self, x, translator):
@@ -253,7 +253,8 @@ class WaterTank(DynamicalSystem):
         self.input_domain = [(0.1, 10.0)]  # Water level should be positive
         self.hidden_sizes = [12]
         self.delta = np.array([10.1 / 16])
-        self.epsilon = 0.097
+        self.epsilon = 0.097 
+        self.small_epsilon = 0.001  # is tractable for the larger network
         self.system_name = "WaterTank"
         
     def compute_dynamics(self, x, translator):
@@ -271,7 +272,8 @@ class JetEngine(DynamicalSystem):
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for jet engine state variables
         self.hidden_sizes = [10, 16]
         self.delta = np.array([0.25, 0.5])
-        self.epsilon = 0.039
+        self.epsilon = 0.039     
+        self.small_epsilon = 0.005    # is tractable for the larger network 
         self.system_name = "JetEngine"
         
     def compute_dynamics(self, x, translator):
@@ -293,7 +295,8 @@ class SteamGovernor(DynamicalSystem):
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for steam governor
         self.hidden_sizes = [12]
         self.delta = np.array([0.5, 0.5, 0.5])
-        self.epsilon = 0.105
+        self.epsilon = 0.105     
+        self.small_epsilon = 0.02     # is tractable for the larger network 
         self.system_name = "SteamGovernor"
         
     def compute_dynamics(self, x, translator):
@@ -318,7 +321,8 @@ class Exponential(DynamicalSystem):
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Restricted domain to avoid extremely large values
         self.hidden_sizes = [14, 14]
         self.delta = np.array([0.5, 0.25])
-        self.epsilon = 0.112
+        self.epsilon = 0.112     
+        self.small_epsilon = 0.02      # is tractable for the larger network 
         self.system_name = "Exponential"
         
     def compute_dynamics(self, x, translator):
@@ -341,7 +345,8 @@ class NonLipschitzVectorField1(DynamicalSystem):
         self.input_domain = [(0.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
         self.hidden_sizes = [10]
         self.delta = np.array([0.125, 0.5])
-        self.epsilon = 0.093
+        self.epsilon = 0.093     
+        self.small_epsilon = 0.005     # is tractable for the larger network 
         self.system_name = "NonLipschitzVectorField1"
         
     def compute_dynamics(self, x, translator):
@@ -364,7 +369,8 @@ class NonLipschitzVectorField2(DynamicalSystem):
         self.input_domain = [(-1.0, 1.0), (-1.0, 1.0)]  # Typical domain for analysis
         self.hidden_sizes = [12, 10]
         self.delta = np.array([0.25, 0.5])
-        self.epsilon = 0.081
+        self.epsilon = 0.081     
+        self.small_epsilon = 0.005      # is tractable for the larger network 
         self.system_name = "NonLipschitzVectorField2"
         
     def compute_dynamics(self, x, translator):
@@ -391,7 +397,7 @@ class NonlinearOscillator(DynamicalSystem):
         self.input_domain = [(-3.0, 3.0)]  # Typical domain for oscillator
         self.hidden_sizes = [128, 128, 128]
         self.delta = np.array([0.375])
-        self.epsilon = 0.1 * 0.3 * (55 - math.sin(3.0))  # 10% of the derivative range
+        self.epsilon = 0.01 * 0.3 * (55 - math.sin(3.0))  # 1% of the derivative range
         self.system_name = "NonlinearOscillator"
     
     def compute_dynamics(self, x, translator):
@@ -424,7 +430,7 @@ class Sine2D(DynamicalSystem):
         self.input_domain = [(-2.0, 2.0), (-2.0, 2.0)]  # Domain for both dimensions
         self.hidden_sizes = [128, 128, 128]
         self.delta = np.array([0.5, 1.0])
-        self.epsilon = 0.1  # 10% of the derivative range
+        self.epsilon = 0.01  # 1% of the derivative range
         self.system_name = "Sine2D"
     
     def compute_dynamics(self, x, translator):
