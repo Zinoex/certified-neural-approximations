@@ -18,28 +18,23 @@ class SimpleNN(nn.Module):
             prev_size = hidden_size
         layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
         self.network = nn.Sequential(*layers)
-        self._initialize_weights()  # Add weight initialization
 
     def forward(self, x):
         return self.network(x)
 
-    def _initialize_weights(self):  # Initialize weights for better training
-        for layer in self.network:
-            if isinstance(layer, nn.Linear):
-                nn.init.kaiming_uniform_(layer.weight, nonlinearity="relu")
-                nn.init.zeros_(layer.bias)
-
 
 # Train the neural network
-def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learning_rate = 0.001, num_epochs = 50000, batch_size = 4096):
+def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_size = 4096):
     
     input_size = dynamics_model.input_dim
+    hidden_sizes = dynamics_model.hidden_sizes  # Get hidden sizes from dynamics model
     output_size = dynamics_model.output_dim  # Update output size to match target size
     input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
+    epsilon = dynamics_model.epsilon  # Get epsilon from dynamics model
     
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
-    patience = 1000
+    patience = 5000
     best_loss = float('inf')
     patience_counter = 0
 
@@ -59,7 +54,7 @@ def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learnin
         max_loss = torch.max(torch.abs(outputs - y_train.T))
         loss = criterion(outputs, y_train.T)
             
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         loss.backward()
         
         # Apply gradient clipping to prevent explosion
@@ -70,7 +65,7 @@ def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learnin
 
         if (epoch + 1) % 100 == 0:
             print(
-                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, Max: {max_loss.item():.6f},LR: {optimizer.param_groups[0]['lr']:.6f}"
+                f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}, Max: {max_loss.item():.6f}, LR: {optimizer.param_groups[0]['lr']:.6f}"
             )
             
         # Early stopping logic
@@ -78,8 +73,7 @@ def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learnin
         # which is critical for applications requiring strict error bounds.
         if max_loss < best_loss:
             best_loss = max_loss
-            if best_loss > epsilon:
-                patience_counter = 0
+            patience_counter = 0
         else:
             patience_counter += 1
             

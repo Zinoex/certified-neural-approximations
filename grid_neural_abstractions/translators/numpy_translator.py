@@ -75,6 +75,16 @@ class NumpyTranslator:
         :return: np.ndarray of floats
         """
         return np.sqrt(a)
+    
+    def cbrt(self, a):
+        """
+        Element-wise cube root
+
+        :param a: np.ndarray of floats
+
+        :return: np.ndarray of floats
+        """
+        return np.power(a, 1/3)
 
     def pow(self, a, b):
         """
