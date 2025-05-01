@@ -38,7 +38,7 @@ def mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper):
 
 class VerificationStrategy(ABC):
     @abstractmethod
-    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
+    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-8):
         """
         Verify the neural network against the dynamics.
 

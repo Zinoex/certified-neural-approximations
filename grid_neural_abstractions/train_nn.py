@@ -6,7 +6,7 @@ from .generate_data import generate_data
 
 # Define the neural network
 class SimpleNN(nn.Module):
-    def __init__(self, input_size, hidden_sizes, output_size):
+    def __init__(self, input_size, hidden_sizes, output_size, LeakyReLU=False):
         super(SimpleNN, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if torch.cuda.is_available():
@@ -16,7 +16,10 @@ class SimpleNN(nn.Module):
         prev_size = input_size
         for hidden_size in hidden_sizes:
             layers.append(nn.Linear(prev_size, hidden_size, device=self.device))  # Create layer on device
-            layers.append(nn.LeakyReLU())
+            if LeakyReLU:
+                layers.append(nn.LeakyReLU())
+            else:
+                layers.append(nn.ReLU())
             prev_size = hidden_size
         layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
         self.network = nn.Sequential(*layers)
