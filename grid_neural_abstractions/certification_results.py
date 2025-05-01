@@ -48,7 +48,7 @@ class CertificationRegion:
             random_point = sample.copy()
             random_point[i] += 0.1 * delta_i
             # Calculate the Taylor approximation at the random point (corrected by the error from the centre)
-            approx = taylor_approximation(random_point)[self.output_dim]-approximation_error
+            approx = taylor_approximation(random_point) - approximation_error
             true_value = dynamics(random_point).flatten()[self.output_dim]
             current_error = np.abs(approx - true_value)
             if current_error > error:

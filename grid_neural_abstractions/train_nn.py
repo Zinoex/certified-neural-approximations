@@ -32,15 +32,17 @@ class SimpleNN(nn.Module):
 
 
 # Train the neural network
-def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learning_rate = 0.001, num_epochs = 50000, batch_size = 4096):
+def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_size = 4096):
     
     input_size = dynamics_model.input_dim
+    hidden_sizes = dynamics_model.hidden_sizes  # Get hidden sizes from dynamics model
     output_size = dynamics_model.output_dim  # Update output size to match target size
     input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
+    epsilon = dynamics_model.epsilon  # Get epsilon from dynamics model
     
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
-    patience = 1000
+    patience = 5000
     best_loss = float('inf')
     patience_counter = 0
     
@@ -84,8 +86,7 @@ def train_nn(dynamics_model, epsilon = 0.05, hidden_sizes=[128,128,128], learnin
             best_loss = max_loss
             # Save the best model state
             best_model_state = model.state_dict().copy()
-            if best_loss > epsilon:
-                patience_counter = 0
+            patience_counter = 0
         else:
             patience_counter += 1
             

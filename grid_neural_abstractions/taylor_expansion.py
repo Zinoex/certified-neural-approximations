@@ -1,5 +1,17 @@
 from .translators.julia_translator import JuliaTranslator
 import numpy as np
+import torch
+
+jl = None
+
+def check_jl_initialized():
+    global jl
+    if jl is None:
+        from juliacall import Main
+
+        jl = Main
+        jl.seval("using TaylorModels")
+
 
 def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     """
@@ -13,12 +25,11 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     :param delta: The (hyperrectangular) radius of the expansion.
     :return: (a = f(c), B = Df(c), R) where the Taylor expansion is `f(c) + (x - c) Df(c) ⊕ R`.
     """
-    translator = JuliaTranslator()
 
     # Import inside the function to allow multiprocessing
-    from juliacall import Main as jl
-    import torch
-    jl.seval("using TaylorModels")
+    check_jl_initialized()
+
+    translator = JuliaTranslator()
 
     order = 1
 
@@ -71,6 +82,5 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
 
 
 def prepare_taylor_expansion(n):
-    from juliacall import Main as jl
-    jl.seval("using TaylorModels")
+    check_jl_initialized()
     jl.seval("n -> set_variables(Float64, \"x\", order=2, numvars=n)")(n)
