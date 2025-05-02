@@ -65,7 +65,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         from maraboupy import Marabou
-        options = Marabou.createOptions(verbosity=0)
+        options = Marabou.createOptions(verbosity=0, timeoutInSeconds=2, lpSolver="native")
 
         sample, delta, j = data  # Unpack the data tuple
 
@@ -157,7 +157,18 @@ class MarabouTaylorStrategy(VerificationStrategy):
         network.addEquation(equation_GE, isProperty=True)
 
         # Find a counterexample for upper bound
-        res, vals, _ = network.solve(verbose=False, options=options)
+        res, vals, stats = network.solve(verbose=False, options=options)
+        if stats.hasTimedOut():
+            split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
+            if split_dim is not None:
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                end_time = time.time()
+                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+            else:
+                print("No split dimension found, returning UNSAT")
+                end_time = time.time()
+                return SampleResultUNSAT(data, end_time - start_time, [])
+
         if res == "sat":
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
@@ -203,7 +214,18 @@ class MarabouTaylorStrategy(VerificationStrategy):
         network.addEquation(equation_LE, isProperty=True)
 
         # Find a counterexample for lower bound
-        res, vals, _ = network.solve(verbose=False, options=options)
+        res, vals, stats = network.solve(verbose=False, options=options)
+        if stats.hasTimedOut():
+            split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
+            if split_dim is not None:
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                end_time = time.time()
+                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+            else:
+                print("No split dimension found, returning UNSAT")
+                end_time = time.time()
+                return SampleResultUNSAT(data, end_time - start_time, [])
+
         if res == "sat":
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
