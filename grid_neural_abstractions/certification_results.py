@@ -36,24 +36,29 @@ class CertificationRegion:
         :return: The dimension index with the highest approximation error
         """
         sample, delta = self.center, self.radius  # Unpack the data tuple
-        error = -0.1  # Initialize error to a negative value to ensure it gets updated
         split_dim = None
         approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
         i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
+        error_list = []
+        rng = np.random.default_rng()
         for j in range(len(delta)):
             i = (i0 + j) % len(delta)
             delta_i = delta[i]
             if delta_i < self.min_radius[i]:
                 continue
             random_point = sample.copy()
-            random_point[i] += 0.1 * delta_i
+            random_point[i] += rng.normal(0.0, 0.1) * delta_i # Randomly perturb the point in the i-th dimension
             # Calculate the Taylor approximation at the random point (corrected by the error from the centre)
             approx = taylor_approximation(random_point) - approximation_error
             true_value = dynamics(random_point).flatten()[self.output_dim]
             current_error = np.abs(approx - true_value)
-            if current_error > error:
-                split_dim = i
-                error = current_error
+            if current_error > 0.0:
+                error_list.append(current_error)
+        
+        # Softmax calculation
+        exp_values = np.exp(error_list)
+        probabilities = exp_values / np.sum(exp_values)
+        split_dim  = np.random.choice(len(error_list), p=probabilities)
         return split_dim
     
     def incrementsplitdim(self):
