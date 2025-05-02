@@ -24,44 +24,51 @@ NA_SYSTEMS = [
 
 NEW_SYSTEMS = [
     VanDerPolOscillator,
-    # Quadcopter,
     Sine2D,
     NonlinearOscillator,
+    # Quadcopter,
 ]
 
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS
 
-def train_models():
-    for dynamics_cls in SYSTEMS:
+def train_na_models(leaky_relu=False):
+    leaky_relu_path = 'leaky_relu' if leaky_relu else ''
+
+    for dynamics_cls in NA_SYSTEMS:
         dynamics = dynamics_cls()
 
         print(f"\nTraining {dynamics.system_name} system")
-        model = train_nn(dynamics_model=dynamics)
-        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_simple_nn.onnx")
+        model = train_nn(dynamics_model=dynamics, leaky_relu=leaky_relu)
+        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_simple_nn{leaky_relu_path}.onnx")
 
         save_model(model, path)
 
         print(f"Done training for {dynamics.system_name}")
 
 
-def train_na_128_models():
-    for dynamics_cls in NA_SYSTEMS:
-        dynamics = dynamics_cls()
-        dynamics.hidden_sizes = [128, 128, 128]
+def train_64_models(residual=False, leaky_relu=False):
+    residual_path = '_residual' if residual else ''
+    leaky_relu_path = 'leaky_relu' if leaky_relu else ''
 
-        print(f"\nTraining {dynamics.system_name} system with 3x[128] neurons")
-        model = train_nn(dynamics_model=dynamics)
-        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_128_simple_nn.onnx")
-
-        save_model(model, path)
-
-        print(f"Done training for {dynamics.system_name}")
-
-
-def verify_models():
     for dynamics_cls in SYSTEMS:
         dynamics = dynamics_cls()
-        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_simple_nn.onnx")
+        dynamics.hidden_sizes = [64, 64, 64]
+
+        print(f"\nTraining {dynamics.system_name} system with 3x[64] neurons")
+        model = train_nn(dynamics_model=dynamics, residual=residual, leaky_relu=leaky_relu)
+        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_64_simple_nn{residual_path}{leaky_relu_path}.onnx")
+
+        save_model(model, path)
+
+        print(f"Done training for {dynamics.system_name}")
+
+
+def verify_na_models(leaky_relu=False):
+    leaky_relu_path = 'leaky_relu' if leaky_relu else ''
+
+    for dynamics_cls in NA_SYSTEMS:
+        dynamics = dynamics_cls()
+        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_simple_nn{leaky_relu_path}.onnx")
 
         print(f"\nVerifying model {dynamics.system_name}")
         t1 = time.time()
@@ -74,13 +81,20 @@ def verify_models():
         print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds")
 
 
-def verify_na_128_models():
-    for dynamics_cls in NA_SYSTEMS:
-        dynamics = dynamics_cls()
-        dynamics.hidden_sizes = [128, 128, 128]
-        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_128_simple_nn.onnx")
+def verify_64_models(residual=False, leaky_relu=False):
+    residual_path = '_residual' if residual else ''
+    leaky_relu_path = 'leaky_relu' if leaky_relu else ''
 
-        print(f"\nVerifying model {dynamics.system_name} with 3x[128] neurons")
+    for dynamics_cls in SYSTEMS:
+        dynamics = dynamics_cls()
+        dynamics.hidden_sizes = [64, 64, 64]
+
+        if hasattr(dynamics, 'small_epsilon'):
+            dynamics.epsilon = dynamics.small_epsilon
+
+        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_64_simple_nn{residual_path}{leaky_relu_path}.onnx")
+
+        print(f"\nVerifying model {dynamics.system_name} with 3x[64] neurons")
         t1 = time.time()
         verify_nn(
             onnx_path=path,
@@ -94,10 +108,10 @@ def verify_na_128_models():
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # train_models()
-    # train_na_128_models()
-    # verify_models()
-    verify_na_128_models()
+    # train_na_models()
+    # train_64_models()
+    # verify_na_models()
+    verify_64_models()
 
 
 if __name__ == "__main__":

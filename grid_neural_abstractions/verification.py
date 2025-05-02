@@ -61,7 +61,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         prepare_taylor_expansion(dynamics.input_dim)
 
     @staticmethod
-    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
+    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-8):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         from maraboupy import Marabou
