@@ -140,13 +140,22 @@ class VanDerPolOscillator(DynamicalSystem):
 
 
 class Quadcopter(DynamicalSystem):
-    """A class representing the 9D dynamics of a quadcopter (including velocity)."""
+    """A class representing the dynamics of a quadcopter based on a full mathematical model.
+    
+    The state vector includes:
+    - Orientation angles (x₃)
+    - Angular velocity (x₄)
+    
+    Control inputs are the squared angular velocities of the rotors (γᵢ = ω²ᵢ).
+    """
 
     def __init__(
         self,
         mass=1.0,
         gravity=9.81,
         arm_length=0.2,
+        b=0.01,
+        k=0.01,
         moment_inertia_x=0.01,
         moment_inertia_y=0.01,
         moment_inertia_z=0.02,
@@ -156,91 +165,138 @@ class Quadcopter(DynamicalSystem):
         self.mass = mass
         self.gravity = gravity
         self.arm_length = arm_length
-        self.moment_inertia_x = moment_inertia_x
-        self.moment_inertia_y = moment_inertia_y
-        self.moment_inertia_z = moment_inertia_z
+        self.I_xx = moment_inertia_x  # Moment of inertia around x-axis
+        self.I_yy = moment_inertia_y  # Moment of inertia around y-axis
+        self.I_zz = moment_inertia_z  # Moment of inertia around z-axis
 
-        self.input_dim = 9  # 9D states: orientation (3), angular velocity (3), linear velocity (3)
-        self.output_dim = 6  # 9D derivatives
+        self.b = b # Drag coefficient (assumed small for simplicity)
+        self.k = k # Thrust coefficient (assumed small for simplicity)
         
-        # Typical domains for each state dimension (including velocities)
-        self.input_domain = [
-            (-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5),        # roll, pitch, yaw
-            (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0),        # angular velocity (wx, wy, wz)
-            (-2.0, 2.0), (-2.0, 2.0), (-2.0, 2.0)         # linear velocity (vx, vy, vz)
-        ]
-        self.hidden_sizes = [64, 64, 64]
-        self.delta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 1.0])  # Domain size for the input
-        self.epsilon = 0.2
-        self.system_name = "Quadcopter"
+        self.orientation = False
+        if self.orientation:
+            # Define state dimension for orientation and angular velocity only (reduced model)
+            self.input_dim = 10  # orientation(3) + angular velocity(3) + rotor speeds(4)
+            # We output derivatives for these states
+            self.output_dim = 6  # derivatives of orientation(3) + angular velocity(3)
+            # Typical domains for each state dimension
+            self.input_domain = [
+                # Orientation (roll, pitch, yaw)
+                (-0.5, 0.5), (-0.2, 0.2), (-np.pi, np.pi),
+                # Angular velocity (ωx, ωy, ωz)
+                (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0),
+                # Squared angular velocities of rotors (γ1, γ2, γ3, γ4)
+                (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0)
+            ]
+            self.delta = np.array([
+                0.1, 0.1, 0.1,   # Orientation
+                1.0, 1.0, 1.0,  # Angular velocity
+                5.0, 5.0, 5.0, 5.0   # Squared angular velocities of rotors
+            ])
+        else:
+            # Define state dimension for orientation and angular velocity only (reduced model)
+            self.input_dim = 7  # angular velocity(3) + rotor speeds(4)
+            # We output derivatives for these states
+            self.output_dim = 3  # derivatives of angular velocity(3)
+            # Typical domains for each state dimension
+            self.input_domain = [
+                # Angular velocity (ωx, ωy, ωz)
+                (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0),
+                # Squared angular velocities of rotors (γ1, γ2, γ3, γ4)
+                (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0)
+            ]
+            self.delta = np.array([
+                1.0, 1.0, 1.0,  # Angular velocity
+                5.0, 5.0, 5.0, 5.0   # Squared angular velocities of rotors
+            ])
+        
+        self.hidden_sizes = [128, 128]
+        self.epsilon = 0.15
+        self.system_name = "QuadcopterFull"
 
     def compute_dynamics(self, x, translator):
         """
-        Compute 9D quadcopter dynamics (including velocity).
+        Compute the quadcopter dynamics based on the full mathematical model.
         
         Args:
-            x: Input tensor with shape [9, batch_size]
+            x: Input tensor with shape [10, batch_size]
             translator: The translator for mathematical operations
             
         Returns:
-            Tensor of shape [6, batch_size] with the dynamics
+            Tensor of shape [6, batch_size] with the derivatives
         """
-        # Extract state variables      
+        # Angular velocity (ωx, ωy, ωz)
+        gamma = x[3:7]  # Squared angular velocities of the rotors
         
-        # Orientation: roll, pitch, yaw
-        roll, pitch, yaw = x[0], x[1], x[2]
+        # Orientation derivative from angular velocities
+        # This is the inverse of the transformation matrix in the image
+        # Computing Euler angle rates from body-frame angular velocities
+        omega_x = x[0]
+        omega_y = x[1]
+        omega_z = x[2]
+
+        # Extract state variables
+        # Orientation (roll, pitch, yaw)
+        if self.orientation:
+            roll, pitch, yaw = x[7], x[8], x[9]
+
+            # Rotation matrix terms
+            sin_roll = translator.sin(roll)
+            cos_roll = translator.cos(roll)
+            cos_pitch = translator.cos(pitch)
+            tan_pitch = translator.tan(pitch)
+
+            droll = omega_x + sin_roll * tan_pitch * omega_y + cos_roll * tan_pitch * omega_z
+            dpitch = cos_roll * omega_y - sin_roll * omega_z
+            dyaw = (sin_roll / cos_pitch) * omega_y + (cos_roll / cos_pitch) * omega_z
         
-        # Angular velocity (full 3D)
-        wx, wy, wz = x[3], x[4], x[5]
+        # Angular velocity derivative
+        # Calculate torque differences for roll, pitch, yaw control
+        L = self.arm_length
+        b = self.b  # Drag coefficient (assumed small for simplicity)
+        k = self.k  # Thrust coefficient (assumed small for simplicity)
+        tau_roll, tau_pitch, tau_yaw = self.torques(gamma, L, b, k)
         
-        # Linear velocity
-        vx, vy, vz = x[6], x[7], x[8]
-
-        # Simplified thrust and control inputs (can be replaced with actual control inputs)
-        # Here using a hover thrust and small attitude corrections
-        thrust = self.mass * self.gravity
-
-        sin_pitch = translator.sin(pitch)
-        cos_pitch = translator.cos(pitch)
-        sin_roll = translator.sin(roll)
-        cos_roll = translator.cos(roll)
-        sin_yaw = translator.sin(yaw)
-        cos_yaw = translator.cos(yaw)
-        tan_pitch = translator.tan(pitch)
-
-        # Velocity derivatives (from forces)
-        # Simplified model assuming small angles
-        dvx = (
-            (
-            sin_pitch * cos_yaw
-            + sin_roll * cos_pitch * sin_yaw
-            )
-            * thrust
-            / self.mass
-        )
-        dvy = (
-            (
-            sin_pitch * sin_yaw
-            - sin_roll * cos_pitch * cos_yaw
-            )
-            * thrust
-            / self.mass
-        )
-        dvz = (
-            cos_roll * cos_pitch * thrust / self.mass
-            - self.gravity
-        )
-
-        # Orientation derivatives from angular velocities using Euler angle rates
-        # These equations relate angular velocities in the body frame to Euler angle rates
-        droll = wx + wy * sin_roll * tan_pitch + wz * cos_roll * tan_pitch
-        dpitch = wy * cos_roll - wz * sin_roll
-        dyaw = wy * sin_roll / cos_pitch + wz * cos_roll / cos_pitch
-
-        # Combine all derivatives (including velocity derivatives)
-        derivatives = translator.stack([droll, dpitch, dyaw, dvx, dvy, dvz])
+        # Angular acceleration using rigid body dynamics
+        # Using the angular velocity dynamics from the image
+        domega = translator.stack([
+            (tau_roll / self.I_xx) - ((self.I_yy - self.I_zz) / self.I_xx) * omega_y * omega_z,
+            (tau_pitch / self.I_yy) - ((self.I_zz - self.I_xx) / self.I_yy) * omega_x * omega_z,
+            (tau_yaw / self.I_zz) - ((self.I_xx - self.I_yy) / self.I_zz) * omega_z * omega_y
+        ])
+        domega_x = domega[0]
+        domega_y = domega[1]
+        domega_z = domega[2]
+        
+        # Combine all derivatives
+        if self.orientation:
+            derivatives = translator.stack([
+                droll, dpitch, dyaw,
+                domega_x, domega_y, domega_z
+            ])
+        else:
+            derivatives = translator.stack([
+                domega_x, domega_y, domega_z
+            ])
 
         return derivatives
+
+    def torques(self, inputs, L, b, k):
+        """
+        Compute torques given current inputs, arm length, drag coefficient, and thrust coefficient.
+
+        Args:
+            inputs: List or array of squared angular velocities of the rotors.
+            L: Arm length of the quadcopter.
+            b: Drag coefficient.
+            k: Thrust coefficient.
+
+        Returns:
+            Torque vector [tau_roll, tau_pitch, tau_yaw].
+        """
+        tau_roll = L * k * (inputs[0] - inputs[2])
+        tau_pitch = L * k * (inputs[1] - inputs[3])
+        tau_yaw = b * (inputs[0] - inputs[1] + inputs[2] - inputs[3])
+        return tau_roll, tau_pitch, tau_yaw
 
 
 class WaterTank(DynamicalSystem):
