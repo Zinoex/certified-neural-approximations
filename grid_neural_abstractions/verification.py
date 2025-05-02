@@ -65,7 +65,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         from maraboupy import Marabou
-        options = Marabou.createOptions(verbosity=0, timeoutInSeconds=1, lpSolver="native")
+        options = Marabou.createOptions(verbosity=0, timeoutInSeconds=2, lpSolver="native")
 
         sample, delta, j = data  # Unpack the data tuple
 
