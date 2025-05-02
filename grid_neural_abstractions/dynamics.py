@@ -564,6 +564,42 @@ class VortexShedding4D(DynamicalSystem):
         return translator.stack([dx1, dx2, dx3, dx4])
 
 
+class LorenzAttractor(DynamicalSystem):
+    """A class representing the Lorenz attractor dynamics."""
+
+    def __init__(self, sigma=10.0, rho=28.0, beta=8.0 / 3.0):   # These are the values Lorenz used with the beautiful butterfly
+        super().__init__()
+        # Parameter for the Lorenz attractor
+        self.sigma = sigma
+        self.rho = rho
+        self.beta = beta
+        self.input_dim = 3  # Lorenz attractor state dimension
+        self.output_dim = 3  # Lorenz attractor derivative dimension
+        self.input_domain = [(-30.0, 30.0), (-30.0, 30.0), (0.0, 6.0)]  # Typical domain for Lorenz attractor
+        self.hidden_sizes = [64, 64, 64]
+        self.delta = np.array([30.0, 30.0, 30.0])  # Domain size for the input
+        self.epsilon = 10.0  # Let's try?
+        self.system_name = "LorenzAttractor"
+
+    def compute_dynamics(self, x, translator):
+        """
+        Compute Lorenz dynamics.
+
+        Args:
+            x: Input tensor with shape [3, batch_size]
+            translator: The translator for mathematical operations
+
+        Returns:
+            Tensor of shape [3, batch_size] with the dynamics
+        """
+        x, y, z = x[0], x[1], x[2]
+
+        dx = self.sigma * (y - x)
+        dy = x * (self.rho - z) - y
+        dz = x * y - self.beta * z
+
+        return translator.stack([dx, dy, dz])
+
 class NNDynamics(DynamicalSystem):
     """A class representing the dynamics of a neural network."""
 
