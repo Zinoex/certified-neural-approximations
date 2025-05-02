@@ -221,6 +221,6 @@ class MultiprocessExecutor:
                     uncertified_percentage = (uncertified_domain_size / total_domain_size) * 100
                     
                     pbar.set_description_str(
-                        f"Overall Progress (remaining samples: {len(waiter)}, certified: {certified_percentage:.2f}%, uncertified: {uncertified_percentage:.2f}%)"
+                        f"Overall Progress (remaining samples: {len(waiter)}, certified: {certified_percentage:.4f}%, uncertified: {uncertified_percentage:.4f}%)"
                     )
         return agg, certified_percentage, uncertified_percentage, computation_time
