@@ -600,6 +600,7 @@ class LorenzAttractor(DynamicalSystem):
 
         return translator.stack([dx, dy, dz])
 
+
 class NNDynamics(DynamicalSystem):
     """A class representing the dynamics of a neural network."""
 

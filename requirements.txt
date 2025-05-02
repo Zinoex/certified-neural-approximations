@@ -9,6 +9,7 @@ maraboupy
 onnx
 onnxruntime
 bound_propagation==0.4.5
+scipy
 
 #Plotting
 matplotlib
