@@ -1,7 +1,7 @@
 import numpy as np
 from grid_neural_abstractions.dynamics import LorenzAttractor, NNDynamics
 from grid_neural_abstractions.generate_data import generate_data
-from grid_neural_abstractions.train_nn import SimpleNN, train_nn, save_model
+from grid_neural_abstractions.train_nn import SimpleNN, load_torch_model, train_nn, save_model
 
 import torch
 from torch import nn, optim
@@ -10,11 +10,11 @@ from scipy.integrate import solve_ivp
 from grid_neural_abstractions.translators.numpy_translator import NumpyTranslator
 
 
-def generate_data_from_trajectories(dynamics_model, batch_size=128, dt=0.1, trajectory_length=32, device=None):
+def generate_data_from_trajectories(dynamics_model, batch_size=128, dt=0.05, trajectory_length=64, device=None):
     input_size = dynamics_model.input_dim
     input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
 
-    x0, _ = generate_data(input_size, input_domain, batch_size=batch_size)
+    x0, _ = generate_data(input_size, input_domain, batch_size=batch_size, device=torch.device('cpu'))
 
     translator = NumpyTranslator()
 
@@ -25,7 +25,7 @@ def generate_data_from_trajectories(dynamics_model, batch_size=128, dt=0.1, traj
         solve_ivp(
             dynamics,
             (0.0, trajectory_length * dt),
-            x0[:, i],
+            x0[:, i].numpy(),
             t_eval=np.linspace(0, trajectory_length * dt, trajectory_length + 1),
             method="RK45",
             rtol=1e-6,
@@ -113,12 +113,15 @@ def train_nn_from_trajectories(dynamics_model, learning_rate=0.001, num_epochs=5
 
 
 def train_compression(dynamics_model=None):
-    dynamics_model.hidden_sizes = [1024, 1024, 1024, 1024, 1024]  # Set hidden sizes for the dynamics model
-    model = train_nn_from_trajectories(dynamics_model, learning_rate=1e-4)
-    save_model(model, "data/compression_ground_truth.onnx")
+    # dynamics_model.hidden_sizes = [1024, 1024, 1024, 1024, 1024]  # Set hidden sizes for the dynamics model
+    # model = train_nn_from_trajectories(dynamics_model, learning_rate=1e-4)
+    # save_model(model, "data/compression_ground_truth.onnx")
+
+    model = load_torch_model("data/compression_ground_truth.pth", input_size=dynamics_model.input_dim, hidden_sizes=[1024, 1024, 1024, 1024, 1024], output_size=dynamics_model.output_dim)
 
     nn_dynamics = NNDynamics(model, dynamics_model.input_domain)
-    nn_dynamics.hidden_sizes = [64, 64, 64]  # Set hidden sizes for the compression model
+    nn_dynamics.hidden_sizes = [64, 64, 64, 64, 64]  # Set hidden sizes for the compression model
+    nn_dynamics.epsilon = dynamics_model.epsilon
     compressed_model = train_nn(nn_dynamics)
     save_model(compressed_model, "data/compression_compressed.onnx")
 
