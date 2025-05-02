@@ -105,7 +105,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
             
         # Early stopping logic and best model tracking
         if max_loss < best_loss and epoch > 2500:
-            best_loss = max_loss
+            best_loss = max_loss.detach().item()
             # Save the best model state
             best_model_state = model.state_dict().copy()
             patience_counter = 0
