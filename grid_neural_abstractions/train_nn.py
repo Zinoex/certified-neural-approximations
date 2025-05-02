@@ -8,6 +8,7 @@ class LinearResidual(nn.Module):
     def __init__(self, size, leaky_relu=False, device=None):
         super().__init__()
         self.linear = nn.Linear(size, size, device=device)
+        self.residual_linear = nn.Linear(size, size, device=device)
         
         if leaky_relu:
             self.act = nn.LeakyReLU()
@@ -15,7 +16,7 @@ class LinearResidual(nn.Module):
             self.act = nn.ReLU()
 
     def forward(self, x):
-        return self.linear(self.act(x)) + x
+        return self.linear(self.act(x)) + self.residual_linear(x)
 
 
 # Define the neural network
