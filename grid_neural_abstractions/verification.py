@@ -14,12 +14,12 @@ def split_sample(data, delta, split_dim):
     sample_left = deepcopy(data)
     sample_left.center[split_dim] -= split_radius
     sample_left.radius[split_dim] = split_radius
-    sample_left.incrementsplitdim()
+    # sample_left.incrementsplitdim()
 
     sample_right = deepcopy(data)
     sample_right.center[split_dim] += split_radius
     sample_right.radius[split_dim] = split_radius
-    sample_right.incrementsplitdim()
+    # sample_right.incrementsplitdim()
 
     return sample_left, sample_right
 
@@ -65,7 +65,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         from maraboupy import Marabou
-        options = Marabou.createOptions(verbosity=0, timeoutInSeconds=2, lpSolver="native")
+        options = Marabou.createOptions(verbosity=0, timeoutInSeconds=1, lpSolver="native")
 
         sample, delta, j = data  # Unpack the data tuple
 

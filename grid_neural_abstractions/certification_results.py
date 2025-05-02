@@ -38,11 +38,12 @@ class CertificationRegion:
         sample, delta = self.center, self.radius  # Unpack the data tuple
         split_dim = None
         approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
-        i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
+        # i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
         error_list = np.ones(len(delta)) * 10e-9 # Initializenear zero
         rng = np.random.default_rng()
-        for j in range(len(delta)):
-            i = (i0 + j) % len(delta)
+
+        for i in range(len(delta)):
+            # i = (i0 + j) % len(delta)
             delta_i = delta[i]
             if delta_i < self.min_radius[i]:
                 continue
@@ -55,10 +56,13 @@ class CertificationRegion:
             if current_error > 0.0:
                 error_list[i] = current_error
         
-        # Softmax calculation
-        exp_values = np.exp(error_list)
-        probabilities = exp_values / np.sum(exp_values)
-        split_dim  = np.random.choice(len(error_list), p=probabilities)
+        delta_maxmin_ratio = np.max(delta) / np.min(delta)
+        if delta_maxmin_ratio > 1e2:
+            # Softmax calculation
+            probabilities = error_list / np.sum(error_list)
+            split_dim = np.random.choice(len(error_list), p=probabilities)
+        else:
+            split_dim = np.argmax(error_list)
         return split_dim
     
     def incrementsplitdim(self):
