@@ -51,17 +51,30 @@ class CertificationRegion:
             if delta_i < self.min_radius[i]:
                 error_list[i] = 0.0
                 continue
-            random_point = sample.copy()
-            random_point[i] += rng.normal(0.0, 0.1) * delta_i # Randomly perturb the point in the i-th dimension
-            # Calculate the Taylor approximation at the random point (corrected by the error from the centre)
-            approx = taylor_approximation(random_point) - approximation_error
-            true_value = dynamics(random_point).flatten()[self.output_dim]
-            current_error = np.abs(approx - true_value)
-            if current_error > 0.0:
-                error_list[i] = current_error
+
+            left_point = sample.copy()
+            left_point[i] -= 0.5 * delta_i
+            
+            # Calculate the Taylor approximation at the left point (corrected by the error from the centre)
+            approx = taylor_approximation(left_point) - approximation_error
+            true_value = dynamics(left_point).flatten()[self.output_dim]
+            left_error = np.abs(approx - true_value)
+
+            right_point = sample.copy()
+            right_point[i] += 0.5 * delta_i
+            
+            # Calculate the Taylor approximation at the right point (corrected by the error from the centre)
+            approx = taylor_approximation(right_point) - approximation_error
+            true_value = dynamics(right_point).flatten()[self.output_dim]
+            right_error = np.abs(approx - true_value)
+
+            max_error = np.maximum(left_error, right_error)
+
+            if max_error > 0.0:
+                error_list[i] = max_error
         
         delta_maxmin_ratio = np.max(delta) / np.min(delta)
-        if delta_maxmin_ratio > 1e2:
+        if delta_maxmin_ratio.item() > 1e2:
             # Softmax calculation
             probabilities = error_list / np.sum(error_list)
             split_dim = np.random.choice(len(error_list), p=probabilities)
