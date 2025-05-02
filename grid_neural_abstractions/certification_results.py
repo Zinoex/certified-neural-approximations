@@ -39,7 +39,7 @@ class CertificationRegion:
         split_dim = None
         approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
         i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
-        error_list = []
+        error_list = np.ones(len(delta)) * 10e-9 # Initializenear zero
         rng = np.random.default_rng()
         for j in range(len(delta)):
             i = (i0 + j) % len(delta)
@@ -53,7 +53,7 @@ class CertificationRegion:
             true_value = dynamics(random_point).flatten()[self.output_dim]
             current_error = np.abs(approx - true_value)
             if current_error > 0.0:
-                error_list.append(current_error)
+                error_list[i] = current_error
         
         # Softmax calculation
         exp_values = np.exp(error_list)
