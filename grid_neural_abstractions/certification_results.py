@@ -42,10 +42,14 @@ class CertificationRegion:
         error_list = np.ones(len(delta)) * 10e-9 # Initializenear zero
         rng = np.random.default_rng()
 
+        if all(delta < self.min_radius):
+            return None
+
         for i in range(len(delta)):
             # i = (i0 + j) % len(delta)
             delta_i = delta[i]
             if delta_i < self.min_radius[i]:
+                error_list[i] = 0.0
                 continue
             random_point = sample.copy()
             random_point[i] += rng.normal(0.0, 0.1) * delta_i # Randomly perturb the point in the i-th dimension
