@@ -210,24 +210,29 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
     def verify_batch(self, large_network_dynamics, small_network, batch, precision=1e-6):
         linear_bounds = self.taylor_expansion(large_network_dynamics.network, batch)
 
-        samples = [(sample, linear_bounds[i]) for i, sample in enumerate(batch)]
+        A_gap = linear_bounds.upper[0] - linear_bounds.lower[0]
+        b_gap = linear_bounds.upper[1] - linear_bounds.lower[1]
+        lbp_gap = LinearBounds(linear_bounds.region, None, (A_gap, b_gap))
+        interval_gap = lbp_gap.concretize()  # Turn linear bounds into interval bounds
+
+        samples = [(sample, linear_bounds[i], interval_gap.upper[i]) for i, sample in enumerate(batch)]
 
         process_sample = partial(self.verify_sample, large_network_dynamics, small_network, precision=precision)
 
         # results = self.pool.starmap(process_sample, samples)
-        results = [process_sample(sample, linear_bounds) for sample, linear_bounds in samples]
+        results = [process_sample(sample, linear_bounds, max_gap) for sample, linear_bounds, max_gap in samples]
 
         return results
 
     @staticmethod
     @torch.no_grad()
-    def verify_sample(large_network_dynamics, small_network, sample: CertificationRegion, linear_bounds, precision=1e-6):
+    def verify_sample(large_network_dynamics, small_network, sample: CertificationRegion, linear_bounds, max_gap, precision=1e-6):
         start_time = time.time()
 
         inputVars = small_network.inputVars[0].flatten()
         outputVars = small_network.outputVars[0].flatten()
         options = Marabou.createOptions(verbosity=0, timeoutInSeconds=5, lpSolver="native")
-        delta = sample.radius
+        _, delta, j = sample  # Unpack the data tuple
         epsilon = large_network_dynamics.epsilon
 
         torch_model = large_network_dynamics.network
@@ -237,6 +242,22 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
             y = torch_model(x)
             return y.numpy()
 
+        A_lower = linear_bounds.lower[0][j].numpy()
+        b_lower = linear_bounds.lower[1][j].numpy()
+        A_upper = linear_bounds.upper[0][j].numpy()
+        b_upper = linear_bounds.upper[1][j].numpy()
+
+        max_gap = max_gap[j].item()
+
+        # Check if we need to split based on remainder bounds
+        if max_gap > epsilon:
+            # Try and see if splitting the input_dimension is helpful
+            split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+            if split_dim is not None:
+                sample_left, sample_right = split_sample(sample, delta, split_dim)
+                end_time = time.time()
+                return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
+
         # Add input constraints
         input_dim = large_network_dynamics.input_dim
         region = linear_bounds.region
@@ -244,117 +265,109 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
             small_network.setLowerBound(inputVars[i], region.lower[i].item())
             small_network.setUpperBound(inputVars[i], region.upper[i].item())
 
-
-        A_lower = linear_bounds.lower[0].numpy()
-        b_lower = linear_bounds.lower[1].numpy()
-        A_upper = linear_bounds.upper[0].numpy()
-        b_upper = linear_bounds.upper[1].numpy()
-
         # Add output constraints
-        output_dim = large_network_dynamics.output_dim
-        for j in range(output_dim):
-            outputVar = outputVars[j]
+        outputVar = outputVars[j]
 
-            # Reset the query
-            small_network.additionalEquList.clear()
+        # Reset the query
+        small_network.additionalEquList.clear()
 
-            # A_upper @ x - nn_output >= epsilon - b_upper
-            equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
-            for i, inputVar in enumerate(inputVars):
-                equation_GE.addAddend(A_upper[j, i].item(), inputVar)
-            equation_GE.addAddend(-1, outputVar)
-            equation_GE.setScalar(epsilon - b_upper[j].item())
-            small_network.addEquation(equation_GE, isProperty=True)
+        # A_upper @ x - nn_output >= epsilon - b_upper
+        equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
+        for i, inputVar in enumerate(inputVars):
+            equation_GE.addAddend(A_upper[i].item(), inputVar)
+        equation_GE.addAddend(-1, outputVar)
+        equation_GE.setScalar(epsilon - b_upper.item())
+        small_network.addEquation(equation_GE, isProperty=True)
 
-            # Find a counterexample for upper bound
-            res, vals, stats = small_network.solve(verbose=False, options=options)
-            if stats.hasTimedOut():
-                split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower[j], b_lower[j], A_upper[j], b_upper[j]), numpy_model)
-                if split_dim is not None:
-                    sample_left, sample_right = split_sample(sample, delta, split_dim)
-                    end_time = time.time()
-                    return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
-                else:
-                    print("No split dimension found, returning UNSAT")
-                    end_time = time.time()
-                    return SampleResultUNSAT(sample, end_time - start_time, [])
-
-            if res == "sat":
-                cex = np.empty(len(inputVars))
-                for i, inputVar in enumerate(inputVars):
-                    cex[i] = vals[inputVar]
-                    assert cex[i] + precision >= region.lower[i].item()
-                    assert cex[i] - precision <= region.upper[i].item()
-
-                violation_found = (
-                    np.dot(A_upper[j], cex) - vals[outputVar] + precision >= epsilon - b_upper[j].item()
-                )
-
-                assert (
-                    violation_found
-                ), "The counterexample violates the bound, this is not a valid counterexample"
-
-                small_network.additionalEquList.clear()
-                nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
-                f_cex = torch_model(torch.as_tensor(cex, dtype=torch.float32).view(1, -1)).flatten().numpy()
-                if np.abs(nn_cex - f_cex)[j] < epsilon:
-                    split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower[j], b_lower[j], A_upper[j], b_upper[j]), numpy_model)
-                    sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
-                    end_time = time.time()
-                    return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
-
+        # Find a counterexample for upper bound
+        res, vals, stats = small_network.solve(verbose=False, options=options)
+        if stats.hasTimedOut():
+            split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+            if split_dim is not None:
+                sample_left, sample_right = split_sample(sample, delta, split_dim)
                 end_time = time.time()
-                return SampleResultUNSAT(sample, end_time - start_time, [cex])
-
-            # Reset the query
-            small_network.additionalEquList.clear()
-
-            # A_lower @ x - nn_output <= -epsilon - b_lower
-            equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
-            for i, inputVar in enumerate(inputVars):
-                equation_LE.addAddend(A_lower[j, i].item(), inputVar)
-            equation_LE.addAddend(-1, outputVar)
-            equation_LE.setScalar(-epsilon - b_lower[j].item())
-            small_network.addEquation(equation_LE, isProperty=True)
-
-            # Find a counterexample for lower bound
-            res, vals, stats = small_network.solve(verbose=False, options=options)
-            if stats.hasTimedOut():
-                split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower[j], b_lower[j], A_upper[j], b_upper[j]), numpy_model)
-                if split_dim is not None:
-                    sample_left, sample_right = split_sample(sample, delta, split_dim)
-                    end_time = time.time()
-                    return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
-                else:
-                    print("No split dimension found, returning UNSAT")
-                    end_time = time.time()
-                    return SampleResultUNSAT(sample, end_time - start_time, [])
-                
-            if res == "sat":
-                cex = np.empty(len(inputVars))
-                for i, inputVar in enumerate(inputVars):
-                    cex[i] = vals[inputVar]
-                    assert cex[i] + precision >= region.lower[i].item()
-                    assert cex[i] - precision <= region.upper[i].item()
-
-                violation_found = (
-                    np.dot(A_lower[j], cex) - vals[outputVar] - precision <= -epsilon - b_lower[j].item()
-                )
-                assert (
-                    violation_found
-                ), "The counterexample violates the bound, this is not a valid counterexample"
-
-                small_network.additionalEquList.clear()
-                nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
-                f_cex = torch_model(torch.as_tensor(cex, dtype=torch.float32).view(1, -1)).flatten().numpy()
-                if np.abs(nn_cex - f_cex)[j] < epsilon:
-                    split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower[j], b_lower[j], A_upper[j], b_upper[j]), numpy_model)
-                    sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
-                    end_time = time.time()
-                    return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
-
+                return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
+            else:
+                print("No split dimension found, returning UNSAT")
                 end_time = time.time()
-                return SampleResultUNSAT(sample, end_time - start_time, [cex])
+                return SampleResultUNSAT(sample, end_time - start_time, [])
+
+        if res == "sat":
+            cex = np.empty(len(inputVars))
+            for i, inputVar in enumerate(inputVars):
+                cex[i] = vals[inputVar]
+                assert cex[i] + precision >= region.lower[i].item()
+                assert cex[i] - precision <= region.upper[i].item()
+
+            violation_found = (
+                np.dot(A_upper, cex) - vals[outputVar] + precision >= epsilon - b_upper.item()
+            )
+
+            assert (
+                violation_found
+            ), "The counterexample violates the bound, this is not a valid counterexample"
+
+            small_network.additionalEquList.clear()
+            nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
+            f_cex = torch_model(torch.as_tensor(cex, dtype=torch.float32).view(1, -1)).flatten().numpy()
+            if np.abs(nn_cex - f_cex)[j] < epsilon:
+                split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+                sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
+                end_time = time.time()
+                return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
+
+            end_time = time.time()
+            return SampleResultUNSAT(sample, end_time - start_time, [cex])
+
+        # Reset the query
+        small_network.additionalEquList.clear()
+
+        # A_lower @ x - nn_output <= -epsilon - b_lower
+        equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
+        for i, inputVar in enumerate(inputVars):
+            equation_LE.addAddend(A_lower[i].item(), inputVar)
+        equation_LE.addAddend(-1, outputVar)
+        equation_LE.setScalar(-epsilon - b_lower.item())
+        small_network.addEquation(equation_LE, isProperty=True)
+
+        # Find a counterexample for lower bound
+        res, vals, stats = small_network.solve(verbose=False, options=options)
+        if stats.hasTimedOut():
+            split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+            if split_dim is not None:
+                sample_left, sample_right = split_sample(sample, delta, split_dim)
+                end_time = time.time()
+                return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
+            else:
+                print("No split dimension found, returning UNSAT")
+                end_time = time.time()
+                return SampleResultUNSAT(sample, end_time - start_time, [])
+            
+        if res == "sat":
+            cex = np.empty(len(inputVars))
+            for i, inputVar in enumerate(inputVars):
+                cex[i] = vals[inputVar]
+                assert cex[i] + precision >= region.lower[i].item()
+                assert cex[i] - precision <= region.upper[i].item()
+
+            violation_found = (
+                np.dot(A_lower, cex) - vals[outputVar] - precision <= -epsilon - b_lower.item()
+            )
+            assert (
+                violation_found
+            ), "The counterexample violates the bound, this is not a valid counterexample"
+
+            small_network.additionalEquList.clear()
+            nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
+            f_cex = torch_model(torch.as_tensor(cex, dtype=torch.float32).view(1, -1)).flatten().numpy()
+            if np.abs(nn_cex - f_cex)[j] < epsilon:
+                split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+                sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
+                end_time = time.time()
+                return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
+
+            end_time = time.time()
+            return SampleResultUNSAT(sample, end_time - start_time, [cex])
 
         end_time = time.time()
         return SampleResultSAT(sample, end_time - start_time)   # No counterexample found, return the original sample
