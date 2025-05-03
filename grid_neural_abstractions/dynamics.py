@@ -631,10 +631,10 @@ class LorenzAttractor(DynamicalSystem):
         self.beta = beta
         self.input_dim = 3  # Lorenz attractor state dimension
         self.output_dim = 3  # Lorenz attractor derivative dimension
-        self.input_domain = [(-30.0, 30.0), (-30.0, 30.0), (0.0, 6.0)]  # Typical domain for Lorenz attractor
+        self.input_domain = [(-30.0, 30.0), (-30.0, 30.0), (0.0, 60.0)]  # Typical domain for Lorenz attractor
         self.hidden_sizes = [64, 64, 64]
         self.delta = np.array([30.0, 30.0, 30.0])  # Domain size for the input
-        self.epsilon = 10.0  # Let's try?
+        self.epsilon = 0.6  # Let's try?
         self.system_name = "LorenzAttractor"
 
     def compute_dynamics(self, x, translator):
@@ -668,6 +668,7 @@ class NNDynamics(DynamicalSystem):
         self.input_domain = input_domain
         self.system_name = "NNDynamics"
 
+    @torch.no_grad()
     def compute_dynamics(self, x, translator):
         """
         Compute the dynamics for the neural network.
