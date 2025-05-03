@@ -10,7 +10,7 @@ from scipy.integrate import solve_ivp
 from grid_neural_abstractions.translators.numpy_translator import NumpyTranslator
 
 
-def generate_data_from_trajectories(dynamics_model, batch_size=128, dt=0.05, trajectory_length=64, device=None):
+def generate_data_from_trajectories(dynamics_model, batch_size=128, dt=0.02, trajectory_length=64, device=None):
     input_size = dynamics_model.input_dim
     input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
 
@@ -42,7 +42,7 @@ def generate_data_from_trajectories(dynamics_model, batch_size=128, dt=0.05, tra
 
 
 # Train the neural network
-def train_nn_from_trajectories(dynamics_model, learning_rate=0.001, num_epochs=500000, batch_size=128,
+def train_nn_from_trajectories(dynamics_model, learning_rate=1e-6, num_epochs=500000, batch_size=128,
                                trajectory_length=32, residual=False, leaky_relu=False):
     
     input_size = dynamics_model.input_dim
@@ -52,7 +52,7 @@ def train_nn_from_trajectories(dynamics_model, learning_rate=0.001, num_epochs=5
     
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
-    patience = 20000
+    patience = 40000
     best_loss = float('inf')
     patience_counter = 0
     
@@ -63,7 +63,7 @@ def train_nn_from_trajectories(dynamics_model, learning_rate=0.001, num_epochs=5
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)  # Use AdamW optimizer
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.90, patience=1000, min_lr=1e-6
+        optimizer, mode='min', factor=0.90, patience=2000, min_lr=1e-8
     )
 
     # Load data
@@ -88,7 +88,7 @@ def train_nn_from_trajectories(dynamics_model, learning_rate=0.001, num_epochs=5
 
         if (epoch + 1) % 100 == 0:
             print(
-                f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {avg_loss.item():.6f}, Max: {max_loss.item():.6f}, LR: {optimizer.param_groups[0]['lr']:.6f}"
+                f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {avg_loss.item():.6f}, Max: {max_loss.item():.6f}, LR: {optimizer.param_groups[0]['lr']:.8f}"
             )
             
         # Early stopping logic and best model tracking
@@ -114,16 +114,18 @@ def train_nn_from_trajectories(dynamics_model, learning_rate=0.001, num_epochs=5
 
 def train_compression(dynamics_model=None):
     # dynamics_model.hidden_sizes = [1024, 1024, 1024, 1024, 1024]  # Set hidden sizes for the dynamics model
-    # model = train_nn_from_trajectories(dynamics_model, learning_rate=1e-4)
+    # model = train_nn_from_trajectories(dynamics_model, learning_rate=1e-6)
     # save_model(model, "data/compression_ground_truth.onnx")
 
     model = load_torch_model("data/compression_ground_truth.pth", input_size=dynamics_model.input_dim, hidden_sizes=[1024, 1024, 1024, 1024, 1024], output_size=dynamics_model.output_dim)
 
     nn_dynamics = NNDynamics(model, dynamics_model.input_domain)
-    nn_dynamics.hidden_sizes = [64, 64, 64, 64, 64]  # Set hidden sizes for the compression model
+    nn_dynamics.hidden_sizes = [128, 128, 128, 128, 128]  # Set hidden sizes for the compression model
     nn_dynamics.epsilon = dynamics_model.epsilon
-    compressed_model = train_nn(nn_dynamics)
+    compressed_model = train_nn(nn_dynamics, learning_rate=1e-6, num_epochs=1000000)
     save_model(compressed_model, "data/compression_compressed.onnx")
+
+
 
 
 if __name__ == "__main__":

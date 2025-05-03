@@ -2,19 +2,20 @@
 from abc import ABC, abstractmethod
 import copy
 from functools import partial
+import time
 import types
 from torch.multiprocessing import Pool
 from queue import LifoQueue
 import numpy as np
 import torch
 from tqdm import tqdm
-from bound_propagation import HyperRectangle, BoundModelFactory
+from bound_propagation import HyperRectangle, BoundModelFactory, LinearBounds
 
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 from grid_neural_abstractions.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
-from grid_neural_abstractions.dynamics import NNDynamics, Quadcopter
+from grid_neural_abstractions.dynamics import LorenzAttractor, NNDynamics, Quadcopter
 from grid_neural_abstractions.train_nn import load_onnx_model, load_torch_model
-from grid_neural_abstractions.verification import split_sample
+from grid_neural_abstractions.verification import mean_linear_bound, split_sample
 from grid_neural_abstractions.verify_nn import aggregate
 from grid_neural_abstractions.generate_data import generate_grid
 
@@ -132,19 +133,17 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         self.bound_network = None
 
     @staticmethod
-    def initialize_pool(*args):
-        global _LOCAL
-        _LOCAL = types.SimpleNamespace()
-        _LOCAL.large_torch_model = load_torch_model(*args)
+    def initialize_pool(large_network_dynamics, args, kwargs):
+        large_network_dynamics.network = load_torch_model(*args, **kwargs)
 
-    def verify(self, large_network_dynamics, small_network, epsilon, delta, precision=1e-6, batch_size=10, plotter=None):
-        self.pool = Pool(self.num_workers, initializer=self.initialize_pool, initargs=large_network_dynamics.torch_params)
+    def verify(self, large_network_dynamics, small_network, precision=1e-6, batch_size=10, plotter=None):
+        # self.pool = Pool(self.num_workers, initializer=self.initialize_pool, initargs=large_network_dynamics.torch_params)
 
         factory = BoundModelFactory()
         self.bound_network = factory.build(large_network_dynamics.network.network)
 
         # Generate initial set of samples
-        delta = np.full(large_network_dynamics.input_dim, delta)
+        delta = np.full(large_network_dynamics.input_dim, large_network_dynamics.delta)
         X_train, _ = generate_grid(large_network_dynamics.input_dim, dynamics_model.input_domain, delta=delta)
         output_dim = dynamics_model.output_dim
         samples = [
@@ -170,7 +169,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                 ]
 
                 # Execute the batches
-                results = self.verify_batch(large_network_dynamics, small_network, batch, epsilon, precision)
+                results = self.verify_batch(large_network_dynamics, small_network, batch, precision)
 
                 for result in results:
                     if result.issat():
@@ -203,32 +202,40 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                 uncertified_percentage = (uncertified_domain_size / total_domain_size) * 100
 
                 pbar.set_description_str(
-                    f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.2f}%, uncertified: {uncertified_percentage:.2f}%)"
+                    f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.4f}%, uncertified: {uncertified_percentage:.4f}%)"
                 )
 
         return agg
 
-    def verify_batch(self, large_network_dynamics, small_network, batch, epsilon, precision=1e-6):
+    def verify_batch(self, large_network_dynamics, small_network, batch, precision=1e-6):
         linear_bounds = self.taylor_expansion(large_network_dynamics.network, batch)
 
         samples = [(sample, linear_bounds[i]) for i, sample in enumerate(batch)]
 
-        process_sample = partial(self.verify_sample, large_network_dynamics, small_network, epsilon, precision=precision)
+        process_sample = partial(self.verify_sample, large_network_dynamics, small_network, precision=precision)
 
-        results = self.pool.starmap(process_sample, samples)
-        # results = [process_sample(sample, linear_bounds) for sample, linear_bounds in samples]
+        # results = self.pool.starmap(process_sample, samples)
+        results = [process_sample(sample, linear_bounds) for sample, linear_bounds in samples]
 
         return results
 
     @staticmethod
     @torch.no_grad()
-    def verify_sample(large_network_dynamics, small_network, epsilon, sample, linear_bounds, precision=1e-6):
+    def verify_sample(large_network_dynamics, small_network, sample: CertificationRegion, linear_bounds, precision=1e-6):
+        start_time = time.time()
+
         inputVars = small_network.inputVars[0].flatten()
         outputVars = small_network.outputVars[0].flatten()
-        options = Marabou.createOptions(verbosity=0)
+        options = Marabou.createOptions(verbosity=0, timeoutInSeconds=5, lpSolver="native")
+        delta = sample.radius
+        epsilon = large_network_dynamics.epsilon
 
-        global _LOCAL
-        torch_model = _LOCAL.large_torch_model
+        torch_model = large_network_dynamics.network
+
+        def numpy_model(x):
+            x = torch.as_tensor(x, dtype=torch.float32)
+            y = torch_model(x)
+            return y.numpy()
 
         # Add input constraints
         input_dim = large_network_dynamics.input_dim
@@ -236,6 +243,12 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         for i in range(input_dim):
             small_network.setLowerBound(inputVars[i], region.lower[i].item())
             small_network.setUpperBound(inputVars[i], region.upper[i].item())
+
+
+        A_lower = linear_bounds.lower[0].numpy()
+        b_lower = linear_bounds.lower[1].numpy()
+        A_upper = linear_bounds.upper[0].numpy()
+        b_upper = linear_bounds.upper[1].numpy()
 
         # Add output constraints
         output_dim = large_network_dynamics.output_dim
@@ -248,13 +261,24 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
             # A_upper @ x - nn_output >= epsilon - b_upper
             equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
             for i, inputVar in enumerate(inputVars):
-                equation_GE.addAddend(linear_bounds.upper[0][j, i].item(), inputVar)
+                equation_GE.addAddend(A_upper[j, i].item(), inputVar)
             equation_GE.addAddend(-1, outputVar)
-            equation_GE.setScalar(epsilon - linear_bounds.upper[1][j].item())
+            equation_GE.setScalar(epsilon - b_upper[j].item())
             small_network.addEquation(equation_GE, isProperty=True)
 
             # Find a counterexample for upper bound
-            res, vals, _ = small_network.solve(verbose=False, options=options)
+            res, vals, stats = small_network.solve(verbose=False, options=options)
+            if stats.hasTimedOut():
+                split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower[j], b_lower[j], A_upper[j], b_upper[j]), numpy_model)
+                if split_dim is not None:
+                    sample_left, sample_right = split_sample(sample, delta, split_dim)
+                    end_time = time.time()
+                    return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
+                else:
+                    print("No split dimension found, returning UNSAT")
+                    end_time = time.time()
+                    return SampleResultUNSAT(sample, end_time - start_time, [])
+
             if res == "sat":
                 cex = np.empty(len(inputVars))
                 for i, inputVar in enumerate(inputVars):
@@ -263,7 +287,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                     assert cex[i] - precision <= region.upper[i].item()
 
                 violation_found = (
-                    np.dot(linear_bounds.upper[0][j].numpy(), cex) - vals[outputVar] + precision >= epsilon - linear_bounds.upper[1][j].item()
+                    np.dot(A_upper[j], cex) - vals[outputVar] + precision >= epsilon - b_upper[j].item()
                 )
 
                 assert (
@@ -274,11 +298,13 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                 nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
                 f_cex = torch_model(torch.as_tensor(cex, dtype=torch.float32).view(1, -1)).flatten().numpy()
                 if np.abs(nn_cex - f_cex)[j] < epsilon:
-                    split_dim = sample.incrementsplitdim()
+                    split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower[j], b_lower[j], A_upper[j], b_upper[j]), numpy_model)
                     sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
-                    return SampleResultMaybe(sample, [sample_left, sample_right])
+                    end_time = time.time()
+                    return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
 
-                return SampleResultUNSAT(sample, [cex])
+                end_time = time.time()
+                return SampleResultUNSAT(sample, end_time - start_time, [cex])
 
             # Reset the query
             small_network.additionalEquList.clear()
@@ -286,13 +312,24 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
             # A_lower @ x - nn_output <= -epsilon - b_lower
             equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
             for i, inputVar in enumerate(inputVars):
-                equation_LE.addAddend(linear_bounds.lower[0][j, i].item(), inputVar)
+                equation_LE.addAddend(A_lower[j, i].item(), inputVar)
             equation_LE.addAddend(-1, outputVar)
-            equation_LE.setScalar(-epsilon - linear_bounds.lower[1][j].item())
+            equation_LE.setScalar(-epsilon - b_lower[j].item())
             small_network.addEquation(equation_LE, isProperty=True)
 
             # Find a counterexample for lower bound
-            res, vals, _ = small_network.solve(verbose=False, options=options)
+            res, vals, stats = small_network.solve(verbose=False, options=options)
+            if stats.hasTimedOut():
+                split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower[j], b_lower[j], A_upper[j], b_upper[j]), numpy_model)
+                if split_dim is not None:
+                    sample_left, sample_right = split_sample(sample, delta, split_dim)
+                    end_time = time.time()
+                    return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
+                else:
+                    print("No split dimension found, returning UNSAT")
+                    end_time = time.time()
+                    return SampleResultUNSAT(sample, end_time - start_time, [])
+                
             if res == "sat":
                 cex = np.empty(len(inputVars))
                 for i, inputVar in enumerate(inputVars):
@@ -301,7 +338,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                     assert cex[i] - precision <= region.upper[i].item()
 
                 violation_found = (
-                    np.dot(linear_bounds.lower[0][j].numpy(), cex) - vals[outputVar] - precision <= -epsilon - linear_bounds.lower[1][j].item()
+                    np.dot(A_lower[j], cex) - vals[outputVar] - precision <= -epsilon - b_lower[j].item()
                 )
                 assert (
                     violation_found
@@ -311,13 +348,16 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                 nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
                 f_cex = torch_model(torch.as_tensor(cex, dtype=torch.float32).view(1, -1)).flatten().numpy()
                 if np.abs(nn_cex - f_cex)[j] < epsilon:
-                    split_dim = sample.incrementsplitdim()
+                    split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower[j], b_lower[j], A_upper[j], b_upper[j]), numpy_model)
                     sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
-                    return SampleResultMaybe(sample, [sample_left, sample_right])
+                    end_time = time.time()
+                    return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
 
-                return SampleResultUNSAT(sample, [cex])
+                end_time = time.time()
+                return SampleResultUNSAT(sample, end_time - start_time, [cex])
 
-        return SampleResultSAT(sample)   # No counterexample found, return the original sample
+        end_time = time.time()
+        return SampleResultSAT(sample, end_time - start_time)   # No counterexample found, return the original sample
 
     @torch.no_grad()
     def taylor_expansion(self, network, batch):
@@ -331,7 +371,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
 
 if __name__ == "__main__":
-    dynamics_model = Quadcopter()
+    dynamics_model = LorenzAttractor()
 
     # Example usage
     large_network = load_torch_model("data/compression_ground_truth.pth",
@@ -339,13 +379,15 @@ if __name__ == "__main__":
                                      hidden_sizes=[1024, 1024, 1024, 1024, 1024],
                                      output_size=dynamics_model.output_dim)
     large_network_dynamics = NNDynamics(large_network, dynamics_model.input_domain)
-    large_network_dynamics.torch_params = ("data/compression_ground_truth.pth", dynamics_model.input_dim, [1024, 1024, 1024, 1024, 1024], dynamics_model.output_dim)
+    args = ("data/compression_ground_truth.pth", dynamics_model.input_dim, [1024, 1024, 1024, 1024, 1024], dynamics_model.output_dim)
+    kwargs = {'device': torch.device('cpu')}
+    large_network_dynamics.torch_params = (large_network_dynamics, args, kwargs)
+    large_network_dynamics.delta = dynamics_model.delta
+    large_network_dynamics.epsilon = dynamics_model.epsilon
     small_network = load_onnx_model("data/compression_compressed.onnx")
 
     strategy = TaylorMarabouCompressionVerificationStrategy(num_workers=8)
-    epsilon = 0.1
-    delta = 0.1
     precision = 1e-6
 
-    result = strategy.verify(large_network_dynamics, small_network, epsilon, delta, precision)
+    result = strategy.verify(large_network_dynamics, small_network, precision)
     print(result)

@@ -1,3 +1,4 @@
+import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -21,9 +22,12 @@ class LinearResidual(nn.Module):
 
 # Define the neural network
 class SimpleNN(nn.Module):
-    def __init__(self, input_size, hidden_sizes, output_size, leaky_relu=False, residual=False):
+    def __init__(self, input_size, hidden_sizes, output_size, leaky_relu=False, residual=False, device=None):
         super(SimpleNN, self).__init__()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device
 
         if residual:
             common_hidden_size = hidden_sizes[0]
@@ -143,6 +147,7 @@ def save_onnx_model(model, file_name="data/simple_nn.onnx"):
 
 
 def save_torch_model(model, file_name="data/simple_nn.pth"):
+    model = copy.deepcopy(model).cpu()
     torch.save(model.state_dict(), file_name)
     print(f"Model saved as {file_name}")
 
@@ -161,8 +166,8 @@ def load_onnx_model(file_name="data/simple_nn.onnx"):
     return network
 
 
-def load_torch_model(file_name="data/simple_nn.pth", input_size=3, hidden_sizes=[128, 128, 128], output_size=3):
-    model = SimpleNN(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size)
+def load_torch_model(file_name="data/simple_nn.pth", input_size=3, hidden_sizes=[128, 128, 128], output_size=3, device=None):
+    model = SimpleNN(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, device=device)
     model.load_state_dict(torch.load(file_name, map_location=torch.device('cpu')))
     print(f"PyTorch model {file_name} loaded")
     return model
