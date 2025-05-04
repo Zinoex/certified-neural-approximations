@@ -12,6 +12,7 @@ from tqdm import tqdm
 from bound_propagation import HyperRectangle, BoundModelFactory, LinearBounds
 
 from maraboupy import Marabou, MarabouCore, MarabouUtils
+import onnxruntime
 from grid_neural_abstractions.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
 from grid_neural_abstractions.dynamics import LorenzAttractor, NNDynamics, Quadcopter
 from grid_neural_abstractions.train_nn import load_onnx_model, load_torch_model
@@ -133,11 +134,36 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         self.bound_network = None
 
     @staticmethod
-    def initialize_pool(large_network_dynamics, args, kwargs):
-        large_network_dynamics.network = load_torch_model(*args, **kwargs)
+    def initialize_pool(large_network_dynamics, onnx_path):
+        # large_network_dynamics.torch_network = load_torch_model(*args, **kwargs)
 
-    def verify(self, large_network_dynamics, small_network, precision=1e-6, batch_size=10, plotter=None):
-        # self.pool = Pool(self.num_workers, initializer=self.initialize_pool, initargs=large_network_dynamics.torch_params)
+        onnx_model = load_onnx_model(onnx_path)
+
+        input_names, output_names = onnx_model.inputNames, onnx_model.outputNames
+        input_vars = onnx_model.inputVars
+
+        sess = onnxruntime.InferenceSession(onnx_path)
+
+        def evaluate(x):
+            input_dict = dict()
+            for i, input_name in enumerate(input_names):
+
+                # Try to cast input to correct type
+                onnx_type = sess.get_inputs()[i].type
+                if 'float' in onnx_type:
+                    input_type = 'float32'
+                else:
+                    raise NotImplementedError("Inputs to network expected to be of type 'float', not %s" % onnx_type)
+                input_dict[input_name] = x[i].reshape(input_vars[i].shape).astype(input_type)
+            return sess.run(output_names, input_dict)
+
+        global _LOCAL
+        _LOCAL = types.SimpleNamespace()
+        _LOCAL.onnx_model = evaluate
+
+
+    def verify(self, large_network_dynamics, small_network, precision=1e-6, batch_size=200, plotter=None):
+        self.pool = Pool(self.num_workers, initializer=self.initialize_pool, initargs=large_network_dynamics.onnx_params)
 
         factory = BoundModelFactory()
         self.bound_network = factory.build(large_network_dynamics.network.network)
@@ -219,8 +245,8 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
         process_sample = partial(self.verify_sample, large_network_dynamics, small_network, precision=precision)
 
-        # results = self.pool.starmap(process_sample, samples)
-        results = [process_sample(sample, linear_bounds, max_gap) for sample, linear_bounds, max_gap in samples]
+        results = self.pool.starmap(process_sample, samples)
+        # results = [process_sample(sample, linear_bounds, max_gap) for sample, linear_bounds, max_gap in samples]
 
         return results
 
@@ -235,12 +261,12 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         _, delta, j = sample  # Unpack the data tuple
         epsilon = large_network_dynamics.epsilon
 
-        torch_model = large_network_dynamics.network
+        global _LOCAL
+        onnx_model = _LOCAL.onnx_model
 
         def numpy_model(x):
-            x = torch.as_tensor(x, dtype=torch.float32)
-            y = torch_model(x)
-            return y.numpy()
+            y = onnx_model([x])[0].flatten()
+            return y
 
         A_lower = linear_bounds.lower[0][j].numpy()
         b_lower = linear_bounds.lower[1][j].numpy()
@@ -309,7 +335,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
             small_network.additionalEquList.clear()
             nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
-            f_cex = torch_model(torch.as_tensor(cex, dtype=torch.float32).view(1, -1)).flatten().numpy()
+            f_cex = onnx_model([cex])[0].flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
                 split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
                 sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
@@ -359,7 +385,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
             small_network.additionalEquList.clear()
             nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
-            f_cex = torch_model(torch.as_tensor(cex, dtype=torch.float32).view(1, -1)).flatten().numpy()
+            f_cex = onnx_model([cex])[0].flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
                 split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
                 sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
@@ -395,6 +421,7 @@ if __name__ == "__main__":
     args = ("data/compression_ground_truth.pth", dynamics_model.input_dim, [1024, 1024, 1024, 1024, 1024], dynamics_model.output_dim)
     kwargs = {'device': torch.device('cpu')}
     large_network_dynamics.torch_params = (large_network_dynamics, args, kwargs)
+    large_network_dynamics.onnx_params = (large_network_dynamics, "data/compression_ground_truth.onnx")
     large_network_dynamics.delta = dynamics_model.delta
     large_network_dynamics.epsilon = dynamics_model.epsilon
     small_network = load_onnx_model("data/compression_compressed.onnx")
