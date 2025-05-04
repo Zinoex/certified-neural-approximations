@@ -3,7 +3,7 @@ import os
 import time
 from grid_neural_abstractions.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
     NonLipschitzVectorField1, NonLipschitzVectorField2
-from grid_neural_abstractions.dynamics import VanDerPolOscillator, Quadcopter, Sine2D, NonlinearOscillator
+from grid_neural_abstractions.dynamics import VanDerPolOscillator, LowThrustSpacecraft, Sine2D, NonlinearOscillator
 
 from grid_neural_abstractions.train_nn import train_nn, save_model
 from grid_neural_abstractions.verify_nn import verify_nn
@@ -14,19 +14,19 @@ REPO_DIR = os.path.dirname(BASE_DIR)
 DATA_DIR = os.path.join(REPO_DIR, "data")
 
 NA_SYSTEMS = [
-    WaterTank,
-    JetEngine,
-    SteamGovernor,
-    Exponential,
-    NonLipschitzVectorField1,
-    NonLipschitzVectorField2,
+    #WaterTank,
+    #JetEngine,
+    #SteamGovernor,
+    #Exponential,
+    #NonLipschitzVectorField1,
+    #NonLipschitzVectorField2,
 ]
 
 NEW_SYSTEMS = [
-    VanDerPolOscillator,
-    Sine2D,
-    NonlinearOscillator,
-    # Quadcopter,
+    #VanDerPolOscillator,
+    #Sine2D,
+    #NonlinearOscillator,
+    LowThrustSpacecraft,
 ]
 
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS
@@ -108,9 +108,9 @@ def verify_64_models(residual=False, leaky_relu=False):
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # train_na_models()
-    # train_64_models()
-    # verify_na_models()
+    #train_na_models()
+    #train_64_models()
+    #verify_na_models()
     verify_64_models()
 
 
