@@ -109,7 +109,7 @@ def main():
     os.makedirs(DATA_DIR, exist_ok=True)
 
     #train_na_models()
-    #train_64_models()
+    train_64_models()
     #verify_na_models()
     verify_64_models()
 

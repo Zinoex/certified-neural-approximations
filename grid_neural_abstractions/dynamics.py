@@ -629,7 +629,7 @@ class LowThrustSpacecraft(DynamicalSystem):
     - Position (r, θ, φ)
     - Velocity (vr, vθ, vφ)
     - Mass (m)
-    - Control inputs (ur, uθ, uφ)
+    - Control inputs (thrust_magnitude, thrust_angle)
     
     The dynamics include gravitational forces and thrust acceleration in spherical coordinates.
     """
@@ -648,7 +648,7 @@ class LowThrustSpacecraft(DynamicalSystem):
         self.mu = mu                # Gravitational parameter
         self.c = c                 # Normalization factor Tmax*ρ0/(m0*V0²)
         
-        self.input_dim = 7  # Position(r, θ) + velocity(vr, vθ) + mass(1) + control(ur, uθ)
+        self.input_dim = 7  # Position(r, θ) + velocity(vr, vθ) + mass(1) + control(thrust_magnitude, thrust_angle)
         self.output_dim = 5  # Derivatives of position(2) + velocity(2) + mass(1)
         
         # Typical domains for each state dimension
@@ -659,16 +659,16 @@ class LowThrustSpacecraft(DynamicalSystem):
             (-5.0, 5.0), (-5.0, 5.0),
             # Mass (delta_m) in kg
             (0.0, 10),
-            # Control inputs (ur, uθ) - normalized thrust direction
-            (-1.0, 1.0), (-1.0, 1.0)
+            # Control inputs (thrust_magnitude, thrust_angle)
+            (0.0, 1.0), (0.0, 2*np.pi)
         ]
         
         self.hidden_sizes = [128, 128]
         self.delta = np.array([
             1, np.pi,      # Position deltas (r, θ)
-            5, 5, # Velocity deltas (vr, vθ)
-            5,                # Mass delta
-            0.5, 0.5          # Control input deltas (ur, uθ)
+            5, 5,          # Velocity deltas (vr, vθ)
+            5,             # Mass delta
+            0.5, np.pi     # Control input deltas (thrust_magnitude, thrust_angle)
         ])
         self.epsilon = 0.01
         self.system_name = "LowThrustSpacecraft"
@@ -684,8 +684,8 @@ class LowThrustSpacecraft(DynamicalSystem):
                 [2] - Radial velocity (vr)
                 [3] - Angular velocity (vθ)
                 [4] - Mass change (delta_m)
-                [5] - Radial control (ur)
-                [6] - Angular control (uθ)
+                [5] - Thrust magnitude
+                [6] - Thrust angle (from radial direction)
             translator: The translator for mathematical operations
             
         Returns:
@@ -697,15 +697,16 @@ class LowThrustSpacecraft(DynamicalSystem):
         v_r = x[2] * 10e-3  # Radial velocity
         v_theta = x[3] * 10e-3     # Angular velocity
         delta_m = x[4]     # Mass decrease due to propellant consumption
-        u_r = x[5]         # Radial control
-        u_theta = x[6]     # Angular control
+        thrust_magnitude = x[5]    # Thrust magnitude (normalized)
+        thrust_angle = x[6]        # Thrust angle
         
         # Compute gravitational force in radial direction (inward)
         # F_g = -μ/r²
         gravity_acc = -self.mu / translator.pow(r, 2)
         
-        # Compute thrust magnitude
-        thrust_magnitude = translator.sqrt(10e-3 + translator.pow(u_r, 2) + translator.pow(u_theta, 2))
+        # Compute thrust direction components from magnitude and angle
+        u_r = thrust_magnitude * translator.cos(thrust_angle)
+        u_theta = thrust_magnitude * translator.sin(thrust_angle)
         
         # Mass decrease due to propellant consumption
         dmass = -self.c * thrust_magnitude / self.v_exhaust
