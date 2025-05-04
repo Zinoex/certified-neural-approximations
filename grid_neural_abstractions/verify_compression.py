@@ -11,7 +11,6 @@ import torch
 from tqdm import tqdm
 from bound_propagation import HyperRectangle, BoundModelFactory, LinearBounds
 
-from maraboupy import Marabou, MarabouCore, MarabouUtils
 import onnxruntime
 from grid_neural_abstractions.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
 from grid_neural_abstractions.dynamics import LorenzAttractor, NNDynamics, Quadcopter
@@ -33,6 +32,7 @@ class CompressionVerificationStrategy(ABC):
 class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy):
 
     def verify(self, large_network_dynamics, small_network, epsilon, precision=1e-6):
+        from maraboupy import Marabou, MarabouCore, MarabouUtils
         joint_network, outputVarsLarge, outputVarsSmall = self.merge_networks(large_network_dynamics.network, small_network)
         inputVars = joint_network.inputVars[0].flatten()
     
@@ -69,6 +69,7 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
             return SampleResultUNSAT(large_network_dynamics.input_domain, [])
 
     def merge_networks(self, large_network, small_network):
+        from maraboupy import Marabou, MarabouCore, MarabouUtils
         """
         Merge two networks into a single network for verification.
         """
@@ -134,7 +135,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         self.bound_network = None
 
     @staticmethod
-    def initialize_pool(large_network_dynamics, onnx_path):
+    def initialize_pool(onnx_path, small_network_onnx_path):
         # large_network_dynamics.torch_network = load_torch_model(*args, **kwargs)
 
         onnx_model = load_onnx_model(onnx_path)
@@ -160,10 +161,11 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         global _LOCAL
         _LOCAL = types.SimpleNamespace()
         _LOCAL.onnx_model = evaluate
+        _LOCAL.small_network = load_onnx_model(small_network_onnx_path)
 
 
-    def verify(self, large_network_dynamics, small_network, precision=1e-6, batch_size=200, plotter=None):
-        self.pool = Pool(self.num_workers, initializer=self.initialize_pool, initargs=large_network_dynamics.onnx_params)
+    def verify(self, large_network_dynamics, small_network_onnx_path, precision=1e-6, batch_size=20, plotter=None):
+        self.pool = Pool(self.num_workers, initializer=self.initialize_pool, initargs=(large_network_dynamics.onnx_path, small_network_onnx_path))
 
         factory = BoundModelFactory()
         self.bound_network = factory.build(large_network_dynamics.network.network)
@@ -186,92 +188,111 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         for sample in samples:
             queue.put(sample)
 
+        awaiting_results = []
+
         agg = None
 
         with tqdm(desc="Overall Progress", smoothing=0.1) as pbar:
-            while not queue.empty():
-                batch = [
-                    queue.get() for _ in range(min(batch_size, queue.qsize()))
-                ]
+            while not queue.empty() or awaiting_results:
+                if not queue.empty() and len(awaiting_results) <= 10:
+                    batch = [
+                        queue.get() for _ in range(min(batch_size, queue.qsize()))
+                    ]
 
-                # Execute the batches
-                results = self.verify_batch(large_network_dynamics, small_network, batch, precision)
+                    # Execute the batches
+                    async_result = self.verify_batch(large_network_dynamics, batch, precision)
+                    awaiting_results.append(async_result)
 
-                for result in results:
-                    if result.issat():
-                        # Sample was succesfully verified, no new samples to process
-                        # Update certified domain size in a thread-safe manner
-                        certified_domain_size += result.lebesguemeasure()
-                        # Update visualization if plotter is provided
-                        if plotter is not None:
-                            plotter.update_figure(result)
+                for async_result in awaiting_results:
+                    if async_result.ready():
+                        results = async_result.get()
+                        awaiting_results.remove(async_result)
 
-                    if result.isunsat():
-                        # Sample was not verified, add to the uncertified domain size
-                        uncertified_domain_size += result.lebesguemeasure()
-                        # Update visualization if plotter is provided
-                        if plotter is not None:
-                            plotter.update_figure(result)
+                        for result in results:
+                            if result.issat():
+                                # Sample was succesfully verified, no new samples to process
+                                # Update certified domain size in a thread-safe manner
+                                certified_domain_size += result.lebesguemeasure()
+                                # Update visualization if plotter is provided
+                                if plotter is not None:
+                                    plotter.update_figure(result)
 
-                    agg = aggregate(agg, result)
+                            if result.isunsat():
+                                # Sample was not verified, add to the uncertified domain size
+                                uncertified_domain_size += result.lebesguemeasure()
+                                # Update visualization if plotter is provided
+                                if plotter is not None:
+                                    plotter.update_figure(result)
 
-                    if result.hasnewsamples():
-                        # Get the new samples
-                        new_samples = result.newsamples()
+                            agg = aggregate(agg, result)
 
-                        # Put the new samples back into the queue
-                        for new_sample in new_samples:
-                            queue.put(new_sample)
+                            if result.hasnewsamples():
+                                # Get the new samples
+                                new_samples = result.newsamples()
 
-                pbar.update(len(results))
-                certified_percentage = (certified_domain_size / total_domain_size) * 100
-                uncertified_percentage = (uncertified_domain_size / total_domain_size) * 100
+                                # Put the new samples back into the queue
+                                for new_sample in new_samples:
+                                    queue.put(new_sample)
 
-                pbar.set_description_str(
-                    f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.4f}%, uncertified: {uncertified_percentage:.4f}%)"
-                )
+                        pbar.update(len(results))
+                        certified_percentage = (certified_domain_size / total_domain_size) * 100
+                        uncertified_percentage = (uncertified_domain_size / total_domain_size) * 100
 
-        return agg
+                        pbar.set_description_str(
+                            f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.4f}%, uncertified: {uncertified_percentage:.4f}%)"
+                        )
 
-    def verify_batch(self, large_network_dynamics, small_network, batch, precision=1e-6):
-        linear_bounds = self.taylor_expansion(large_network_dynamics.network, batch)
+        return agg, certified_percentage, uncertified_percentage
+
+    def verify_batch(self, large_network_dynamics, batch, precision=1e-6):
+        linear_bounds = self.taylor_expansion(large_network_dynamics.network, batch, device=large_network_dynamics.network.device)
 
         A_gap = linear_bounds.upper[0] - linear_bounds.lower[0]
         b_gap = linear_bounds.upper[1] - linear_bounds.lower[1]
         lbp_gap = LinearBounds(linear_bounds.region, None, (A_gap, b_gap))
         interval_gap = lbp_gap.concretize()  # Turn linear bounds into interval bounds
 
-        samples = [(sample, linear_bounds[i], interval_gap.upper[i]) for i, sample in enumerate(batch)]
+        linear_bounds = LinearBounds(
+            HyperRectangle(linear_bounds.region.lower.cpu().numpy(), linear_bounds.region.upper.cpu().numpy()),
+            (linear_bounds.lower[0].cpu().numpy(), linear_bounds.lower[1].cpu().numpy()),
+            (linear_bounds.upper[0].cpu().numpy(), linear_bounds.upper[1].cpu().numpy()),
+        )
 
-        process_sample = partial(self.verify_sample, large_network_dynamics, small_network, precision=precision)
+        max_gap = interval_gap.upper.cpu().numpy()
 
-        results = self.pool.starmap(process_sample, samples)
+        samples = [(sample, linear_bounds[i], max_gap[i]) for i, sample in enumerate(batch)]
+
+        process_sample = partial(self.verify_sample, large_network_dynamics.epsilon, large_network_dynamics.input_dim, precision=precision)
+
+        results = self.pool.starmap_async(process_sample, samples)
         # results = [process_sample(sample, linear_bounds, max_gap) for sample, linear_bounds, max_gap in samples]
 
         return results
 
     @staticmethod
     @torch.no_grad()
-    def verify_sample(large_network_dynamics, small_network, sample: CertificationRegion, linear_bounds, max_gap, precision=1e-6):
+    def verify_sample(epsilon, input_dim, sample: CertificationRegion, linear_bounds, max_gap, precision=1e-6):
+        from maraboupy import Marabou, MarabouCore, MarabouUtils
         start_time = time.time()
+
+        global _LOCAL
+        onnx_model = _LOCAL.onnx_model
+        small_network = _LOCAL.small_network
 
         inputVars = small_network.inputVars[0].flatten()
         outputVars = small_network.outputVars[0].flatten()
         options = Marabou.createOptions(verbosity=0, timeoutInSeconds=5, lpSolver="native")
         _, delta, j = sample  # Unpack the data tuple
-        epsilon = large_network_dynamics.epsilon
-
-        global _LOCAL
-        onnx_model = _LOCAL.onnx_model
+        epsilon = epsilon
 
         def numpy_model(x):
             y = onnx_model([x])[0].flatten()
             return y
 
-        A_lower = linear_bounds.lower[0][j].numpy()
-        b_lower = linear_bounds.lower[1][j].numpy()
-        A_upper = linear_bounds.upper[0][j].numpy()
-        b_upper = linear_bounds.upper[1][j].numpy()
+        A_lower = linear_bounds.lower[0][j]
+        b_lower = linear_bounds.lower[1][j]
+        A_upper = linear_bounds.upper[0][j]
+        b_upper = linear_bounds.upper[1][j]
 
         max_gap = max_gap[j].item()
 
@@ -285,7 +306,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                 return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
 
         # Add input constraints
-        input_dim = large_network_dynamics.input_dim
+        input_dim = input_dim
         region = linear_bounds.region
         for i in range(input_dim):
             small_network.setLowerBound(inputVars[i], region.lower[i].item())
@@ -399,9 +420,9 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         return SampleResultSAT(sample, end_time - start_time)   # No counterexample found, return the original sample
 
     @torch.no_grad()
-    def taylor_expansion(self, network, batch):
-        lower = torch.stack([torch.as_tensor(sample.center - sample.radius, dtype=torch.float32) for sample in batch])
-        upper = torch.stack([torch.as_tensor(sample.center + sample.radius, dtype=torch.float32) for sample in batch])
+    def taylor_expansion(self, network, batch, device=None):
+        lower = torch.stack([torch.as_tensor(sample.center - sample.radius, dtype=torch.float32, device=device) for sample in batch])
+        upper = torch.stack([torch.as_tensor(sample.center + sample.radius, dtype=torch.float32, device=device) for sample in batch])
 
         input_region = HyperRectangle(lower, upper)
         linear_bounds = self.bound_network.crown(input_region)
@@ -418,16 +439,24 @@ if __name__ == "__main__":
                                      hidden_sizes=[1024, 1024, 1024, 1024, 1024],
                                      output_size=dynamics_model.output_dim)
     large_network_dynamics = NNDynamics(large_network, dynamics_model.input_domain)
-    args = ("data/compression_ground_truth.pth", dynamics_model.input_dim, [1024, 1024, 1024, 1024, 1024], dynamics_model.output_dim)
-    kwargs = {'device': torch.device('cpu')}
-    large_network_dynamics.torch_params = (large_network_dynamics, args, kwargs)
-    large_network_dynamics.onnx_params = (large_network_dynamics, "data/compression_ground_truth.onnx")
+    large_network_dynamics.torch_params = ("data/compression_ground_truth.pth", dynamics_model.input_dim, [1024, 1024, 1024, 1024, 1024], dynamics_model.output_dim)
+    large_network_dynamics.onnx_path = "data/compression_ground_truth.onnx"
     large_network_dynamics.delta = dynamics_model.delta
     large_network_dynamics.epsilon = dynamics_model.epsilon
-    small_network = load_onnx_model("data/compression_compressed.onnx")
+    # small_network = load_onnx_model("data/compression_compressed.onnx")
+    small_network = "data/compression_compressed.onnx"
 
     strategy = TaylorMarabouCompressionVerificationStrategy(num_workers=8)
     precision = 1e-6
 
-    result = strategy.verify(large_network_dynamics, small_network, precision)
-    print(result)
+    t1 = time.time()
+    cex_list, certified_percentage, uncertified_percentage = strategy.verify(large_network_dynamics, small_network, precision)
+    t2 = time.time()
+
+    num_cex = len(cex_list) if cex_list else 0
+
+    computation_time = t2 - t1
+
+    print(f"Number of counterexamples found: {num_cex}")
+    print(f"Certified percentage: {certified_percentage}%, uncertified percentage: {uncertified_percentage}%, computation time: {computation_time:.2f} seconds")
+    print("Finished")
