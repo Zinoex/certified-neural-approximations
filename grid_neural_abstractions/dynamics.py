@@ -211,11 +211,12 @@ class Quadcopter(DynamicalSystem):
         
         self.hidden_sizes = [128, 128]
         self.epsilon = 0.15
-        self.system_name = "QuadcopterFull"
+        self.system_name = "Quadcopter"
+        # Used https://andrew.gibiansky.com/blog/physics/quadcopter-dynamics/
 
     def compute_dynamics(self, x, translator):
         """
-        Compute the quadcopter dynamics based on the full mathematical model.
+        Compute the quadcopter dynamics.
         
         Args:
             x: Input tensor with shape [10, batch_size]
@@ -618,6 +619,120 @@ class VortexShedding4D(DynamicalSystem):
         )
         
         return translator.stack([dx1, dx2, dx3, dx4])
+
+
+class LowThrustSpacecraft(DynamicalSystem):
+    """
+    A class representing the dynamics of a spacecraft with low-thrust propulsion in spherical coordinates.
+    
+    The state vector includes:
+    - Position (r, θ, φ)
+    - Velocity (vr, vθ, vφ)
+    - Mass (m)
+    - Control inputs (ur, uθ, uφ)
+    
+    The dynamics include gravitational forces and thrust acceleration in spherical coordinates.
+    """
+
+    def __init__(
+        self,
+        initial_mass = 750.0,  # kg
+        exhaust_velocity = 40,  # km/s
+        mu = 3.98600 * 10e5,  # Gravitational parameter for Earth (km^3/s^2)
+        c = 1.0  # Normalization factor Tmax*ρ0/(m0*V0²)
+    ):
+        super().__init__()
+        # Parameters for the spacecraft model
+        self.m0 = initial_mass       # Initial mass of the spacecraft
+        self.v_exhaust = exhaust_velocity  # Exhaust velocity
+        self.mu = mu                # Gravitational parameter
+        self.c = c                 # Normalization factor Tmax*ρ0/(m0*V0²)
+        
+        self.input_dim = 7  # Position(r, θ) + velocity(vr, vθ) + mass(1) + control(ur, uθ)
+        self.output_dim = 5  # Derivatives of position(2) + velocity(2) + mass(1)
+        
+        # Typical domains for each state dimension
+        self.input_domain = [
+            # Position (r, θ) in 1000 km and radians
+            (6.3780, 10.0000), (0.0, 2*np.pi), 
+            # Velocity (vr, vθ) in m/s
+            (-5.0, 5.0), (-5.0, 5.0),
+            # Mass (delta_m) in kg
+            (0.0, 10),
+            # Control inputs (ur, uθ) - normalized thrust direction
+            (-1.0, 1.0), (-1.0, 1.0)
+        ]
+        
+        self.hidden_sizes = [128, 128]
+        self.delta = np.array([
+            1, np.pi,      # Position deltas (r, θ)
+            5, 5, # Velocity deltas (vr, vθ)
+            5,                # Mass delta
+            0.5, 0.5          # Control input deltas (ur, uθ)
+        ])
+        self.epsilon = 0.01
+        self.system_name = "LowThrustSpacecraft"
+
+    def compute_dynamics(self, x, translator):
+        """
+        Compute the spacecraft dynamics with low thrust in spherical coordinates.
+        
+        Args:
+            x: Input tensor with shape [7, batch_size]
+                [0] - Radial distance (r)
+                [1] - Azimuthal angle (θ)
+                [2] - Radial velocity (vr)
+                [3] - Angular velocity (vθ)
+                [4] - Mass change (delta_m)
+                [5] - Radial control (ur)
+                [6] - Angular control (uθ)
+            translator: The translator for mathematical operations
+            
+        Returns:
+            Tensor of shape [5, batch_size] with the derivatives
+        """
+        # Extract state variables
+        r = x[0]*1000      # Radial distance
+        theta = x[1]       # Azimuthal angle
+        v_r = x[2] * 10e-3  # Radial velocity
+        v_theta = x[3] * 10e-3     # Angular velocity
+        delta_m = x[4]     # Mass decrease due to propellant consumption
+        u_r = x[5]         # Radial control
+        u_theta = x[6]     # Angular control
+        
+        # Compute gravitational force in radial direction (inward)
+        # F_g = -μ/r²
+        gravity_acc = -self.mu / translator.pow(r, 2)
+        
+        # Compute thrust magnitude
+        thrust_magnitude = translator.sqrt(10e-3 + translator.pow(u_r, 2) + translator.pow(u_theta, 2))
+        
+        # Mass decrease due to propellant consumption
+        dmass = -self.c * thrust_magnitude / self.v_exhaust
+        
+        # Thrust acceleration terms with normalization factor
+        mass_factor = self.c / (self.m0 + delta_m)
+        thrust_acc_r = u_r * mass_factor
+        thrust_acc_theta = u_theta * mass_factor
+        
+        # Position derivatives
+        dr = v_r
+        dtheta = v_theta / r  # Angular velocity / radius
+        
+        # Velocity derivatives in spherical coordinates
+        # dvr = g_r + v_θ²/r + thrust_r
+        # dvθ = -v_r*v_θ/r + thrust_θ
+        dv_r = gravity_acc + translator.pow(v_theta, 2) / r + thrust_acc_r
+        dv_theta = -v_r * v_theta / r + thrust_acc_theta
+        
+        # Stack all derivatives
+        derivatives = translator.stack([
+            dr, dtheta,        # Position derivatives
+            dv_r, dv_theta,    # Velocity derivatives
+            dmass              # Mass derivative
+        ])
+        
+        return derivatives
 
 
 class LorenzAttractor(DynamicalSystem):
