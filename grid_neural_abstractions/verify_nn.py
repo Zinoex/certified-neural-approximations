@@ -1,27 +1,24 @@
 from functools import partial
-
-from grid_neural_abstractions.train_nn import load_onnx_model
 from grid_neural_abstractions.executors import (
     MultiprocessExecutor,
     SinglethreadExecutor,
 )
-
 from grid_neural_abstractions.verification import MarabouTaylorStrategy
 from grid_neural_abstractions.certification_results import CertificationRegion
 
 from grid_neural_abstractions.generate_data import generate_grid
 
-
-
-def onnx_input_shape(onnx_path):
+def load_onnx(onnx_path):
     """
     Get the input shape of the ONNX model.
     """
     
-    from maraboupy import Marabou
+    from maraboupy import Marabou, MarabouUtils, MarabouCore
     network = Marabou.read_onnx(onnx_path)
+    equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
+    equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
     inputVars = network.inputVars
-    return inputVars[0].shape[1:]
+    return inputVars[0].shape[1:], network, (equation_GE, equation_LE)
 
 
 def aggregate(agg, result):
@@ -35,17 +32,16 @@ def aggregate(agg, result):
 
 
 def verify_nn(
-    onnx_path, dynamics_model, num_workers=8, visualize=True
+    onnx_path, dynamics_model, num_workers=16, visualize=True
 ):
     strategy = MarabouTaylorStrategy()
 
     input_dim = dynamics_model.input_dim
-    onnx_input_dim = onnx_input_shape(onnx_path)
+    onnx_input_dim, network, equations = load_onnx(onnx_path)
     assert len(onnx_input_dim) == 1, f"Only 1D input dims are supported, was {len(onnx_input_dim)}"
     assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
 
-    network = load_onnx_model(onnx_path)
-    partial_process_sample = partial(strategy.verify, network, dynamics_model, epsilon=dynamics_model.epsilon)
+    partial_process_sample = partial(strategy.verify, network, equations, dynamics_model, epsilon=dynamics_model.epsilon)
 
     X_train, _ = generate_grid(input_dim, dynamics_model.input_domain, delta=dynamics_model.delta)
     output_dim = dynamics_model.output_dim

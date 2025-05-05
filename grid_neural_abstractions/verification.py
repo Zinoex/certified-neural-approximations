@@ -4,7 +4,6 @@ import time
 from grid_neural_abstractions.translators.bound_propagation_translator import BoundPropagationTranslator
 from bound_propagation import LinearBounds
 import numpy as np
-from maraboupy import MarabouCore, MarabouUtils
 
 from grid_neural_abstractions.taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
 from grid_neural_abstractions.certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
@@ -61,9 +60,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
         prepare_taylor_expansion(dynamics.input_dim)
 
     @staticmethod
-    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6, max_timeout=30):
+    def verify(network, equations, dynamics, data: CertificationRegion, epsilon, precision=1e-6, max_timeout=30):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
+        equation_GE, equation_LE = equations
         from maraboupy import Marabou        
 
         sample, delta, j = data  # Unpack the data tuple
@@ -71,15 +71,20 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Run the first-order Taylor expansion twice to not count the precompilation time
         # as part of the verification time (the first run is for precompilation).
         # This is a bit of a hack, but it works.
-        first_order_certified_taylor_expansion(
-            dynamics, sample, delta
-        )
+        try:
+            first_order_certified_taylor_expansion(
+                dynamics, sample, delta
+            )
 
-        start_time = time.time()
+            start_time = time.time()
 
-        taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
-            dynamics, sample, delta
-        )
+            taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
+                dynamics, sample, delta
+            )
+        except Exception as e:
+            print(f"Error in first_order_certified_taylor_expansion: {e}")
+            print(f"Sample: {sample}")
+            return SampleResultMaybe(data, 0, [data])
 
         # Unpack the Taylor expansion components
         # taylor_pol_lower <-- (f(c), Df(c), R_min)
@@ -152,7 +157,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         network.additionalEquList.clear()
 
         # x df_c - nn_output >= epsilon + c df_c - f(c) - r_upper
-        equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
+        equation_GE.addendList.clear()
         for i, inputVar in enumerate(inputVars):
             equation_GE.addAddend(A_upper[i], inputVar)
         equation_GE.addAddend(-1, outputVar)
@@ -201,6 +206,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
         # x df_c - nn_output <= -epsilon + c df_c - f(c) - r_lower
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
+        equation_LE.addendList.clear()
         for i, inputVar in enumerate(inputVars):
             # j is the output dimension, i is the input dimension, thus df_c[j, i] is the partial derivative of the j-th output with respect to the i-th input
             equation_LE.addAddend(A_lower[i], inputVar)
