@@ -61,26 +61,31 @@ class MarabouTaylorStrategy(VerificationStrategy):
         prepare_taylor_expansion(dynamics.input_dim)
 
     @staticmethod
-    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-8):
+    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6, max_timeout=30):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
+
         from maraboupy import Marabou
-        options = Marabou.createOptions(verbosity=0, timeoutInSeconds=2, lpSolver="native")
 
         sample, delta, j = data  # Unpack the data tuple
 
         # Run the first-order Taylor expansion twice to not count the precompilation time
         # as part of the verification time (the first run is for precompilation).
         # This is a bit of a hack, but it works.
-        first_order_certified_taylor_expansion(
-            dynamics, sample, delta
-        )
+        try:
+            first_order_certified_taylor_expansion(
+                dynamics, sample, delta
+            )
 
-        start_time = time.time()
+            start_time = time.time()
 
-        taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
-            dynamics, sample, delta
-        )
+            taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
+                dynamics, sample, delta
+            )
+        except Exception as e:
+            print(f"Error in first_order_certified_taylor_expansion: {e}")
+            print(f"Sample: {sample}")
+            return SampleResultMaybe(data, 0, [data])
 
         # Unpack the Taylor expansion components
         # taylor_pol_lower <-- (f(c), Df(c), R_min)
@@ -129,11 +134,15 @@ class MarabouTaylorStrategy(VerificationStrategy):
             A_upper = A_upper[j].numpy()
             b_upper = b_upper[j].numpy()
 
+        
+        # Setup Marabou options using a dynamic timeout based on the size of the region
+        timeout = min(120, max(1, np.log((min(delta)))/np.log(min(data.min_radius))*max_timeout))
+        options = Marabou.createOptions(verbosity=0, timeoutInSeconds=int(timeout), lpSolver="native")
+
         # Check if we need to split based on remainder bounds
         if max_gap > epsilon:
-            # Try and see if splitting the input_dimension is helpful
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
-            if split_dim is not None:
+            if delta[split_dim] > data.min_radius[split_dim]:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 end_time = time.time()
                 return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
@@ -144,7 +153,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             network.setUpperBound(inputVar, sample[i] + delta[i])
 
         outputVar = outputVars[j]
-
+        
         # Reset the query
         network.additionalEquList.clear()
 
@@ -155,20 +164,19 @@ class MarabouTaylorStrategy(VerificationStrategy):
         equation_GE.addAddend(-1, outputVar)
         equation_GE.setScalar(epsilon - b_upper)
         network.addEquation(equation_GE, isProperty=True)
-
+        
         # Find a counterexample for upper bound
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
-            if split_dim is not None:
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                end_time = time.time()
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+            end_time = time.time()
+            if split_dim is None:
+                # Min split radius is reached
+                return SampleResultUNSAT(data, end_time - start_time, [cex])
             else:
-                print("No split dimension found, returning UNSAT")
-                end_time = time.time()
-                return SampleResultUNSAT(data, end_time - start_time, [])
-
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+            
         if res == "sat":
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
@@ -189,12 +197,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
-                if split_dim is not None:
-                    sample_left, sample_right = split_sample(data, delta, split_dim)
-                    end_time = time.time()
-                    return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
-                else:
-                    print("No split dimension found, returning UNSAT")
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                end_time = time.time()
+                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
             #else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
@@ -217,14 +222,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
-            if split_dim is not None:
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                end_time = time.time()
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
-            else:
-                print("No split dimension found, returning UNSAT")
-                end_time = time.time()
-                return SampleResultUNSAT(data, end_time - start_time, [])
+            sample_left, sample_right = split_sample(data, delta, split_dim)
+            end_time = time.time()
+            return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
 
         if res == "sat":
             cex = np.empty(len(inputVars))
@@ -244,12 +244,9 @@ class MarabouTaylorStrategy(VerificationStrategy):
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
-                if split_dim is not None:
-                    sample_left, sample_right = split_sample(data, delta, split_dim)
-                    end_time = time.time()
-                    return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
-                else:
-                    print("No split dimension found, returning UNSAT")
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                end_time = time.time()
+                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
             #else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
