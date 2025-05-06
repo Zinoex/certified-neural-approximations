@@ -14,11 +14,9 @@ def load_onnx(onnx_path):
     """
     
     from maraboupy import Marabou, MarabouUtils, MarabouCore
+    
     network = Marabou.read_onnx(onnx_path)
-    equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
-    equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
-    inputVars = network.inputVars
-    return inputVars[0].shape[1:], network, (equation_GE, equation_LE)
+    return network
 
 
 def aggregate(agg, result):
@@ -37,11 +35,13 @@ def verify_nn(
     strategy = MarabouTaylorStrategy()
 
     input_dim = dynamics_model.input_dim
-    onnx_input_dim, network, equations = load_onnx(onnx_path)
+    network = load_onnx(onnx_path)
+
+    onnx_input_dim = network.inputVars[0].shape[1:]
     assert len(onnx_input_dim) == 1, f"Only 1D input dims are supported, was {len(onnx_input_dim)}"
     assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
 
-    partial_process_sample = partial(strategy.verify, network, equations, dynamics_model, epsilon=dynamics_model.epsilon)
+    partial_process_sample = partial(strategy.verify, network, dynamics_model, epsilon=dynamics_model.epsilon)
 
     X_train, _ = generate_grid(input_dim, dynamics_model.input_domain, delta=dynamics_model.delta)
     output_dim = dynamics_model.output_dim

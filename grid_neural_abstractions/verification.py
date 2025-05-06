@@ -4,6 +4,7 @@ import time
 from grid_neural_abstractions.translators.bound_propagation_translator import BoundPropagationTranslator
 from bound_propagation import LinearBounds
 import numpy as np
+from maraboupy import MarabouCore, MarabouUtils
 
 from grid_neural_abstractions.taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
 from grid_neural_abstractions.certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
@@ -60,11 +61,11 @@ class MarabouTaylorStrategy(VerificationStrategy):
         prepare_taylor_expansion(dynamics.input_dim)
 
     @staticmethod
-    def verify(network, equations, dynamics, data: CertificationRegion, epsilon, precision=1e-6, max_timeout=30):
+    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6, max_timeout=30):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
-        equation_GE, equation_LE = equations
-        from maraboupy import Marabou        
+
+        from maraboupy import Marabou
 
         sample, delta, j = data  # Unpack the data tuple
 
@@ -152,18 +153,18 @@ class MarabouTaylorStrategy(VerificationStrategy):
             network.setUpperBound(inputVar, sample[i] + delta[i])
 
         outputVar = outputVars[j]
-
+        
         # Reset the query
         network.additionalEquList.clear()
 
         # x df_c - nn_output >= epsilon + c df_c - f(c) - r_upper
-        equation_GE.addendList.clear()
+        equation_GE = MarabouUtils.Equation(MarabouCore.Equation.GE)
         for i, inputVar in enumerate(inputVars):
             equation_GE.addAddend(A_upper[i], inputVar)
         equation_GE.addAddend(-1, outputVar)
         equation_GE.setScalar(epsilon - b_upper)
         network.addEquation(equation_GE, isProperty=True)
-
+        
         # Find a counterexample for upper bound
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():

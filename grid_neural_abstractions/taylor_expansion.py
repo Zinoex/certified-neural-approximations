@@ -40,28 +40,32 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     dom = jl.IntervalBox(low, high)
 
     input_dim = dynamics.input_dim
-    x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
-        order, expansion_point, dom, input_dim
-    )
+    try:
+        x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
+            order, expansion_point, dom, input_dim
+        )
 
-    y = dynamics.compute_dynamics(x, translator)
+        y = dynamics.compute_dynamics(x, translator)
 
-    # constant term (select zeroth order, first and only coefficient)
-    a = jl.broadcast(jl.seval("yi -> yi[0][1]"), y)
-    a_lower = jl.broadcast(jl.inf, a)
-    a_upper = jl.broadcast(jl.sup, a)
+        # constant term (select zeroth order, first and only coefficient)
+        a = jl.broadcast(jl.seval("yi -> yi[0][1]"), y)
+        a_lower = jl.broadcast(jl.inf, a)
+        a_upper = jl.broadcast(jl.sup, a)
 
-    # linear term (select first order, all coefficients)
-    b = jl.broadcast(jl.seval("yi -> yi[1][:]"), y)
-    b = jl.broadcast(jl.transpose, b)
-    b = jl.reduce(jl.vcat, b)
-    b_lower = jl.broadcast(jl.inf, b)
-    b_upper = jl.broadcast(jl.sup, b)
+        # linear term (select first order, all coefficients)
+        b = jl.broadcast(jl.seval("yi -> yi[1][:]"), y)
+        b = jl.broadcast(jl.transpose, b)
+        b = jl.reduce(jl.vcat, b)
+        b_lower = jl.broadcast(jl.inf, b)
+        b_upper = jl.broadcast(jl.sup, b)
 
-    # remainder
-    r = jl.broadcast(jl.remainder, y)
-    r_lower = jl.broadcast(jl.inf, r)
-    r_upper = jl.broadcast(jl.sup, r)
+        # remainder
+        r = jl.broadcast(jl.remainder, y)
+        r_lower = jl.broadcast(jl.inf, r)
+        r_upper = jl.broadcast(jl.sup, r)
+    finally:
+        # Force Julia's garbage collector to run
+        jl.seval("GC.gc(true)")
 
     if input_dim>1:
         a_lower = a_lower.to_numpy()
