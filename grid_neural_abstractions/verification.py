@@ -207,7 +207,6 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
         # x df_c - nn_output <= -epsilon + c df_c - f(c) - r_lower
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
-        equation_LE.addendList.clear()
         for i, inputVar in enumerate(inputVars):
             # j is the output dimension, i is the input dimension, thus df_c[j, i] is the partial derivative of the j-th output with respect to the i-th input
             equation_LE.addAddend(A_lower[i], inputVar)

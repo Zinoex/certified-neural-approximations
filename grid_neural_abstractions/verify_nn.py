@@ -13,7 +13,7 @@ def load_onnx(onnx_path):
     Get the input shape of the ONNX model.
     """
     
-    from maraboupy import Marabou, MarabouUtils, MarabouCore
+    from maraboupy import Marabou
     
     network = Marabou.read_onnx(onnx_path)
     return network
