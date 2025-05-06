@@ -1,120 +1,120 @@
-import torch
-
 class TorchTranslator:
     def __init__(self, device=None):
         self.device = device
+        import torch as torch
+        self.torch = torch
 
     def matrix_vector(self, a, b):
         """
         Matrix-vector multiplication
 
-        :param a: torch.tensor of floats [n, m]
-        :param b: torch.tensor of floats [m]
+        :param a: self.torch.tensor of floats [n, m]
+        :param b: self.torch.tensor of floats [m]
 
-        :return: torch.tensor of floats [n]
+        :return: self.torch.tensor of floats [n]
         """
-        return torch.matmul(a, b.unsqueeze(1)).squeeze(1)
+        return self.torch.matmul(a, b.unsqueeze(1)).squeeze(1)
     
     def sin(self, a):
         """
         Element-wise sine
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
-        :return: torch.tensor of floats
+        :return: self.torch.tensor of floats
         """
-        return torch.sin(a)
+        return self.torch.sin(a)
     
     def cos(self, a):
         """
         Element-wise cosine
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
-        :return: torch.tensor of floats
+        :return: self.torch.tensor of floats
         """
-        return torch.cos(a)
+        return self.torch.cos(a)
     
     def tan(self, a):
         """
         Element-wise tangent
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
-        :return: torch.tensor of floats
+        :return: self.torch.tensor of floats
         """
-        return torch.tan(a)
+        return self.torch.tan(a)
     
     def exp(self, a):
         """
         Element-wise exponential
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
-        :return: torch.tensor of floats
+        :return: self.torch.tensor of floats
         """
-        return torch.exp(a)
+        return self.torch.exp(a)
     
     def log(self, a):
         """
         Element-wise logarithm
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
-        :return: torch.tensor of floats
+        :return: self.torch.tensor of floats
         """
-        return torch.log(a)
+        return self.torch.log(a)
 
     def sqrt(self, a):
         """
         Element-wise square root
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
-        :return: torch.tensor of floats
+        :return: self.torch.tensor of floats
         """
-        return torch.sqrt(a)
+        return self.torch.sqrt(a)
     
     def cbrt(self, a):
         """
         Element-wise cube root
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
-        :return: torch.tensor of floats
+        :return: self.torch.tensor of floats
         """
-        return torch.pow(a, 1/3)
+        return self.torch.pow(a, 1/3)
 
     def pow(self, a, b):
         """
         Element-wise power
 
-        :param a: torch.tensor of floats
-        :param b: torch.tensor of floats
+        :param a: self.torch.tensor of floats
+        :param b: self.torch.tensor of floats
 
-        :return: torch.tensor of floats
+        :return: self.torch.tensor of floats
         """
-        return torch.pow(a, b)
+        return self.torch.pow(a, b)
 
     def min(self, a):
         """
         Return the minimum value of a torch tensor
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
         :return: float
         """
-        return torch.min(a)
+        return self.torch.min(a)
 
     def max(self, a):
         """
         Return the maximum value of a torch tensor
 
-        :param a: torch.tensor of floats
+        :param a: self.torch.tensor of floats
 
         :return: float
         """
-        return torch.max(a)
+        return self.torch.max(a)
 
     def stack(self, a):
         """
@@ -122,9 +122,9 @@ class TorchTranslator:
 
         :param a: list of torch tensors
 
-        :return: torch.tensor
+        :return: self.torch.tensor
         """
-        return torch.stack(a)
+        return self.torch.stack(a)
 
     def hstack(self, a):
         """
@@ -132,15 +132,15 @@ class TorchTranslator:
 
         :param a: list of torch tensors
 
-        :return: torch.tensor
+        :return: self.torch.tensor
         """
-        return torch.stack(a, dim=1)
+        return self.torch.stack(a, dim=1)
 
     def to_numpy(self, a):
         """
         Convert a tensor to a numpy array
 
-        :param a: torch.tensor
+        :param a: self.torch.tensor
 
         :return: np.array
         """
@@ -152,6 +152,6 @@ class TorchTranslator:
 
         :param a: np.array
 
-        :return: torch.tensor
+        :return: self.torch.tensor
         """
-        return torch.as_tensor(a, dtype=torch.float32, device=self.device)
+        return self.torch.as_tensor(a, dtype=self.torch.float32, device=self.device)

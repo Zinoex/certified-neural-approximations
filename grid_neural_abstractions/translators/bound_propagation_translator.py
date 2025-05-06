@@ -1,9 +1,6 @@
-from torch import nn
-import bound_propagation
-import torch
-
-
 def Constant(a):
+    import torch
+    import bound_propagation
     return bound_propagation.FixedLinear(
         torch.zeros(a.shape[0], a.shape[0]),
         a,
@@ -12,6 +9,7 @@ def Constant(a):
 
 class WrappedBPOperation:
     def __init__(self, op, x=None):
+        from torch import nn
         if isinstance(x, WrappedBPOperation):
             op = nn.Sequential(
                 x.op,
@@ -19,13 +17,16 @@ class WrappedBPOperation:
             )
 
         self.op = op
+        import bound_propagation as bp
+        self.bp = bp
 
     def __add__(self, other):
         if isinstance(other, WrappedBPOperation):
             return WrappedBPOperation(
-                bound_propagation.Add(self.op, other.op),
+                self.bp.Add(self.op, other.op),
             )
         else:
+            import torch
             if torch.is_tensor(other):
                 assert other.shape == (self.op.output_dim,)
             elif isinstance(other, (int, float)):
@@ -39,7 +40,7 @@ class WrappedBPOperation:
                 raise ValueError("Unsupported type for addition")
 
             return WrappedBPOperation(
-                bound_propagation.Add(self.op, Constant(other))
+                self.bp.Add(self.op, Constant(other))
             )
 
     def __radd__(self, other):
@@ -48,9 +49,10 @@ class WrappedBPOperation:
     def __sub__(self, other):
         if isinstance(other, WrappedBPOperation):
             return WrappedBPOperation(
-                bound_propagation.Sub(self.op, other.op),
+                self.bp.Sub(self.op, other.op),
             )
         else:
+            import torch
             if torch.is_tensor(other):
                 assert other.shape == (self.op.output_dim,)
             elif isinstance(other, (int, float)):
@@ -64,15 +66,16 @@ class WrappedBPOperation:
                 raise ValueError("Unsupported type for subtraction")
 
             return WrappedBPOperation(
-                bound_propagation.Sub(self.op, Constant(other))
+                self.bp.Sub(self.op, Constant(other))
             )
 
     def __rsub__(self, other):
         if isinstance(other, WrappedBPOperation):
             return WrappedBPOperation(
-                bound_propagation.Sub(other.op, self.op),
+                self.bp.Sub(other.op, self.op),
             )
         else:
+            import torch
             if torch.is_tensor(other):
                 assert other.shape == (self.op.output_dim,)
             elif isinstance(other, (int, float)):
@@ -86,12 +89,13 @@ class WrappedBPOperation:
                 raise ValueError("Unsupported type for subtraction")
 
             return WrappedBPOperation(
-                bound_propagation.Sub(Constant(other), self.op)
+                self.bp.Sub(Constant(other), self.op)
             )
 
 
 class WrappedBPVector(WrappedBPOperation):
     def __init__(self, length):
+        from torch import nn
         super().__init__(nn.Identity())
         self.length = length
 
@@ -109,7 +113,7 @@ class WrappedBPVector(WrappedBPOperation):
             raise ValueError("Unsupported type for indexing")
 
         return WrappedBPOperation(
-            bound_propagation.Select(item)
+            self.bp.Select(item)
         )
 
 
@@ -134,7 +138,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats [n]
         """
-        return WrappedBPOperation(bound_propagation.FixedLinear(a, None), b)
+        return WrappedBPOperation(self.bp.FixedLinear(a, None), b)
 
     def sin(self, a):
         """
@@ -144,7 +148,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Sin(), a)
+        return WrappedBPOperation(self.bp.Sin(), a)
 
     def cos(self, a):
         """
@@ -154,7 +158,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Cos(), a)
+        return WrappedBPOperation(self.bp.Cos(), a)
     
     def exp(self, a):
         """
@@ -164,7 +168,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Exp(), a)
+        return WrappedBPOperation(self.bp.Exp(), a)
     
     def log(self, a):
         """
@@ -174,7 +178,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Log(), a)
+        return WrappedBPOperation(self.bp.Log(), a)
 
     def sqrt(self, a):
         """
@@ -184,7 +188,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Sqrt(), a)
+        return WrappedBPOperation(self.bp.Sqrt(), a)
 
     def cbrt(self, a):
         """
@@ -194,7 +198,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Cbrt(), a)
+        return WrappedBPOperation(self.bp.Cbrt(), a)
 
     def pow(self, a, b):
         """
@@ -205,7 +209,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Pow(b), a)  # a^b
+        return WrappedBPOperation(self.bp.Pow(b), a)  # a^b
 
     def stack(self, xs):
         """
@@ -215,7 +219,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor
         """
-        return WrappedBPOperation(bound_propagation.Parallel(*[bound_propgation_unwrap(x) for x in xs]))
+        return WrappedBPOperation(self.bp.Parallel(*[bound_propgation_unwrap(x) for x in xs]))
 
     def to_format(self, x):
         """
@@ -229,20 +233,21 @@ class BoundPropagationTranslator:
         Convert a BoundPropagation object to a numpy array
         :param x: BoundPropagation object
         """
+        import torch
         if not torch.is_tensor(x):
             x = torch.as_tensor(x, dtype=torch.float32)
 
         if not torch.is_tensor(epsilon):
             epsilon = torch.as_tensor(epsilon, dtype=torch.float32)
 
-        input_bounds = bound_propagation.HyperRectangle.from_eps(x.unsqueeze(0), epsilon.unsqueeze(0))
+        input_bounds = self.bp.HyperRectangle.from_eps(x.unsqueeze(0), epsilon.unsqueeze(0))
 
-        factory = bound_propagation.BoundModelFactory()
+        factory = self.bp.BoundModelFactory()
         module = wrapped_op.op
         bound_module = factory.build(module)
 
         linear_bounds = bound_module.crown(input_bounds)
-        linear_bounds = bound_propagation.LinearBounds(linear_bounds.region, 
+        linear_bounds = self.bp.LinearBounds(linear_bounds.region, 
                                      (linear_bounds.lower[0][0], linear_bounds.lower[1][0]),
                                      (linear_bounds.upper[0][0], linear_bounds.upper[1][0]))
 

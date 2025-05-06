@@ -14,7 +14,8 @@ from bound_propagation import HyperRectangle, BoundModelFactory, LinearBounds
 from maraboupy import Marabou, MarabouCore, MarabouUtils
 import onnxruntime
 from grid_neural_abstractions.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
-from grid_neural_abstractions.dynamics import LorenzAttractor, NNDynamics, Quadcopter
+from grid_neural_abstractions.dynamics import LorenzAttractor
+from grid_neural_abstractions.nn_dynamics import NNDynamics
 from grid_neural_abstractions.train_nn import load_onnx_model, load_torch_model
 from grid_neural_abstractions.verification import mean_linear_bound, split_sample
 from grid_neural_abstractions.verify_nn import aggregate

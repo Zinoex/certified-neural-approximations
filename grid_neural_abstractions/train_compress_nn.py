@@ -1,5 +1,6 @@
 import numpy as np
-from grid_neural_abstractions.dynamics import LorenzAttractor, NNDynamics
+from grid_neural_abstractions.dynamics import LorenzAttractor
+from grid_neural_abstractions.nn_dynamics import NNDynamics
 from grid_neural_abstractions.generate_data import generate_data
 from grid_neural_abstractions.train_nn import SimpleNN, load_torch_model, train_nn, save_model
 

@@ -1,11 +1,8 @@
-
 import os
 import time
 from grid_neural_abstractions.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
     NonLipschitzVectorField1, NonLipschitzVectorField2
 from grid_neural_abstractions.dynamics import VanDerPolOscillator, LowThrustSpacecraft, Sine2D, NonlinearOscillator
-
-from grid_neural_abstractions.train_nn import train_nn, save_model
 from grid_neural_abstractions.verify_nn import verify_nn
 
 
@@ -32,6 +29,7 @@ NEW_SYSTEMS = [
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS
 
 def train_na_models(leaky_relu=False):
+    from grid_neural_abstractions.train_nn import train_nn, save_model
     leaky_relu_path = 'leaky_relu' if leaky_relu else ''
 
     for dynamics_cls in NA_SYSTEMS:
@@ -47,6 +45,7 @@ def train_na_models(leaky_relu=False):
 
 
 def train_64_models(residual=False, leaky_relu=False):
+    from grid_neural_abstractions.train_nn import train_nn, save_model
     residual_path = '_residual' if residual else ''
     leaky_relu_path = 'leaky_relu' if leaky_relu else ''
 
@@ -109,7 +108,7 @@ def main():
     os.makedirs(DATA_DIR, exist_ok=True)
 
     #train_na_models()
-    train_64_models()
+    #train_64_models()
     #verify_na_models()
     verify_64_models()
 

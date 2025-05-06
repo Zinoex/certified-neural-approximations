@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 import time
 from grid_neural_abstractions.translators.bound_propagation_translator import BoundPropagationTranslator
-from bound_propagation import LinearBounds
 import numpy as np
 from maraboupy import MarabouCore, MarabouUtils
 
@@ -109,6 +108,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Then use bound_propagation to get linear bounds
         if (not np.isfinite(A_upper).all()) or (not np.isfinite(b_upper).all()) or \
            (not np.isfinite(A_lower).all()) or (not np.isfinite(b_lower).all()):
+            from bound_propagation import LinearBounds
             translator = BoundPropagationTranslator()
             x = translator.to_format(sample)
             y = dynamics.compute_dynamics(x, translator)

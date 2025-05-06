@@ -1,6 +1,5 @@
 from .translators.julia_translator import JuliaTranslator
 import numpy as np
-import torch
 
 jl = None
 
@@ -34,6 +33,7 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     order = 1
 
     if not isinstance(expansion_point, np.ndarray):
+        import torch
         expansion_point = expansion_point.to(torch.float64).numpy()
     
     low, high = expansion_point - delta, expansion_point + delta

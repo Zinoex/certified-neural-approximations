@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 
 
 def generate_grid(input_size, input_domain, delta=0.01, batch_size=256, dynamics_model=None):
@@ -68,7 +67,7 @@ def generate_data(input_size, input_domain, delta=0.01, batch_size=256, dynamics
         X_train: Input data with shape [input_dim, batch_size]
         y_train: Output data with shape [input_dim, batch_size]
     """
-    
+    import torch
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
