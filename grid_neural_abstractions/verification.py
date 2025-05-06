@@ -169,10 +169,14 @@ class MarabouTaylorStrategy(VerificationStrategy):
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
-            sample_left, sample_right = split_sample(data, delta, split_dim)
             end_time = time.time()
-            return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
-
+            if split_dim is None:
+                # Min split radius is reached
+                return SampleResultUNSAT(data, end_time - start_time, [cex])
+            else:
+                sample_left, sample_right = split_sample(data, delta, split_dim)
+                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+            
         if res == "sat":
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):

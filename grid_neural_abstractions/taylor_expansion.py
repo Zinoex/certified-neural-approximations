@@ -1,8 +1,10 @@
 from .translators.julia_translator import JuliaTranslator
 import numpy as np
 import torch
+import time
 
 jl = None
+last_gc_time = 0  # Track when garbage collection was last performed
 
 def check_jl_initialized():
     global jl
@@ -12,6 +14,15 @@ def check_jl_initialized():
         jl = Main
         jl.seval("using TaylorModels")
 
+def run_julia_gc():
+    """Run Julia's garbage collector if enough time has passed since last collection"""
+    global last_gc_time
+    current_time = time.time()
+    collection_interval = 30  # seconds
+    # Only run GC every n seconds
+    if current_time - last_gc_time > collection_interval:
+        jl.seval("GC.gc(true)")
+        last_gc_time = current_time
 
 def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     """
@@ -40,32 +51,36 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     dom = jl.IntervalBox(low, high)
 
     input_dim = dynamics.input_dim
-    try:
-        x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
-            order, expansion_point, dom, input_dim
-        )
+    
+    # Initialize variables with default values to ensure they're always defined
+    a_lower = a_upper = b_lower = b_upper = r_lower = r_upper = None
+    
+    # Create Taylor models
+    x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
+        order, expansion_point, dom, input_dim
+    )
 
-        y = dynamics.compute_dynamics(x, translator)
+    y = dynamics.compute_dynamics(x, translator)
 
-        # constant term (select zeroth order, first and only coefficient)
-        a = jl.broadcast(jl.seval("yi -> yi[0][1]"), y)
-        a_lower = jl.broadcast(jl.inf, a)
-        a_upper = jl.broadcast(jl.sup, a)
+    # constant term (select zeroth order, first and only coefficient)
+    a = jl.broadcast(jl.seval("yi -> yi[0][1]"), y)
+    a_lower = jl.broadcast(jl.inf, a)
+    a_upper = jl.broadcast(jl.sup, a)
 
-        # linear term (select first order, all coefficients)
-        b = jl.broadcast(jl.seval("yi -> yi[1][:]"), y)
-        b = jl.broadcast(jl.transpose, b)
-        b = jl.reduce(jl.vcat, b)
-        b_lower = jl.broadcast(jl.inf, b)
-        b_upper = jl.broadcast(jl.sup, b)
+    # linear term (select first order, all coefficients)
+    b = jl.broadcast(jl.seval("yi -> yi[1][:]"), y)
+    b = jl.broadcast(jl.transpose, b)
+    b = jl.reduce(jl.vcat, b)
+    b_lower = jl.broadcast(jl.inf, b)
+    b_upper = jl.broadcast(jl.sup, b)
 
-        # remainder
-        r = jl.broadcast(jl.remainder, y)
-        r_lower = jl.broadcast(jl.inf, r)
-        r_upper = jl.broadcast(jl.sup, r)
-    finally:
-        # Force Julia's garbage collector to run
-        jl.seval("GC.gc(true)")
+    # remainder
+    r = jl.broadcast(jl.remainder, y)
+    r_lower = jl.broadcast(jl.inf, r)
+    r_upper = jl.broadcast(jl.sup, r)
+    
+    # Run GC after expensive computation
+    run_julia_gc()
 
     if input_dim>1:
         a_lower = a_lower.to_numpy()
