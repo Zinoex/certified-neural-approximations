@@ -653,14 +653,14 @@ class LowThrustSpacecraft(DynamicalSystem):
         
         # Typical domains for each state dimension
         self.input_domain = [
-            # Position (r, θ) in 1000 km and radians
+            # Position (r, θ) in [1000 km's] and radians
             (6.3780, 10.0000), (0.0, 2*np.pi), 
             # Velocity (vr, vθ) in m/s
             (-5.0, 5.0), (-5.0, 5.0),
             # Mass (delta_m) in kg
             (0.0, 10),
-            # Control inputs (thrust_magnitude, thrust_angle)
-            (0.0, 1.0), (0.0, 2*np.pi)
+            # Control inputs (thrust_magnitude in (3 ion thrusters at 250mN each), thrust_angle)
+            (0.0, 0.75), (0.0, 2*np.pi)
         ]
         
         self.hidden_sizes = [128, 128]
@@ -692,12 +692,12 @@ class LowThrustSpacecraft(DynamicalSystem):
             Tensor of shape [5, batch_size] with the derivatives
         """
         # Extract state variables
-        r = x[0]*1000      # Radial distance
+        r = x[0]*1000      # Radial distance (convert to km)
         theta = x[1]       # Azimuthal angle
-        v_r = x[2] * 10e-3  # Radial velocity
-        v_theta = x[3] * 10e-3     # Angular velocity
-        delta_m = x[4]     # Mass decrease due to propellant consumption
-        thrust_magnitude = x[5]    # Thrust magnitude (normalized)
+        v_r = x[2] * 10e-3  # Radial velocity (convert to km)
+        v_theta = x[3] * 10e-3     # Angular velocity (convert to km)
+        delta_m = x[4]     # Mass decrease due to propellant consumption 
+        thrust_magnitude = x[5]    # Thrust magnitude (normalized) (in N)
         thrust_angle = x[6]        # Thrust angle
         
         # Compute gravitational force in radial direction (inward)
