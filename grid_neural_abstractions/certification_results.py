@@ -2,7 +2,7 @@ import abc
 import numpy as np
 
 class CertificationRegion:
-    def __init__(self, center: np.array, radius: np.array, output_dim: int = None, split_dim: int = None):
+    def __init__(self, center: np.array, radius: np.array, output_dim: int = None, split_dim: int = None, seed: int = 255):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
@@ -13,6 +13,8 @@ class CertificationRegion:
         if split_dim is None:
             split_dim = center.shape[0] - 1
         self.split_dim = split_dim
+        self.seed = seed  # Store the seed as an instance variable
+        np.random.seed(self.seed)  # Set the random seed globally
 
     def __iter__(self):
         return iter((self.center, self.radius, self.output_dim))
@@ -40,7 +42,6 @@ class CertificationRegion:
         approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
         # i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
         error_list = np.ones(len(delta)) * 10e-9 # Initializenear zero
-        rng = np.random.default_rng()
 
         if all(delta < self.min_radius):
             return None
