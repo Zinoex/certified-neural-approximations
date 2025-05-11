@@ -41,7 +41,7 @@ class CertificationRegion:
         split_dim = None
         approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
         # i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
-        error_list = np.ones(len(delta)) * 10e-9 # Initializenear zero
+        error_list = np.ones(len(delta)) * 10e-9 # Initialize near zero
 
         if all(delta < self.min_radius):
             return None

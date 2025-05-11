@@ -772,3 +772,84 @@ class LorenzAttractor(DynamicalSystem):
 
         return translator.stack([dx, dy, dz])
 
+class QuadraticSystem(DynamicalSystem):
+    """Dynamical system with linear and quadratic components:
+       ẋ₁ = μx₁, ẋ₂ = λ(x₂ - x₁²)
+    """
+
+    def __init__(self, mu=-0.05, lam=-1.0):
+        super().__init__()
+        self.mu = mu
+        self.lam = lam
+        self.input_dim = 2
+        self.time_steps = 51  # Number of discrete steps to simulate
+        self.output_dim = self.input_dim * self.time_steps
+        self.input_domain = [(-0.5, 0.5), (-0.5, 0.5)]
+        self.hidden_sizes = [64, 64]
+        self.delta = np.array([0.5, 0.5])
+        self.epsilon = 0.1
+        self.system_name = "QuadraticSystem"  # Name of the system
+        self.time_step = 0.02  # Time step for integration
+
+    def continuous_dynamics(self, t, y):
+        x1, x2 = y
+        dx1dt = self.mu * x1
+        dx2dt = self.lam * (x2 - x1**2)
+        return [dx1dt, dx2dt]
+
+    def compute_dynamics_integrate(self, x, T):
+        from scipy.integrate import solve_ivp
+        t_span = (0, T)
+        # Solve the system
+        sol = solve_ivp(self.continuous_dynamics, t_span, x, t_eval=np.linspace(t_span[0], t_span[1], 500))
+        return sol.y[:, -1]
+
+    def compute_dynamics_discrete(self, x_current, translator, dt):
+        """
+        Computes one discrete time step of the quadratic system.
+        x_current: state tensor of shape [2, batch_size]
+        translator: math operations translator
+        dt: time step duration
+        """
+        x1_0 = x_current[0]
+        x2_0 = x_current[1]
+
+        # x1(t)
+        x1_next = x1_0 * np.exp(self.mu * dt)
+
+        # x2(t)
+        # Check for the special case 2*mu == lam with a small tolerance
+        if abs(2 * self.mu - self.lam) < 1e-9:
+            # Special case: 2μ = λ
+            # C = x2_0 / translator.exp(self.lam * 0) which is x2_0
+            C = x2_0
+            x2_next = C * np.exp(self.lam * dt) - \
+                      self.lam * translator.pow(x1_0, 2) * dt * np.exp(self.lam * dt)
+        else:
+            # General case: 2μ != λ
+            A = self.lam * translator.pow(x1_0, 2) / (2 * self.mu - self.lam)
+            # C = (x2_0 + A) / translator.exp(self.lam * 0) which is x2_0 + A
+            C = x2_0 + A
+            x2_next = C * np.exp(self.lam * dt) - \
+                      A * np.exp(2 * self.mu * dt)
+
+        return translator.stack([x1_next, x2_next])
+
+    def compute_dynamics(self, x0, translator):
+        """
+        Computes the system dynamics by iterating discrete time steps.
+        x0: initial state tensor of shape [2, batch_size]
+        translator: math operations translator
+        return trajectory of size [2*time_steps, batch_size]
+        """
+        import torch
+        time_steps = self.time_steps  # Number of discrete steps to simulate
+        dt = self.time_step    # Duration of each discrete step
+        x_current = self.compute_dynamics_discrete(x0, translator, dt)
+        x = x_current
+        for i in range(time_steps-1):
+            x_next = self.compute_dynamics_discrete(x0, translator, (i+1)*dt)
+            x = translator.cat([x, x_next])
+            x_current = x_next
+        
+        return x
