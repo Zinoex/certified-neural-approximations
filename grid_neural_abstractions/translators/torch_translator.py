@@ -116,6 +116,16 @@ class TorchTranslator:
         """
         return self.torch.max(a)
 
+    def cat(self, a):
+        """
+        Stack a list of torch tensors vertically
+
+        :param a: list of torch tensors
+
+        :return: self.torch.tensor
+        """
+        return self.torch.cat(a)
+
     def stack(self, a):
         """
         Stack a list of torch tensors vertically

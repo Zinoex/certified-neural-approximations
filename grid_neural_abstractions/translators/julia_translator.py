@@ -1,4 +1,5 @@
 class JuliaTranslator:
+
     def __init__(self):
         from juliacall import Main as jl
         self.jl = jl
@@ -114,6 +115,16 @@ class JuliaTranslator:
         :return: float
         """
         return self.jl.maximum(a)
+
+    def cat(self, a):
+        """
+        Stack a list of numpy arrays vertically
+
+        :param a: list of numpy arrays
+
+        :return: np.ndarray
+        """
+        return self.stack(a)
 
     def stack(self, a):
         """

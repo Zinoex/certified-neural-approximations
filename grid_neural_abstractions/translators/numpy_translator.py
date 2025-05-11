@@ -127,6 +127,16 @@ class NumpyTranslator:
         """
         return np.stack(a)
 
+    def cat(self, a):
+        """
+        Concatenate a list of numpy arrays along the first axis
+
+        :param a: list of np.ndarray
+
+        :return: np.ndarray
+        """
+        return np.concatenate(a)
+        
     def hstack(self, a):
         """
         Stack a list of numpy arrays horizontally
