@@ -2,7 +2,7 @@ import os
 import time
 from grid_neural_abstractions.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
     NonLipschitzVectorField1, NonLipschitzVectorField2
-from grid_neural_abstractions.dynamics import VanDerPolOscillator, LowThrustSpacecraft, Sine2D, NonlinearOscillator
+from grid_neural_abstractions.dynamics import VanDerPolOscillator, LowThrustSpacecraft, Sine2D, NonlinearOscillator, QuadraticSystem
 from grid_neural_abstractions.verify_nn import verify_nn
 
 

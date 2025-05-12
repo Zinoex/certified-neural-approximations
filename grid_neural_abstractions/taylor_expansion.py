@@ -1,9 +1,9 @@
 from .translators.julia_translator import JuliaTranslator
 import numpy as np
 import time
+from .translators.taylor_translator import TaylorTranslator, CertifiedFirstOrderTaylorExpansion
 
 jl = None
-last_gc_time = 0  # Track when garbage collection was last performed
 
 def check_jl_initialized():
     global jl
@@ -13,15 +13,71 @@ def check_jl_initialized():
         jl = Main
         jl.seval("using TaylorModels")
 
-def run_julia_gc():
-    """Run Julia's garbage collector if enough time has passed since last collection"""
-    global last_gc_time
-    current_time = time.time()
-    collection_interval = 30  # seconds
-    # Only run GC every n seconds
-    if current_time - last_gc_time > collection_interval:
-        jl.seval("GC.gc(true)")
-        last_gc_time = current_time
+def certified_taylor_expansion(dynamics, expansion_point, delta):
+    """
+    1st-order Taylor expansion of a function around a point.
+    Computed without Julia call, using TaylorTranslator.
+    """
+    translator = TaylorTranslator()
+
+    if not isinstance(expansion_point, np.ndarray):
+        import torch
+        if isinstance(expansion_point, torch.Tensor):
+            expansion_point = expansion_point.to(torch.float64).numpy()
+        else:
+            expansion_point = np.array(expansion_point, dtype=np.float64)
+
+    if not isinstance(delta, np.ndarray):
+        delta = np.array(delta, dtype=np.float64)
+
+    if expansion_point.ndim == 0:
+        expansion_point = np.array([expansion_point])
+    if delta.ndim == 0:
+        delta = np.array([delta])
+    
+    input_dim = expansion_point.shape[0]
+
+    domain_lower = expansion_point - delta
+    domain_upper = expansion_point + delta
+
+    # Initialize the input for the Taylor expansion
+    # This represents x as a Taylor model: x = expansion_point + 1*(x - expansion_point) + 0
+    x_taylor = translator.to_format(expansion_point, domain_lower, domain_upper)
+
+    # Compute the dynamics with the Taylor model input
+    y_taylor = dynamics.compute_dynamics(x_taylor, translator)
+
+    # Extract results
+    # y_taylor.linear_approximation = (Df(c), f(c))
+    # y_taylor.remainder = (R_lower, R_upper)
+    
+    b_coeffs = y_taylor.linear_approximation[0] # Df(c)
+    a_coeffs = y_taylor.linear_approximation[1] # f(c)
+    r_bounds = y_taylor.remainder             # (R_lower, R_upper)
+
+    a_lower = a_coeffs
+    a_upper = a_coeffs
+    b_lower = b_coeffs
+    b_upper = b_coeffs
+    r_lower = r_bounds[0]
+    r_upper = r_bounds[1]
+    
+    if input_dim > 1:
+        # Ensure correct shapes if not already
+        a_lower = np.array(a_lower).reshape(-1, 1) if not isinstance(a_lower, np.ndarray) or a_lower.ndim == 1 else a_lower
+        a_upper = np.array(a_upper).reshape(-1, 1) if not isinstance(a_upper, np.ndarray) or a_upper.ndim == 1 else a_upper
+        b_lower = np.array(b_lower)
+        r_lower = np.array(r_lower).reshape(-1, 1) if not isinstance(r_lower, np.ndarray) or r_lower.ndim == 1 else r_lower
+        r_upper = np.array(r_upper).reshape(-1, 1) if not isinstance(r_upper, np.ndarray) or r_upper.ndim == 1 else r_upper
+    else:
+        b_lower = np.array(b_lower).reshape(y_taylor.linear_approximation[0].shape[0], input_dim) # Ensure b is [output_dim, input_dim]
+        b_upper = np.array(b_upper).reshape(y_taylor.linear_approximation[0].shape[0], input_dim) # Ensure b is [output_dim, input_dim]
+        r_lower = np.array([[r_lower.item()]])
+        r_upper = np.array([[r_upper.item()]])
+
+    lower = (a_lower, b_lower, r_lower)
+    upper = (a_upper, b_upper, r_upper)
+
 
 def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     """
@@ -36,6 +92,8 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     :return: (a = f(c), B = Df(c), R) where the Taylor expansion is `f(c) + (x - c) Df(c) ⊕ R`.
     """
 
+    return certified_taylor_expansion_julia(dynamics, expansion_point, delta)
+
     # Import inside the function to allow multiprocessing
     check_jl_initialized()
 
@@ -43,8 +101,6 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
 
     order = 1
 
-    if not isinstance(expansion_point, np.ndarray):
-        import torch
         expansion_point = expansion_point.to(torch.float64).numpy()
     
     low, high = expansion_point - delta, expansion_point + delta
@@ -59,7 +115,7 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     x = jl.seval("(order, c, dom, input_dim) -> [TaylorModelN(i, order, IntervalBox(c), dom) for i in 1:input_dim]")(
         order, expansion_point, dom, input_dim
     )
-
+        
     y = dynamics.compute_dynamics(x, translator)
 
     # constant term (select zeroth order, first and only coefficient)

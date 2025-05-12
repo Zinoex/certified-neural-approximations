@@ -71,8 +71,6 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Run the first-order Taylor expansion twice to not count the precompilation time
         # as part of the verification time (the first run is for precompilation).
         # This is a bit of a hack, but it works.
-        try:
-            first_order_certified_taylor_expansion(
                 dynamics, sample, delta
             )
 
