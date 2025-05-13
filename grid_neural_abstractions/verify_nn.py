@@ -7,6 +7,7 @@ from grid_neural_abstractions.verification import MarabouTaylorStrategy
 from grid_neural_abstractions.certification_results import CertificationRegion
 
 from grid_neural_abstractions.generate_data import generate_grid
+from .visualization import DynamicsNetworkPlotter  # Import the new plotter
 
 def load_onnx(onnx_path):
     """
@@ -55,7 +56,6 @@ def verify_nn(
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
     if visualize and input_dim in [1, 2] and num_workers == 1:
-        from .visualization import DynamicsNetworkPlotter  # Import the new plotter
         from maraboupy import Marabou
         # Create a plotter for 1D or 2D dynamics
         plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))

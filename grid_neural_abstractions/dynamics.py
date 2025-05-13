@@ -1,5 +1,8 @@
 import math
 import numpy as np
+import torch
+from scipy.integrate import solve_ivp
+from .translators import NumpyTranslator, TorchTranslator
 
 class DynamicalSystem:
     """Base class for dynamical systems."""
@@ -27,10 +30,8 @@ class DynamicalSystem:
         if translator is None:
             if isinstance(x, np.ndarray):
                 # Use NumpyTranslator if x is a NumPy array
-                from .translators.numpy_translator import NumpyTranslator
                 translator = NumpyTranslator()
             else:
-                from .translators.torch_translator import TorchTranslator
                 translator = TorchTranslator()
         
         return self.compute_dynamics(x, translator)
@@ -115,8 +116,6 @@ class VanDerPolOscillator(DynamicalSystem):
         # For Van der Pol, the Jacobian is:
         # [ 0,  1 ]
         # [-1 - 2*mu*x₁*x₂, mu*(1-x₁²)]
-
-        import torch
         corners = [
             c + r * torch.tensor([1, 1]),
             c + r * torch.tensor([-1, 1]),
@@ -798,7 +797,6 @@ class QuadraticSystem(DynamicalSystem):
         return [dx1dt, dx2dt]
 
     def compute_dynamics_integrate(self, x, T):
-        from scipy.integrate import solve_ivp
         t_span = (0, T)
         # Solve the system
         sol = solve_ivp(self.continuous_dynamics, t_span, x, t_eval=np.linspace(t_span[0], t_span[1], 500))
@@ -842,7 +840,6 @@ class QuadraticSystem(DynamicalSystem):
         translator: math operations translator
         return trajectory of size [2*time_steps, batch_size]
         """
-        import torch
         time_steps = self.time_steps  # Number of discrete steps to simulate
         dt = self.time_step    # Duration of each discrete step
         x = x0

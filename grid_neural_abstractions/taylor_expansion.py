@@ -1,5 +1,6 @@
 from .translators.julia_translator import JuliaTranslator
 import numpy as np
+import torch
 import time
 from .translators.taylor_translator import TaylorTranslator, CertifiedFirstOrderTaylorExpansion
 
@@ -21,7 +22,6 @@ def certified_taylor_expansion(dynamics, expansion_point, delta):
     translator = TaylorTranslator()
 
     if not isinstance(expansion_point, np.ndarray):
-        import torch
         if isinstance(expansion_point, torch.Tensor):
             expansion_point = expansion_point.to(torch.float64).numpy()
         else:
@@ -92,7 +92,7 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     :return: (a = f(c), B = Df(c), R) where the Taylor expansion is `f(c) + (x - c) Df(c) ⊕ R`.
     """
 
-    return certified_taylor_expansion_julia(dynamics, expansion_point, delta)
+    # return certified_taylor_expansion_julia(dynamics, expansion_point, delta)
 
     # Import inside the function to allow multiprocessing
     check_jl_initialized()
@@ -101,7 +101,7 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
 
     order = 1
 
-        expansion_point = expansion_point.to(torch.float64).numpy()
+    # expansion_point = expansion_point.to(torch.float64).numpy()
     
     low, high = expansion_point - delta, expansion_point + delta
     dom = jl.IntervalBox(low, high)
@@ -136,7 +136,7 @@ def first_order_certified_taylor_expansion(dynamics, expansion_point, delta):
     r_upper = jl.broadcast(jl.sup, r)
     
     # Run GC after expensive computation
-    run_julia_gc()
+    # run_julia_gc()
 
     if input_dim>1:
         a_lower = a_lower.to_numpy()
