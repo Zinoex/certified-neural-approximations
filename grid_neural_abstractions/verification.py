@@ -136,7 +136,8 @@ class MarabouTaylorStrategy(VerificationStrategy):
 
         
         # Setup Marabou options using a dynamic timeout based on the size of the region
-        timeout = min(120, max(1, np.log((min(delta)))/np.log(min(data.min_radius))*max_timeout))
+        # timeout = min(120, max(1, np.log((min(delta)))/np.log(min(data.min_radius))*max_timeout))
+        timeout = 2
         options = Marabou.createOptions(verbosity=0, timeoutInSeconds=int(timeout), lpSolver="native")
 
         # Check if we need to split based on remainder bounds
