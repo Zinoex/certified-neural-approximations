@@ -65,25 +65,27 @@ class MarabouTaylorStrategy(VerificationStrategy):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
 
-        from maraboupy import Marabou
+        # from maraboupy import Marabou
 
         sample, delta, j = data  # Unpack the data tuple
 
         # Run the first-order Taylor expansion twice to not count the precompilation time
         # as part of the verification time (the first run is for precompilation).
         # This is a bit of a hack, but it works.
-                dynamics, sample, delta
-            )
+        # try:
+        taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
+            dynamics, sample, delta
+        )
 
-            start_time = time.time()
+        start_time = time.time()
 
-            taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
-                dynamics, sample, delta
-            )
-        except Exception as e:
-            print(f"Error in first_order_certified_taylor_expansion: {e}")
-            print(f"Sample: {sample}")
-            return SampleResultMaybe(data, 0, [data])
+        taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
+            dynamics, sample, delta
+        )
+        # except Exception as e:
+        #     print(f"Error in first_order_certified_taylor_expansion: {e}")
+        #     print(f"Sample: {sample}")
+        #     return SampleResultMaybe(data, 0, [data])
 
         # Unpack the Taylor expansion components
         # taylor_pol_lower <-- (f(c), Df(c), R_min)
