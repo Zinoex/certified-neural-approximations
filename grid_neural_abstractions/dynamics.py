@@ -782,7 +782,7 @@ class QuadraticSystem(DynamicalSystem):
         self.mu = mu
         self.lam = lam
         self.input_dim = 2
-        self.time_steps = 51  # Number of discrete steps to simulate
+        self.time_steps = 50  # Number of discrete steps to simulate
         self.output_dim = self.input_dim * self.time_steps
         self.input_domain = [(-0.5, 0.5), (-0.5, 0.5)]
         self.hidden_sizes = [64, 64]
@@ -845,11 +845,9 @@ class QuadraticSystem(DynamicalSystem):
         import torch
         time_steps = self.time_steps  # Number of discrete steps to simulate
         dt = self.time_step    # Duration of each discrete step
-        x_current = self.compute_dynamics_discrete(x0, translator, dt)
-        x = x_current
-        for i in range(time_steps-1):
+        x = x0
+        for i in range(time_steps):
             x_next = self.compute_dynamics_discrete(x0, translator, (i+1)*dt)
             x = translator.cat([x, x_next])
-            x_current = x_next
         
         return x
