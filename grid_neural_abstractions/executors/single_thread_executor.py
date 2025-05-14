@@ -5,7 +5,7 @@ import time
 
 
 class SinglethreadExecutor:
-    def __init__(self, linearization_strategy, verification_strategy, linear_batch_size=10):
+    def __init__(self, linearization_strategy, verification_strategy, linear_batch_size=1):
         self.linearization_strategy = linearization_strategy
         self.verification_strategy = verification_strategy
         self.linear_batch_size = linear_batch_size
@@ -15,8 +15,6 @@ class SinglethreadExecutor:
         statistics = Statistics(samples)
 
         self.verification_strategy.initialize_worker()
-
-        computation_time = 0.0
 
         # Task queue (pre-linearize samples)
         queue = LifoQueue()
@@ -35,7 +33,6 @@ class SinglethreadExecutor:
                 result = self.verification_strategy.verify_sample(sample)
 
                 # Update statistics
-                computation_time += result.computation_time
                 statistics.add_sample(result)
 
                 # If plotting is enabled, update the plot

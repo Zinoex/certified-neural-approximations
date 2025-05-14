@@ -101,7 +101,7 @@ def verify_64_models(residual=False, leaky_relu=False):
             visualize=False
         )
         t2 = time.time()
-        print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds")
+        print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds including precompilation and process spawn time")
 
 
 def main():
@@ -110,7 +110,7 @@ def main():
     # train_na_models()
     # train_64_models()
     verify_na_models()
-    # verify_64_models()
+    verify_64_models()
 
 
 if __name__ == "__main__":

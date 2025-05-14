@@ -45,7 +45,7 @@ class CrownLinearization:
             return AugmentedSample.from_certification_region(
                 sample,
                 ((A_lower[i, j].numpy(), b_lower[i, j].numpy()),
-                 (A_upper[i, j].numpy(), b_upper[i, j].numpy()), interval_gap.upper[0, j].item())
+                 (A_upper[i, j].numpy(), b_upper[i, j].numpy()), interval_gap.upper[i, j].item())
             )
 
         augmented_samples = [to_augmented_sample(i) for i in range(len(samples))]

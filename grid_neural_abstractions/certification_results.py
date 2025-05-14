@@ -107,9 +107,9 @@ class AugmentedSample(CertificationRegion):
 
 
 class SampleResult(abc.ABC):
-    def __init__(self, sample, computation_time):
+    def __init__(self, sample, start_time):
         self.sample = sample
-        self.computation_time = computation_time
+        self.start_time = start_time
 
     @abc.abstractmethod
     def issat(self) -> bool:
@@ -158,8 +158,8 @@ class SampleResultSAT(SampleResult):
 
 
 class SampleResultUNSAT(SampleResult):
-    def __init__(self, sample, computation_time, counterexamples):
-        super().__init__(sample, computation_time)
+    def __init__(self, sample, start_time, counterexamples):
+        super().__init__(sample, start_time)
         self._counterexamples = counterexamples
 
     def issat(self) -> bool:
@@ -182,8 +182,8 @@ class SampleResultUNSAT(SampleResult):
 
 
 class SampleResultMaybe(SampleResult):
-    def __init__(self, sample, computation_time, new_samples):
-        super().__init__(sample, computation_time)
+    def __init__(self, sample, start_time, new_samples):
+        super().__init__(sample, start_time)
         self._new_samples = new_samples
 
     def issat(self) -> bool:

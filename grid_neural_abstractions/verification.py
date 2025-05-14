@@ -73,7 +73,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         """
         Initialize the Marabou worker. This method is called once per worker.
         """
-        from maraboupy import Marabou, MarabouCore, MarabouUtils        
+        from maraboupy import Marabou, MarabouCore, MarabouUtils
 
         global _LOCAL
         _LOCAL = types.SimpleNamespace()
@@ -116,8 +116,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
             if delta[split_dim] > data.min_radius[split_dim]:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                end_time = time.time()
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                return SampleResultMaybe(data, start_time, [sample_left, sample_right])
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -141,13 +140,12 @@ class MarabouTaylorStrategy(VerificationStrategy):
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
-            end_time = time.time()
             if split_dim is None:
                 # Min split radius is reached
-                return SampleResultUNSAT(data, end_time - start_time, [None])
+                return SampleResultUNSAT(data, start_time, [None])
             else:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                return SampleResultMaybe(data, start_time, [sample_left, sample_right])
 
         if res == "sat":
             cex = np.empty(len(inputVars))
@@ -170,13 +168,11 @@ class MarabouTaylorStrategy(VerificationStrategy):
             if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                end_time = time.time()
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                return SampleResultMaybe(data, start_time, [sample_left, sample_right])
             # else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
-            end_time = time.time()
-            return SampleResultUNSAT(data, end_time - start_time, [cex])
+            return SampleResultUNSAT(data, start_time, [cex])
 
         # Reset the query
         network.additionalEquList.clear()
@@ -194,8 +190,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         if stats.hasTimedOut():
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
             sample_left, sample_right = split_sample(data, delta, split_dim)
-            end_time = time.time()
-            return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+            return SampleResultMaybe(data, start_time, [sample_left, sample_right])
 
         if res == "sat":
             cex = np.empty(len(inputVars))
@@ -217,16 +212,13 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 if split_dim is None:
                     # Min split radius is reached
-                    return SampleResultUNSAT(data, end_time - start_time, [None])
+                    return SampleResultUNSAT(data, start_time, [None])
                 else:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
-                    end_time = time.time()
-                    return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                    return SampleResultMaybe(data, start_time, [sample_left, sample_right])
             # else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
-            end_time = time.time()
-            return SampleResultUNSAT(data, end_time - start_time, [cex])
+            return SampleResultUNSAT(data, start_time, [cex])
 
-        end_time = time.time()
-        return SampleResultSAT(data, end_time - start_time)   # No counterexample found, return the original sample
+        return SampleResultSAT(data, start_time)   # No counterexample found, return the original sample
