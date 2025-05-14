@@ -1,6 +1,7 @@
 import abc
 import numpy as np
 
+
 class CertificationRegion:
     def __init__(self, center: np.array, radius: np.array, output_dim: int = None, split_dim: int = None, seed: int = 255):
         self.center = center
@@ -24,11 +25,11 @@ class CertificationRegion:
         Calculate the size of the region (hypercube volume).
         """
         return np.prod(2 * self.radius).item()
-    
+
     def nextsplitdim(self, taylor_approximation, dynamics):
         """
         Identify the dimension with the highest approximation error for splitting.
-        
+
         This method tests a random point within the region to find which dimension
         contributes most to the approximation error between the Taylor approximation
         and the actual dynamics.
@@ -41,7 +42,7 @@ class CertificationRegion:
         split_dim = None
         approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
         # i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
-        error_list = np.ones(len(delta)) * 10e-9 # Initialize near zero
+        error_list = np.ones(len(delta)) * 10e-9  # Initialize near zero
 
         if all(delta < self.min_radius):
             return None
@@ -55,7 +56,7 @@ class CertificationRegion:
 
             left_point = sample.copy()
             left_point[i] -= 0.5 * delta_i
-            
+
             # Calculate the Taylor approximation at the left point (corrected by the error from the centre)
             approx = taylor_approximation(left_point) - approximation_error
             true_value = dynamics(left_point).flatten()[self.output_dim]
@@ -63,7 +64,7 @@ class CertificationRegion:
 
             right_point = sample.copy()
             right_point[i] += 0.5 * delta_i
-            
+
             # Calculate the Taylor approximation at the right point (corrected by the error from the centre)
             approx = taylor_approximation(right_point) - approximation_error
             true_value = dynamics(right_point).flatten()[self.output_dim]
@@ -73,7 +74,7 @@ class CertificationRegion:
 
             if max_error > 0.0:
                 error_list[i] = max_error
-        
+
         delta_maxmin_ratio = np.max(delta) / np.min(delta)
         if delta_maxmin_ratio.item() > 1e2:
             # Softmax calculation
@@ -82,20 +83,34 @@ class CertificationRegion:
         else:
             split_dim = np.argmax(error_list)
         return split_dim
-    
+
     def incrementsplitdim(self):
         self.split_dim = (self.split_dim + 1) % self.center.shape[0]
         return self.split_dim
-    
+
     def __repr__(self):
         return f"CertificationRegion(center={self.center}, radius={self.radius}, output_dim={self.output_dim})"
+
+
+class AugmentedSample(CertificationRegion):
+    def __init__(self, center, radius, first_order_model, output_dim=None, split_dim=None, seed=255):
+        super().__init__(center, radius, output_dim, split_dim, seed)
+        self.first_order_model = first_order_model
+
+    @staticmethod
+    def from_certification_region(region, first_order_model):
+        return AugmentedSample(region.center, region.radius, first_order_model, region.output_dim, region.split_dim, region.seed)
+
+    def isfinite(self):
+        return np.isfinite(self.first_order_model[0][0]).all() and np.isfinite(self.first_order_model[0][1]).all() and \
+            np.isfinite(self.first_order_model[1][0]).all() and np.isfinite(self.first_order_model[1][1]).all()
 
 
 class SampleResult(abc.ABC):
     def __init__(self, sample, computation_time):
         self.sample = sample
         self.computation_time = computation_time
-    
+
     @abc.abstractmethod
     def issat(self) -> bool:
         pass
@@ -103,6 +118,9 @@ class SampleResult(abc.ABC):
     @abc.abstractmethod
     def isunsat(self) -> bool:
         pass
+
+    def isleaf(self) -> bool:
+        return self.issat() or self.isunsat()
 
     @abc.abstractmethod
     def hasnewsamples(self) -> bool:
@@ -117,10 +135,10 @@ class SampleResult(abc.ABC):
 
     def counterexamples(self):
         raise ValueError("Counterexamples not available for this sample result.")
-    
+
     def lebesguemeasure(self):
         return self.sample.lebesguemeasure()
-    
+
 
 class SampleResultSAT(SampleResult):
     def issat(self) -> bool:
@@ -155,13 +173,13 @@ class SampleResultUNSAT(SampleResult):
 
     def hascounterexamples(self) -> bool:
         return True
-    
+
     def counterexamples(self):
         return self._counterexamples
 
     def __repr__(self):
         return f"UNSAT: {self.sample}"
-    
+
 
 class SampleResultMaybe(SampleResult):
     def __init__(self, sample, computation_time, new_samples):
@@ -170,16 +188,16 @@ class SampleResultMaybe(SampleResult):
 
     def issat(self) -> bool:
         return False
-    
+
     def isunsat(self) -> bool:
         return False
-    
+
     def hasnewsamples(self) -> bool:
         return True
-    
+
     def newsamples(self):
         return self._new_samples
-    
+
     def hascounterexamples(self) -> bool:
         return False
 

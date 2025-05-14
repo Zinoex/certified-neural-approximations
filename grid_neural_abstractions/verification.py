@@ -1,13 +1,12 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import time
-from grid_neural_abstractions.translators.bound_propagation_translator import BoundPropagationTranslator
+import types
 import numpy as np
-from maraboupy import Marabou, MarabouCore, MarabouUtils
-from bound_propagation import LinearBounds
 
-from grid_neural_abstractions.taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
-from grid_neural_abstractions.certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
+from grid_neural_abstractions.certification_results import AugmentedSample, \
+    SampleResultSAT, SampleResultUNSAT, SampleResultMaybe
+
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2
@@ -39,7 +38,7 @@ def mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper):
 
 class VerificationStrategy(ABC):
     @abstractmethod
-    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-8):
+    def verify_sample(self, data: AugmentedSample):
         """
         Verify the neural network against the dynamics.
 
@@ -56,85 +55,57 @@ class VerificationStrategy(ABC):
 
 
 class MarabouTaylorStrategy(VerificationStrategy):
-    @staticmethod
-    def prepare_strategy(dynamics):
-        prepare_taylor_expansion(dynamics.input_dim)
+    def __init__(self, network, dynamics, epsilon, precision=1e-6):
+        """
+        Initialize the Marabou verification strategy.
+
+        :param network: The neural network to be verified.
+        :param dynamics: The dynamics of the system.
+        :param epsilon: The tolerance for verification.
+        :param precision: The precision for numerical checks.
+        """
+        self.network = network
+        self.dynamics = dynamics
+        self.epsilon = epsilon
+        self.precision = precision
+
+    def initialize_worker(self):
+        """
+        Initialize the Marabou worker. This method is called once per worker.
+        """
+        from maraboupy import Marabou, MarabouCore, MarabouUtils        
+
+        global _LOCAL
+        _LOCAL = types.SimpleNamespace()
+        _LOCAL.network = self.network
+        _LOCAL.dynamics = self.dynamics
+        _LOCAL.epsilon = self.epsilon
+        _LOCAL.precision = self.precision
 
     @staticmethod
-    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6, max_timeout=30):
+    def verify_sample(data: AugmentedSample):
+        return MarabouTaylorStrategy._verify_sample(
+            _LOCAL.network,
+            _LOCAL.dynamics,
+            data,
+            _LOCAL.epsilon,
+            _LOCAL.precision,
+        )
+
+    @staticmethod
+    def _verify_sample(network, dynamics, data: AugmentedSample, epsilon, precision):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
+
+        start_time = time.time()
+
+        from maraboupy import Marabou, MarabouCore, MarabouUtils
 
         # from maraboupy import Marabou
 
         sample, delta, j = data  # Unpack the data tuple
+        (A_lower, b_lower), (A_upper, b_upper), max_gap = data.first_order_model
 
-        # Run the first-order Taylor expansion twice to not count the precompilation time
-        # as part of the verification time (the first run is for precompilation).
-        # This is a bit of a hack, but it works.
-        # try:
-        taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
-            dynamics, sample, delta
-        )
-
-        start_time = time.time()
-
-        taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
-            dynamics, sample, delta
-        )
-        # except Exception as e:
-        #     print(f"Error in first_order_certified_taylor_expansion: {e}")
-        #     print(f"Sample: {sample}")
-        #     return SampleResultMaybe(data, 0, [data])
-
-        # Unpack the Taylor expansion components
-        # taylor_pol_lower <-- (f(c), Df(c), R_min)
-        # taylor_pol_upper <-- (f(c), Df(c), R_max)
-        f_c_lower = taylor_pol_lower[0]  # f(c) - function value at center
-        f_c_upper = taylor_pol_upper[0]  # f(c) - function value at center
-        df_c_lower = taylor_pol_lower[1]  # Df(c) - gradient at center
-        df_c_upper = taylor_pol_upper[1]  # Df(c) - gradient at center
-        r_lower = taylor_pol_lower[2]  # Minimum remainder term
-        r_upper = taylor_pol_upper[2]  # Maximum remainder term
-
-        A_upper = df_c_upper[j]
-        b_upper = -np.dot(df_c_upper[j], sample) + f_c_upper[j] + r_upper[j]
-
-        A_lower = df_c_lower[j]
-        b_lower = -np.dot(df_c_lower[j], sample) + f_c_lower[j] + r_lower[j]
-
-        max_gap = r_upper[j] - r_lower[j]
-
-        # Special case if the certified bounds of the Taylor expansion are not finite
-        # Then use bound_propagation to get linear bounds
-        if (not np.isfinite(A_upper).all()) or (not np.isfinite(b_upper).all()) or \
-           (not np.isfinite(A_lower).all()) or (not np.isfinite(b_lower).all()):
-            translator = BoundPropagationTranslator()
-            x = translator.to_format(sample)
-            y = dynamics.compute_dynamics(x, translator)
-            linear_bounds = translator.bound(y, sample, delta)
-
-            A_lower = linear_bounds.lower[0]
-            b_lower = linear_bounds.lower[1]
-
-            A_upper = linear_bounds.upper[0]
-            b_upper = linear_bounds.upper[1]
-
-            A_gap = A_upper - A_lower
-            b_gap = b_upper - b_lower
-            lbp_gap = LinearBounds(linear_bounds.region, None, (A_gap, b_gap))
-            interval_gap = lbp_gap.concretize()  # Turn linear bounds into interval bounds
-
-            # Select the j-th output dimension
-            max_gap = interval_gap.upper[0, j].item()
-
-            A_lower = A_lower[j].numpy()
-            b_lower = b_lower[j].numpy()
-
-            A_upper = A_upper[j].numpy()
-            b_upper = b_upper[j].numpy()
-
-        
         # Setup Marabou options using a dynamic timeout based on the size of the region
         # timeout = min(120, max(1, np.log((min(delta)))/np.log(min(data.min_radius))*max_timeout))
         timeout = 2
@@ -154,7 +125,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             network.setUpperBound(inputVar, sample[i] + delta[i])
 
         outputVar = outputVars[j]
-        
+
         # Reset the query
         network.additionalEquList.clear()
 
@@ -165,7 +136,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         equation_GE.addAddend(-1, outputVar)
         equation_GE.setScalar(epsilon - b_upper)
         network.addEquation(equation_GE, isProperty=True)
-        
+
         # Find a counterexample for upper bound
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
@@ -173,11 +144,11 @@ class MarabouTaylorStrategy(VerificationStrategy):
             end_time = time.time()
             if split_dim is None:
                 # Min split radius is reached
-                return SampleResultUNSAT(data, end_time - start_time, [cex])
+                return SampleResultUNSAT(data, end_time - start_time, [None])
             else:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
-            
+
         if res == "sat":
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
@@ -201,7 +172,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 end_time = time.time()
                 return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
-            #else:
+            # else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
             end_time = time.time()
@@ -213,7 +184,6 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # x df_c - nn_output <= -epsilon + c df_c - f(c) - r_lower
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         for i, inputVar in enumerate(inputVars):
-            # j is the output dimension, i is the input dimension, thus df_c[j, i] is the partial derivative of the j-th output with respect to the i-th input
             equation_LE.addAddend(A_lower[i], inputVar)
         equation_LE.addAddend(-1, outputVar)
         equation_LE.setScalar(-epsilon - b_lower)
@@ -245,10 +215,14 @@ class MarabouTaylorStrategy(VerificationStrategy):
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
-                sample_left, sample_right = split_sample(data, delta, split_dim)
-                end_time = time.time()
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
-            #else:
+                if split_dim is None:
+                    # Min split radius is reached
+                    return SampleResultUNSAT(data, end_time - start_time, [None])
+                else:
+                    sample_left, sample_right = split_sample(data, delta, split_dim)
+                    end_time = time.time()
+                    return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+            # else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
             end_time = time.time()

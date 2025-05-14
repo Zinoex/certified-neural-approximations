@@ -29,6 +29,7 @@ NEW_SYSTEMS = [
 
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS
 
+
 def train_na_models(leaky_relu=False):
     leaky_relu_path = 'leaky_relu' if leaky_relu else ''
 
@@ -106,10 +107,10 @@ def verify_64_models(residual=False, leaky_relu=False):
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    #train_na_models()
-    #train_64_models()
-    #verify_na_models()
-    verify_64_models()
+    # train_na_models()
+    # train_64_models()
+    verify_na_models()
+    # verify_64_models()
 
 
 if __name__ == "__main__":
