@@ -1,3 +1,4 @@
+import time
 import types
 from tqdm import tqdm  # Added tqdm for progress tracking
 from queue import LifoQueue
@@ -13,7 +14,7 @@ class SinglethreadExecutor:
         certified_domain_size = 0.0
         uncertified_domain_size = 0.0
 
-        computation_time = 0.0
+        start_time = None
 
         queue = LifoQueue()
         for sample in samples:
@@ -26,7 +27,10 @@ class SinglethreadExecutor:
                 # Execute the batches
                 result = process_sample(sample)
 
-                computation_time += result.computation_time
+                if start_time is None:
+                    start_time = result.start_time
+                else:
+                    start_time = min(start_time, result.start_time)
                 
                 if result.issat():
                     # Sample was succesfully verified, no new samples to process
@@ -60,5 +64,8 @@ class SinglethreadExecutor:
                 pbar.set_description_str(
                     f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.4f}%, uncertified: {uncertified_percentage:.4f}%)"
                 )
+
+        end_time = time.time()
+        computation_time = end_time - start_time
 
         return agg, certified_percentage, uncertified_percentage, computation_time

@@ -135,8 +135,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                end_time = time.time()
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                return SampleResultMaybe(data, start_time, [sample_left, sample_right])
 
         # Set the input variables to the sampled point
         for i, inputVar in enumerate(inputVars):
@@ -162,12 +161,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                end_time = time.time()
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                return SampleResultMaybe(data, start_time, [sample_left, sample_right])
             else:
                 print("No split dimension found, returning UNSAT")
-                end_time = time.time()
-                return SampleResultUNSAT(data, end_time - start_time, [])
+                return SampleResultUNSAT(data, start_time, [])
 
         if res == "sat":
             cex = np.empty(len(inputVars))
@@ -191,15 +188,13 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
-                    end_time = time.time()
-                    return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                    return SampleResultMaybe(data, start_time, [sample_left, sample_right])
                 else:
                     print("No split dimension found, returning UNSAT")
             #else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
-            end_time = time.time()
-            return SampleResultUNSAT(data, end_time - start_time, [cex])
+            return SampleResultUNSAT(data, start_time, [cex])
 
         # Reset the query
         network.additionalEquList.clear()
@@ -219,12 +214,10 @@ class MarabouTaylorStrategy(VerificationStrategy):
             split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
-                end_time = time.time()
-                return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                return SampleResultMaybe(data, start_time, [sample_left, sample_right])
             else:
                 print("No split dimension found, returning UNSAT")
-                end_time = time.time()
-                return SampleResultUNSAT(data, end_time - start_time, [])
+                return SampleResultUNSAT(data, start_time, [])
 
         if res == "sat":
             cex = np.empty(len(inputVars))
@@ -247,14 +240,12 @@ class MarabouTaylorStrategy(VerificationStrategy):
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
                     end_time = time.time()
-                    return SampleResultMaybe(data, end_time - start_time, [sample_left, sample_right])
+                    return SampleResultMaybe(data, start_time, [sample_left, sample_right])
                 else:
                     print("No split dimension found, returning UNSAT")
             #else:
             #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
-            end_time = time.time()
-            return SampleResultUNSAT(data, end_time - start_time, [cex])
+            return SampleResultUNSAT(data, start_time, [cex])
 
-        end_time = time.time()
-        return SampleResultSAT(data, end_time - start_time)   # No counterexample found, return the original sample
+        return SampleResultSAT(data, start_time)   # No counterexample found, return the original sample
