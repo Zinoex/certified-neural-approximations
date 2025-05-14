@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import bound_propagation as bp
 
+
 def Constant(a):
     return bp.FixedLinear(
         torch.zeros(a.shape[0], a.shape[0]),
@@ -9,8 +10,10 @@ def Constant(a):
     )
 
 
-class WrappedBPOperation:
+class WrappedBPOperation(nn.Module):
     def __init__(self, op, x=None):
+        super().__init__()
+
         if isinstance(x, WrappedBPOperation):
             op = nn.Sequential(
                 x.op,
@@ -234,15 +237,23 @@ class BoundPropagationTranslator:
         if not torch.is_tensor(epsilon):
             epsilon = torch.as_tensor(epsilon, dtype=torch.float32)
 
-        input_bounds = bp.HyperRectangle.from_eps(x.unsqueeze(0), epsilon.unsqueeze(0))
+        if x.ndim == 1:
+            x = x.unsqueeze(0)
+
+        if torch.is_tensor(epsilon) and epsilon.ndim == 1:
+            epsilon = epsilon.unsqueeze(0)
+
+        input_bounds = bp.HyperRectangle.from_eps(x, epsilon)
 
         factory = bp.BoundModelFactory()
         module = wrapped_op.op
         bound_module = factory.build(module)
 
         linear_bounds = bound_module.crown(input_bounds)
-        linear_bounds = bp.LinearBounds(linear_bounds.region, 
-                                     (linear_bounds.lower[0][0], linear_bounds.lower[1][0]),
-                                     (linear_bounds.upper[0][0], linear_bounds.upper[1][0]))
+
+        if x.ndim == 1:
+            linear_bounds = bp.LinearBounds(linear_bounds.region,
+                                            (linear_bounds.lower[0][0], linear_bounds.lower[1][0]),
+                                            (linear_bounds.upper[0][0], linear_bounds.upper[1][0]))
 
         return linear_bounds

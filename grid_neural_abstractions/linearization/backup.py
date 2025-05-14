@@ -15,9 +15,9 @@ class BackupLinearization:
 
         # Run backup method on non-finite samples
         extra_augmented_samples = self.method2.linearize(non_finite)
-        augmented_samples.extend(extra_augmented_samples)
+        finite.extend(extra_augmented_samples)
 
-        if any(not sample.isfinite() for sample in augmented_samples):
+        if any(not sample.isfinite() for sample in finite):
             raise ValueError("Some samples are still not finite after backup linearization.")
 
-        return augmented_samples
+        return finite

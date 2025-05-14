@@ -33,7 +33,7 @@ def aggregate(agg, result):
 
 
 def verify_nn(
-    onnx_path, dynamics_model, num_workers=0, visualize=True
+    onnx_path, dynamics_model, num_workers=8, visualize=True
 ):
 
     input_dim = dynamics_model.input_dim
@@ -42,8 +42,6 @@ def verify_nn(
     onnx_input_dim = network.inputVars[0].shape[1:]
     assert len(onnx_input_dim) == 1, f"Only 1D input dims are supported, was {len(onnx_input_dim)}"
     assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
-
-    # partial_process_sample = partial(strategy.verify, network, dynamics_model, epsilon=dynamics_model.epsilon)
 
     linearization_strategy = default_linearization(dynamics_model)
     verification_strategy = MarabouTaylorStrategy(network, dynamics_model, epsilon=dynamics_model.epsilon)
@@ -55,8 +53,6 @@ def verify_nn(
         for j in range(output_dim) for x in X_train
     ]
 
-    # prepare_strategy = partial(strategy.prepare_strategy, dynamics_model)
-
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
     if visualize and input_dim in [1, 2] and num_workers == 0:
@@ -67,12 +63,11 @@ def verify_nn(
 
     if num_workers == 0:
         executor = SinglethreadExecutor(linearization_strategy, verification_strategy)
-        # Pass the plotter to the executor
-        cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(aggregate, samples, plotter)
     else:
-        executor = MultiprocessExecutor(num_workers)
-        # Note: Visualization is not supported in multiprocessing mode
-        cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(aggregate, samples)
+        executor = MultiprocessExecutor(linearization_strategy, verification_strategy, num_workers=num_workers)
+
+    # Pass the plotter to the executor
+    cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(aggregate, samples, plotter)
 
     num_cex = len(cex_list) if cex_list else 0
 
