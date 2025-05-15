@@ -60,6 +60,9 @@ class SimpleNN(nn.Module):
 # Train the neural network
 def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4096, residual=False, leaky_relu=False):
 
+    if hasattr(dynamics_model, 'leaky_relu'):
+        leaky_relu = dynamics_model.leaky_relu
+
     input_size = dynamics_model.input_dim
     hidden_sizes = dynamics_model.hidden_sizes  # Get hidden sizes from dynamics model
     output_size = dynamics_model.output_dim  # Update output size to match target size
@@ -78,8 +81,8 @@ def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4
     model = SimpleNN(input_size, hidden_sizes, output_size, residual=residual, leaky_relu=leaky_relu)
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)  # Use AdamW optimizer
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.90, patience=200, min_lr=1e-6
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=num_epochs, eta_min=1e-6
     )
 
     # Load data
@@ -113,13 +116,6 @@ def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4
             best_loss = max_loss.detach().item()
             # Save the best model state
             best_model_state = model.state_dict().copy()
-            patience_counter = 0
-        else:
-            patience_counter += 1
-
-        if patience_counter >= patience and best_loss < epsilon:
-            print(f"Early stopping triggered at epoch {epoch+1}. Best max loss: {best_loss:.6f}")
-            break
 
     # Restore the best model if we found one during training
     if best_model_state is not None:

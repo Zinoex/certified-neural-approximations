@@ -62,7 +62,7 @@ class VanDerPolOscillator(DynamicalSystem):
         self.input_domain = [(-3.0, 3.0), (-3.0, 3.0)]  # Typical domain for Van der Pol oscillator
         self.hidden_sizes = [64, 64, 64]
         self.delta = np.array([0.75, 1.5])  # Domain size for the input
-        self.epsilon = 0.21  # 1% of the derivative range
+        self.epsilon = 0.21   
         self.system_name = "VanDerPolOscillator"
 
     def compute_dynamics(self, x, translator):
@@ -455,7 +455,7 @@ class NonlinearOscillator(DynamicalSystem):
         self.input_domain = [(-3.0, 3.0)]  # Typical domain for oscillator
         self.hidden_sizes = [64, 64, 64]
         self.delta = np.array([0.375])
-        self.epsilon = 0.01 * 0.3 * (55 - math.sin(3.0))  # 1% of the derivative range
+        self.epsilon = 0.01 * 0.3 * (55 - math.sin(3.0))   
         self.system_name = "NonlinearOscillator"
     
     def compute_dynamics(self, x, translator):
@@ -478,17 +478,18 @@ class NonlinearOscillator(DynamicalSystem):
 class Sine2D(DynamicalSystem):
     """A simple 2D sine dynamical system with configurable frequencies."""
     
-    def __init__(self, freq_x=1.0, freq_y=1.0):
+    def __init__(self, freq_x=1.0, freq_y=0.5):
         super().__init__()
         # Frequency parameters to control oscillation speed
         self.freq_x = freq_x
         self.freq_y = freq_y
         self.input_dim = 2  # 2D system
         self.output_dim = 2  # 2D output
-        self.input_domain = [(-2.0, 2.0), (-2.0, 2.0)]  # Domain for both dimensions
+        self.input_domain = [(-np.pi, np.pi), (-np.pi, np.pi)]  # Domain for both dimensions
         self.hidden_sizes = [64, 64, 64]
         self.delta = np.array([0.5, 1.0])
-        self.epsilon = 0.01  # 1% of the derivative range
+        self.epsilon = 0.02   
+        self.leaky_relu = True
         self.system_name = "Sine2D"
     
     def compute_dynamics(self, x, translator):
