@@ -352,7 +352,7 @@ class SteamGovernor(DynamicalSystem):
         self.hidden_sizes = [12]
         self.delta = np.array([0.5, 0.5, 0.5])
         self.epsilon = 0.105     
-        self.small_epsilon = 0.04     # is tractable for the larger network 
+        self.small_epsilon = 0.06     # is tractable for the larger network 
         self.system_name = "SteamGovernor"
         
     def compute_dynamics(self, x, translator):

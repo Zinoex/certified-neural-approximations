@@ -138,4 +138,3 @@ plots/
 # Ignore log and dat files
 logs/
 *.dat
-*pth
