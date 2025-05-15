@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import time
-from grid_neural_abstractions.translators.bound_propagation_translator import BoundPropagationTranslator
+from certified_neural_approximations.translators.bound_propagation_translator import BoundPropagationTranslator
 from bound_propagation import LinearBounds
 import numpy as np
 from maraboupy import MarabouCore, MarabouUtils

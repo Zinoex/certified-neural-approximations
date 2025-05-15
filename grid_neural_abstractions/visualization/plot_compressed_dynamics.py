@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
-from grid_neural_abstractions.dynamics import NNDynamics, LorenzAttractor
-from grid_neural_abstractions.train_nn import load_torch_model
-from grid_neural_abstractions.translators import NumpyTranslator, TorchTranslator
+from certified_neural_approximations.dynamics import NNDynamics, LorenzAttractor
+from certified_neural_approximations.train_nn import load_torch_model
+from certified_neural_approximations.translators import NumpyTranslator, TorchTranslator
 
 
 @torch.no_grad()
