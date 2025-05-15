@@ -62,7 +62,7 @@ class VanDerPolOscillator(DynamicalSystem):
         self.input_domain = [(-3.0, 3.0), (-3.0, 3.0)]  # Typical domain for Van der Pol oscillator
         self.hidden_sizes = [64, 64, 64]
         self.delta = np.array([0.75, 1.5])  # Domain size for the input
-        self.epsilon = 0.21   
+        self.epsilon = 0.25
         self.system_name = "VanDerPolOscillator"
 
     def compute_dynamics(self, x, translator):
@@ -310,7 +310,7 @@ class WaterTank(DynamicalSystem):
         self.hidden_sizes = [12]
         self.delta = np.array([10.1 / 16])
         self.epsilon = 0.097 
-        self.small_epsilon = 0.002  # is tractable for the larger network
+        self.small_epsilon = 0.007  # is tractable for the larger network
         self.system_name = "WaterTank"
         
     def compute_dynamics(self, x, translator):
