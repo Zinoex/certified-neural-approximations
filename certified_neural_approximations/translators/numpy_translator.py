@@ -136,6 +136,16 @@ class NumpyTranslator:
         :return: np.ndarray
         """
         return np.column_stack(a)
+        
+    def cat(self, a):
+        """
+        Concatenate a list of numpy arrays along the first axis
+
+        :param a: list of np.ndarray
+
+        :return: np.ndarray
+        """
+        return np.concatenate(a)
 
     def to_numpy(self, a):
         """

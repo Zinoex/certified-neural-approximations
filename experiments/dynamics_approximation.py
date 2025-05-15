@@ -3,7 +3,7 @@ import os
 import time
 from certified_neural_approximations.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
     NonLipschitzVectorField1, NonLipschitzVectorField2
-from certified_neural_approximations.dynamics import VanDerPolOscillator, Quadcopter, Sine2D, NonlinearOscillator
+from certified_neural_approximations.dynamics import VanDerPolOscillator, Sine2D, NonlinearOscillator, QuadraticSystem
 
 from certified_neural_approximations.train_nn import train_nn, save_model
 from certified_neural_approximations.verify_nn import verify_nn
@@ -26,7 +26,7 @@ NEW_SYSTEMS = [
     VanDerPolOscillator,
     Sine2D,
     NonlinearOscillator,
-    # Quadcopter,
+    #QuadraticSystem,
 ]
 
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS
@@ -104,6 +104,27 @@ def verify_64_models(residual=False, leaky_relu=False):
         t2 = time.time()
         print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds")
 
+def verify_other_models(residual=False, leaky_relu=False):
+    residual_path = '_residual' if residual else ''
+    leaky_relu_path = 'leaky_relu' if leaky_relu else ''
+
+    for dynamics_cls in SYSTEMS:
+        dynamics = dynamics_cls()
+
+        if hasattr(dynamics, 'small_epsilon'):
+            dynamics.epsilon = dynamics.small_epsilon
+
+        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_nn{residual_path}{leaky_relu_path}.onnx")
+
+        print(f"\nVerifying model {dynamics.system_name}")
+        t1 = time.time()
+        verify_nn(
+            onnx_path=path,
+            dynamics_model=dynamics,
+            visualize=False
+        )
+        t2 = time.time()
+        print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds")
 
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -112,6 +133,7 @@ def main():
     # train_64_models()
     # verify_na_models()
     verify_64_models()
+    verify_other_models()
 
 
 if __name__ == "__main__":
