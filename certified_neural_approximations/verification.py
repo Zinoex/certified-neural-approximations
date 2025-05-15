@@ -39,7 +39,7 @@ def mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper):
 
 class VerificationStrategy(ABC):
     @abstractmethod
-    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-8):
+    def verify(self, network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
         """
         Verify the neural network against the dynamics.
 
@@ -61,7 +61,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         prepare_taylor_expansion(dynamics.input_dim)
 
     @staticmethod
-    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-7):
+    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         from maraboupy import Marabou
