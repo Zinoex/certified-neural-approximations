@@ -10,7 +10,7 @@ class LinearResidual(nn.Module):
         super().__init__()
         self.linear = nn.Linear(size, size, device=device)
         self.residual_linear = nn.Linear(size, size, device=device)
-        
+
         if leaky_relu:
             self.act = nn.LeakyReLU()
         else:
@@ -58,20 +58,20 @@ class SimpleNN(nn.Module):
 
 
 # Train the neural network
-def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_size = 4096, residual=False, leaky_relu=False):
-    
+def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4096, residual=False, leaky_relu=False):
+
     input_size = dynamics_model.input_dim
     hidden_sizes = dynamics_model.hidden_sizes  # Get hidden sizes from dynamics model
     output_size = dynamics_model.output_dim  # Update output size to match target size
     input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
     epsilon = dynamics_model.epsilon  # Get epsilon from dynamics model
-    
+
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
     patience = 5000
     best_loss = float('inf')
     patience_counter = 0
-    
+
     # Add variable to store the best model state
     best_model_state = None
 
@@ -85,20 +85,21 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
     # Load data
     for epoch in range(num_epochs):
         if epoch % 50 == 0:
-            X_train, y_train = generate_data(input_size, input_domain, batch_size=batch_size, dynamics_model=dynamics_model, device=model.device)
+            X_train, y_train = generate_data(input_size, input_domain, batch_size=batch_size,
+                                             dynamics_model=dynamics_model, device=model.device)
 
         model.train()
         outputs = model(X_train.T)
         max_loss = torch.max(torch.abs(outputs - y_train.T))
         avg_loss = criterion(outputs, y_train.T)
         loss = avg_loss + 0.001 * max_loss  # Add max loss to the MSE loss
-            
+
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
-        
+
         # Apply gradient clipping to prevent explosion
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
-        
+
         optimizer.step()
         scheduler.step(loss)  # Update learning rate based on loss
 
@@ -106,7 +107,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
             print(
                 f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {avg_loss.item():.6f}, Max: {max_loss.item():.6f}, LR: {optimizer.param_groups[0]['lr']:.6f}"
             )
-            
+
         # Early stopping logic and best model tracking
         if max_loss < best_loss and epoch > 2500:
             best_loss = max_loss.detach().item()
@@ -115,7 +116,7 @@ def train_nn(dynamics_model, learning_rate = 0.001, num_epochs = 50000, batch_si
             patience_counter = 0
         else:
             patience_counter += 1
-            
+
         if patience_counter >= patience and best_loss < epsilon:
             print(f"Early stopping triggered at epoch {epoch+1}. Best max loss: {best_loss:.6f}")
             break

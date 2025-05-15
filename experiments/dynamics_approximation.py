@@ -1,6 +1,8 @@
 
 import os
 import time
+
+import torch
 from certified_neural_approximations.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
     NonLipschitzVectorField1, NonLipschitzVectorField2
 from certified_neural_approximations.dynamics import VanDerPolOscillator, Sine2D, NonlinearOscillator, QuadraticSystem
@@ -36,6 +38,7 @@ def train_na_models(leaky_relu=False):
 
     for dynamics_cls in NA_SYSTEMS:
         dynamics = dynamics_cls()
+        torch.manual_seed(0)
 
         print(f"\nTraining {dynamics.system_name} system")
         model = train_nn(dynamics_model=dynamics, leaky_relu=leaky_relu)
@@ -53,6 +56,7 @@ def train_64_models(residual=False, leaky_relu=False):
     for dynamics_cls in SYSTEMS:
         dynamics = dynamics_cls()
         dynamics.hidden_sizes = [64, 64, 64]
+        torch.manual_seed(0)
 
         print(f"\nTraining {dynamics.system_name} system with 3x[64] neurons")
         model = train_nn(dynamics_model=dynamics, residual=residual, leaky_relu=leaky_relu)
@@ -104,6 +108,7 @@ def verify_64_models(residual=False, leaky_relu=False):
         t2 = time.time()
         print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds")
 
+
 def verify_other_models(residual=False, leaky_relu=False):
     residual_path = '_residual' if residual else ''
     leaky_relu_path = 'leaky_relu' if leaky_relu else ''
@@ -125,6 +130,7 @@ def verify_other_models(residual=False, leaky_relu=False):
         )
         t2 = time.time()
         print(f"Verification completed for {dynamics.system_name} system, took {t2 - t1:.2f} seconds")
+
 
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
