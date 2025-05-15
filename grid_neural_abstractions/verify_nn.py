@@ -1,14 +1,14 @@
 from functools import partial
-from grid_neural_abstractions.executors import (
+from certified_neural_approximations.executors import (
     MultiprocessExecutor,
     SinglethreadExecutor,
 )
-from grid_neural_abstractions.linearization import default_linearization
-from grid_neural_abstractions.verification import MarabouTaylorStrategy
-from grid_neural_abstractions.certification_results import CertificationRegion
+from certified_neural_approximations.linearization import default_linearization
+from certified_neural_approximations.verification import MarabouTaylorStrategy
+from certified_neural_approximations.certification_results import CertificationRegion
 
-from grid_neural_abstractions.generate_data import generate_grid
-from grid_neural_abstractions.visualization import DynamicsNetworkPlotter  # Import the new plotter
+from certified_neural_approximations.generate_data import generate_grid
+from certified_neural_approximations.visualization import DynamicsNetworkPlotter  # Import the new plotter
 
 
 def load_onnx(onnx_path):

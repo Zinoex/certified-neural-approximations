@@ -1,5 +1,5 @@
-from grid_neural_abstractions.certification_results import AugmentedSample
-from grid_neural_abstractions.translators import JuliaTranslator
+from certified_neural_approximations.certification_results import AugmentedSample
+from certified_neural_approximations.translators import JuliaTranslator
 import numpy as np
 from juliacall import Main as jl
 jl.seval("using TaylorModels")

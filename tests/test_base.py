@@ -1,5 +1,5 @@
-from grid_neural_abstractions.base import NAME
+from certified_neural_approximations.base import NAME
 
 
 def test_base():
-    assert NAME == "grid_neural_abstractions"
+    assert NAME == "certified_neural_approximations"

@@ -1,8 +1,8 @@
 
 import torch
 from bound_propagation import LinearBounds
-from grid_neural_abstractions.certification_results import AugmentedSample
-from grid_neural_abstractions.translators import BoundPropagationTranslator
+from certified_neural_approximations.certification_results import AugmentedSample
+from certified_neural_approximations.translators import BoundPropagationTranslator
 
 
 class CrownLinearization:

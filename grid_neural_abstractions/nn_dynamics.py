@@ -1,5 +1,5 @@
 import torch
-from grid_neural_abstractions.dynamics import DynamicalSystem
+from certified_neural_approximations.dynamics import DynamicalSystem
 from .translators import TorchTranslator
 import numpy as np
 

@@ -9,11 +9,11 @@ import pickle
 import glob
 import psutil
 import numpy as np
-from grid_neural_abstractions.certification_results import CertificationRegion
+from certified_neural_approximations.certification_results import CertificationRegion
 
 from tqdm import tqdm
 
-from grid_neural_abstractions.executors.stats import Statistics  # Added tqdm for progress tracking
+from certified_neural_approximations.executors.stats import Statistics  # Added tqdm for progress tracking
 
 # Possible future states (for internal use by the futures package).
 PENDING = 'PENDING'

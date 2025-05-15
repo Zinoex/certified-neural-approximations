@@ -23,20 +23,20 @@ install:          ## Install the project in dev mode.
 
 .PHONY: fmt
 fmt:              ## Format code using black & isort.
-	$(ENV_PREFIX)isort grid_neural_abstractions/
-	$(ENV_PREFIX)black -l 79 grid_neural_abstractions/
+	$(ENV_PREFIX)isort certified_neural_approximations/
+	$(ENV_PREFIX)black -l 79 certified_neural_approximations/
 	$(ENV_PREFIX)black -l 79 tests/
 
 .PHONY: lint
 lint:             ## Run pep8, black, mypy linters.
-	$(ENV_PREFIX)flake8 grid_neural_abstractions/
-	$(ENV_PREFIX)black -l 79 --check grid_neural_abstractions/
+	$(ENV_PREFIX)flake8 certified_neural_approximations/
+	$(ENV_PREFIX)black -l 79 --check certified_neural_approximations/
 	$(ENV_PREFIX)black -l 79 --check tests/
-	$(ENV_PREFIX)mypy --ignore-missing-imports grid_neural_abstractions/
+	$(ENV_PREFIX)mypy --ignore-missing-imports certified_neural_approximations/
 
 .PHONY: test
 test: lint        ## Run tests and generate coverage report.
-	$(ENV_PREFIX)pytest -v --cov-config .coveragerc --cov=grid_neural_abstractions -l --tb=short --maxfail=1 tests/
+	$(ENV_PREFIX)pytest -v --cov-config .coveragerc --cov=certified_neural_approximations -l --tb=short --maxfail=1 tests/
 	$(ENV_PREFIX)coverage xml
 	$(ENV_PREFIX)coverage html
 
@@ -69,9 +69,9 @@ condaenv:       ## Create a conda environment.
 release:          ## Create a new tag for release.
 	@echo "WARNING: This operation will create s version tag and push to github"
 	@read -p "Version? (provide the next x.y.z semver) : " TAG
-	@echo "$${TAG}" > grid_neural_abstractions/VERSION
+	@echo "$${TAG}" > certified_neural_approximations/VERSION
 	@$(ENV_PREFIX)gitchangelog > HISTORY.md
-	@git add grid_neural_abstractions/VERSION HISTORY.md
+	@git add certified_neural_approximations/VERSION HISTORY.md
 	@git commit -m "release: version $${TAG} 🚀"
 	@echo "creating git tag : $${TAG}"
 	@git tag $${TAG}

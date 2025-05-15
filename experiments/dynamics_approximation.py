@@ -1,10 +1,10 @@
 import os
 import time
-from grid_neural_abstractions.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
+from certified_neural_approximations.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
     NonLipschitzVectorField1, NonLipschitzVectorField2
-from grid_neural_abstractions.dynamics import VanDerPolOscillator, LowThrustSpacecraft, Sine2D, NonlinearOscillator, QuadraticSystem
-from grid_neural_abstractions.verify_nn import verify_nn
-from grid_neural_abstractions.train_nn import train_nn, save_model
+from certified_neural_approximations.dynamics import VanDerPolOscillator, LowThrustSpacecraft, Sine2D, NonlinearOscillator, QuadraticSystem
+from certified_neural_approximations.verify_nn import verify_nn
+from certified_neural_approximations.train_nn import train_nn, save_model
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

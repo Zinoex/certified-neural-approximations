@@ -4,7 +4,7 @@ import time
 import types
 import numpy as np
 
-from grid_neural_abstractions.certification_results import AugmentedSample, \
+from certified_neural_approximations.certification_results import AugmentedSample, \
     SampleResultSAT, SampleResultUNSAT, SampleResultMaybe
 
 
