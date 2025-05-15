@@ -133,5 +133,9 @@ dmypy.json
 
 
 # Project-specific ignores
-data/
 plots/
+
+# Ignore log and dat files
+logs/
+*.dat
+*pth
