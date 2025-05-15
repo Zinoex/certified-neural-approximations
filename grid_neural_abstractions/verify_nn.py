@@ -1,15 +1,15 @@
 from functools import partial
 
-from grid_neural_abstractions.train_nn import load_onnx_model
-from grid_neural_abstractions.executors import (
+from certified_neural_approximations.train_nn import load_onnx_model
+from certified_neural_approximations.executors import (
     MultiprocessExecutor,
     SinglethreadExecutor,
 )
 
-from grid_neural_abstractions.verification import MarabouTaylorStrategy
-from grid_neural_abstractions.certification_results import CertificationRegion
+from certified_neural_approximations.verification import MarabouTaylorStrategy
+from certified_neural_approximations.certification_results import CertificationRegion
 
-from grid_neural_abstractions.generate_data import generate_grid
+from certified_neural_approximations.generate_data import generate_grid
 
 
 

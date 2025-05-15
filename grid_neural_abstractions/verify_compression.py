@@ -12,12 +12,12 @@ from tqdm import tqdm
 from bound_propagation import HyperRectangle, BoundModelFactory, LinearBounds
 
 import onnxruntime
-from grid_neural_abstractions.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
-from grid_neural_abstractions.dynamics import LorenzAttractor, NNDynamics, Quadcopter
-from grid_neural_abstractions.train_nn import load_onnx_model, load_torch_model
-from grid_neural_abstractions.verification import mean_linear_bound, split_sample
-from grid_neural_abstractions.verify_nn import aggregate
-from grid_neural_abstractions.generate_data import generate_grid
+from certified_neural_approximations.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
+from certified_neural_approximations.dynamics import LorenzAttractor, NNDynamics, Quadcopter
+from certified_neural_approximations.train_nn import load_onnx_model, load_torch_model
+from certified_neural_approximations.verification import mean_linear_bound, split_sample
+from certified_neural_approximations.verify_nn import aggregate
+from certified_neural_approximations.generate_data import generate_grid
 
 
 class CompressionVerificationStrategy(ABC):

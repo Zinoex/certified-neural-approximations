@@ -6,8 +6,8 @@ from bound_propagation import LinearBounds
 import numpy as np
 from maraboupy import MarabouCore, MarabouUtils
 
-from grid_neural_abstractions.taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
-from grid_neural_abstractions.certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
+from certified_neural_approximations.taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
+from certified_neural_approximations.certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2

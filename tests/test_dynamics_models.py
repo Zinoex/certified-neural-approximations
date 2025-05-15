@@ -6,15 +6,15 @@ from pathlib import Path
 # Add parent directory to path so we can import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from grid_neural_abstractions.dynamics import DynamicalSystem
-from grid_neural_abstractions.verify_nn import verify_nn
+from certified_neural_approximations.dynamics import DynamicalSystem
+from certified_neural_approximations.verify_nn import verify_nn
 
 
 def get_all_dynamics_systems():
     """
     Get all dynamics systems defined in the dynamics module.
     """
-    from grid_neural_abstractions import dynamics
+    from certified_neural_approximations import dynamics
     
     # Find all classes that inherit from DynamicalSystem
     dynamics_systems = []
@@ -64,7 +64,7 @@ class TestDynamicsModels(unittest.TestCase):
             
             # Check if model exists or train one
             if not model_exists(name):
-                from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+                from certified_neural_approximations.train_nn import train_nn, save_onnx_model
                 print(f"Training model for {name}...")
                 
                 # Using the train_nn function but with the specific dynamics model
@@ -88,7 +88,7 @@ class TestDynamicsModels(unittest.TestCase):
     
     def test_sine2d_system(self):
         """Test specifically for the Sine2D system."""
-        from grid_neural_abstractions.dynamics import Sine2D
+        from certified_neural_approximations.dynamics import Sine2D
         
         # Create models directory if it doesn't exist
         model_dir = Path(__file__).parent.parent / "data"
@@ -102,7 +102,7 @@ class TestDynamicsModels(unittest.TestCase):
     
     def _test_sine2d_with_freq(self, model_dir, freq_x, freq_y, model_name):
         """Helper method to test Sine2D with specific frequencies."""
-        from grid_neural_abstractions.dynamics import Sine2D
+        from certified_neural_approximations.dynamics import Sine2D
         
         # Model file path
         model_path = model_dir / f"{model_name}_model.onnx"
@@ -114,7 +114,7 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Check if model exists or train one
         if not model_path.exists():
-            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            from certified_neural_approximations.train_nn import train_nn, save_onnx_model
             print(f"Training model for Sine2D...")
             
             # Generate data and train the neural network
@@ -138,7 +138,7 @@ class TestDynamicsModels(unittest.TestCase):
     
     def test_jet_engine(self):
         """Test specifically for the JetEngine system."""        
-        from grid_neural_abstractions.dynamics import JetEngine
+        from certified_neural_approximations.dynamics import JetEngine
         
         # Create models directory if it doesn't exist
         model_dir = Path(__file__).parent.parent / "data"
@@ -154,7 +154,7 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Check if model exists or train one
         if not model_path.exists():
-            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            from certified_neural_approximations.train_nn import train_nn, save_onnx_model
             print(f"Training model for Jet Engine...")
             
             # Generate data and train the neural network
@@ -176,7 +176,7 @@ class TestDynamicsModels(unittest.TestCase):
     
     def test_quadcopter(self):
         """Test specifically for the Quadcopter system."""        
-        from grid_neural_abstractions.dynamics import Quadcopter
+        from certified_neural_approximations.dynamics import Quadcopter
 
         # Create models directory if it doesn't exist
         model_dir = Path(__file__).parent.parent / "data"
@@ -192,7 +192,7 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Check if model exists or train one
         if not model_path.exists():
-            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            from certified_neural_approximations.train_nn import train_nn, save_onnx_model
             print(f"Training model for Quadcopter...")
             
             # Use a larger network for the complex 12D dynamics
@@ -213,7 +213,7 @@ class TestDynamicsModels(unittest.TestCase):
     
     def test_vortex_shedding(self):
         """Test specifically for the VortexShedding3D system."""
-        from grid_neural_abstractions.dynamics import VortexShedding3D
+        from certified_neural_approximations.dynamics import VortexShedding3D
         
         # Create models directory if it doesn't exist
         model_dir = Path(__file__).parent.parent / "data"
@@ -229,7 +229,7 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Check if model exists or train one
         if not model_path.exists():
-            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            from certified_neural_approximations.train_nn import train_nn, save_onnx_model
             print(f"Training model for VortexShedding3D...")
             
             # Generate data and train the neural network
@@ -250,7 +250,7 @@ class TestDynamicsModels(unittest.TestCase):
         
     def test_vortex_shedding_4d(self):
         """Test specifically for the VortexShedding4D system."""
-        from grid_neural_abstractions.dynamics import VortexShedding4D
+        from certified_neural_approximations.dynamics import VortexShedding4D
         
         # Create models directory if it doesn't exist
         model_dir = Path(__file__).parent.parent / "data"
@@ -266,7 +266,7 @@ class TestDynamicsModels(unittest.TestCase):
         
         # Check if model exists or train one
         if not model_path.exists():
-            from grid_neural_abstractions.train_nn import train_nn, save_onnx_model
+            from certified_neural_approximations.train_nn import train_nn, save_onnx_model
             print(f"Training model for VortexShedding4D...")
             
             # Generate data and train the neural network

@@ -8,16 +8,16 @@ import matplotlib.pyplot as plt
 # Add parent directory to path so we can import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from grid_neural_abstractions.dynamics import DynamicalSystem, NonlinearOscillator, WaterTank
-from grid_neural_abstractions.train_nn import train_nn, save_onnx_model, generate_data
-from grid_neural_abstractions.verify_nn import verify_nn
+from certified_neural_approximations.dynamics import DynamicalSystem, NonlinearOscillator, WaterTank
+from certified_neural_approximations.train_nn import train_nn, save_onnx_model, generate_data
+from certified_neural_approximations.verify_nn import verify_nn
 
 
 def get_1D_systems():
     """
     Get all 1D dynamics systems defined in the dynamics module.
     """
-    from grid_neural_abstractions import dynamics
+    from certified_neural_approximations import dynamics
     
     # Find all classes that inherit from DynamicalSystem and have input_dim=1
     dynamics_systems = []

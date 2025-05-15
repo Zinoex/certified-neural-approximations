@@ -1,6 +1,6 @@
 # How to develop on this project
 
-grid_neural_abstractions welcomes contributions from the community.
+certified_neural_approximations welcomes contributions from the community.
 
 **You need PYTHON3!**
 
@@ -8,9 +8,9 @@ This instructions are for linux base systems. (Linux, MacOS, BSD, etc.)
 ## Setting up your own fork of this repo.
 
 - On github interface click on `Fork` button.
-- Clone your fork of this repo. `git clone git@github.com:YOUR_GIT_USERNAME/grid-neural-abstractions.git`
-- Enter the directory `cd grid-neural-abstractions`
-- Add upstream repo `git remote add upstream https://github.com/Zinoex/grid-neural-abstractions`
+- Clone your fork of this repo. `git clone git@github.com:YOUR_GIT_USERNAME/certified-neural-approximations.git`
+- Enter the directory `cd certified-neural-approximations`
+- Add upstream repo `git remote add upstream https://github.com/<Username>/certified-neural-approximations`
 
 ## Setting up your own virtual environment
 

@@ -40,7 +40,7 @@ See also
 - ✅ Code linting using [flake8](https://flake8.pycqa.org/en/latest/)
 - 📊 Code coverage reports using [codecov](https://about.codecov.io/sign-up/)
 - 🛳️ Automatic release to [PyPI](https://pypi.org) using [twine](https://twine.readthedocs.io/en/latest/) and github actions.
-- 🎯 Entry points to execute your program using `python -m <grid_neural_abstractions>` or `$ grid_neural_abstractions` with basic CLI argument parsing.
+- 🎯 Entry points to execute your program using `python -m <certified_neural_approximations>` or `$ certified_neural_approximations` with basic CLI argument parsing.
 - 🔄 Continuous integration using [Github Actions](.github/workflows/) with jobs to lint, test and release your project on Linux, Mac and Windows environments.
 
 > Curious about architectural decisions on this template? read [ABOUT_THIS_TEMPLATE.md](ABOUT_THIS_TEMPLATE.md)  
@@ -51,12 +51,12 @@ See also
 <!--  DELETE THE LINES ABOVE THIS AND WRITE YOUR PROJECT README BELOW -->
 
 ---
-# grid_neural_abstractions
+# certified_neural_approximations
 
-[![codecov](https://codecov.io/gh/Zinoex/grid-neural-abstractions/branch/main/graph/badge.svg?token=grid-neural-abstractions_token_here)](https://codecov.io/gh/Zinoex/grid-neural-abstractions)
-[![CI](https://github.com/Zinoex/grid-neural-abstractions/actions/workflows/main.yml/badge.svg)](https://github.com/Zinoex/grid-neural-abstractions/actions/workflows/main.yml)
+[![codecov](https://codecov.io/gh/<Username>/certified-neural-approximations/branch/main/graph/badge.svg?token=certified-neural-approximations_token_here)](https://codecov.io/gh/<Username>/certified-neural-approximations)
+[![CI](https://github.com/<Username>/certified-neural-approximations/actions/workflows/main.yml/badge.svg)](https://github.com/<Username>/certified-neural-approximations/actions/workflows/main.yml)
 
-Awesome grid_neural_abstractions created by Zinoex
+Awesome certified_neural_approximations created by <Username>
 
 ## Install it from PyPI
 
@@ -67,17 +67,17 @@ pip install -e .
 ## Usage
 
 ```py
-from grid_neural_abstractions import BaseClass
-from grid_neural_abstractions import base_function
+from certified_neural_approximations import BaseClass
+from certified_neural_approximations import base_function
 
 BaseClass().base_method()
 base_function()
 ```
 
 ```bash
-$ python -m grid_neural_abstractions
+$ python -m certified_neural_approximations
 #or
-$ grid_neural_abstractions
+$ certified_neural_approximations
 ```
 
 ## Development

@@ -1,4 +1,4 @@
-"""CLI interface for grid_neural_abstractions project.
+"""CLI interface for certified_neural_approximations project.
 
 Be creative! do whatever you want!
 
@@ -12,7 +12,7 @@ Be creative! do whatever you want!
 def main():  # pragma: no cover
     """
     The main function executes on commands:
-    `python -m grid_neural_abstractions` and `$ grid_neural_abstractions `.
+    `python -m certified_neural_approximations` and `$ certified_neural_approximations `.
 
     This is your program's entry point.
 

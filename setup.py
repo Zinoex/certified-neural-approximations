@@ -1,4 +1,4 @@
-"""Python setup.py for grid_neural_abstractions package"""
+"""Python setup.py for certified_neural_approximations package"""
 import io
 import os
 from setuptools import find_packages, setup
@@ -6,7 +6,7 @@ from setuptools import find_packages, setup
 
 def read(*paths, **kwargs):
     """Read the contents of a text file safely.
-    >>> read("grid_neural_abstractions", "VERSION")
+    >>> read("certified_neural_approximations", "VERSION")
     '0.1.0'
     >>> read("README.md")
     ...
@@ -30,17 +30,17 @@ def read_requirements(path):
 
 
 setup(
-    name="grid_neural_abstractions",
-    version=read("grid_neural_abstractions", "VERSION"),
-    description="Awesome grid_neural_abstractions created by Zinoex",
-    url="https://github.com/Zinoex/grid-neural-abstractions/",
+    name="certified_neural_approximations",
+    version=read("certified_neural_approximations", "VERSION"),
+    description="Awesome certified_neural_approximations created by <Username>",
+    url="https://github.com/<Username>/certified-neural-approximations/",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
-    author="Zinoex",
+    author="<Username>",
     packages=find_packages(exclude=["tests", ".github"]),
     install_requires=read_requirements("requirements.txt"),
     entry_points={
-        "console_scripts": ["grid_neural_abstractions = grid_neural_abstractions.__main__:main"]
+        "console_scripts": ["certified_neural_approximations = certified_neural_approximations.__main__:main"]
     },
     extras_require={"test": read_requirements("requirements-test.txt")},
 )

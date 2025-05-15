@@ -1,13 +1,13 @@
 import numpy as np
-from grid_neural_abstractions.dynamics import LorenzAttractor, NNDynamics
-from grid_neural_abstractions.generate_data import generate_data
-from grid_neural_abstractions.train_nn import SimpleNN, load_torch_model, train_nn, save_model
+from certified_neural_approximations.dynamics import LorenzAttractor, NNDynamics
+from certified_neural_approximations.generate_data import generate_data
+from certified_neural_approximations.train_nn import SimpleNN, load_torch_model, train_nn, save_model
 
 import torch
 from torch import nn, optim
 from scipy.integrate import solve_ivp
 
-from grid_neural_abstractions.translators.numpy_translator import NumpyTranslator
+from certified_neural_approximations.translators.numpy_translator import NumpyTranslator
 
 
 def generate_data_from_trajectories(dynamics_model, batch_size=128, dt=0.02, trajectory_length=64, device=None):
