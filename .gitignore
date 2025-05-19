@@ -138,3 +138,4 @@ plots/
 # Ignore log and dat files
 logs/
 *.dat
+dlkoopman_logs/

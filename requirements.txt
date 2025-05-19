@@ -1,6 +1,7 @@
 # Infrastructure
 tqdm
 juliacall
+shortuuid
 
 # Functionality
 numpy
@@ -10,6 +11,7 @@ onnx
 onnxruntime
 bound_propagation==0.4.5
 scipy
+dlkoopman
 
 #Plotting
 matplotlib
