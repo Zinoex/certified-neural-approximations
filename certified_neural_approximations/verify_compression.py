@@ -12,6 +12,7 @@ from tqdm import tqdm
 from bound_propagation import HyperRectangle, BoundModelFactory, LinearBounds
 
 import onnxruntime
+from certified_neural_approximations import executors
 from certified_neural_approximations.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
 from certified_neural_approximations.dynamics import LorenzAttractor, NNDynamics
 from certified_neural_approximations.train_nn import load_onnx_model, load_torch_model
@@ -32,10 +33,12 @@ class CompressionVerificationStrategy(ABC):
 class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy):
 
     def verify(self, large_network_dynamics, small_network, epsilon, precision=1e-6):
+        start_time = time.time()
+
         from maraboupy import Marabou, MarabouCore, MarabouUtils
         joint_network, outputVarsLarge, outputVarsSmall = self.merge_networks(large_network_dynamics.network, small_network)
         inputVars = joint_network.inputVars[0].flatten()
-    
+
         # Add input constraints
         input_dim = large_network_dynamics.input_dim
         for i in range(input_dim):
@@ -61,12 +64,12 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
         res, vals, _ = joint_network.solve(options, verbose=False)
 
         if res == 'sat':
-            return SampleResultSAT(large_network_dynamics.input_domain)
+            return SampleResultSAT(large_network_dynamics.input_domain, start_time)
         elif res == 'unsat':
             # This sort of query does not return a counterexample.
             # If we change the query to sat if counterexample found, we can
             # return the counterexample.
-            return SampleResultUNSAT(large_network_dynamics.input_domain, [])
+            return SampleResultUNSAT(large_network_dynamics.input_domain, start_time, [])
 
     def merge_networks(self, large_network, small_network):
         from maraboupy import Marabou, MarabouCore, MarabouUtils
@@ -102,7 +105,8 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
         # TODO: Add other equation types
 
         # Add new input variables
-        joint_network.inputVars[0] = np.arange(joint_network.numVars, joint_network.numVars + small_network_inputVars.shape[0], dtype=np.int64).reshape((1, -1))
+        joint_network.inputVars[0] = np.arange(joint_network.numVars, joint_network.numVars +
+                                               small_network_inputVars.shape[0], dtype=np.int64).reshape((1, -1))
         joint_network_inputVars = joint_network.inputVars[0].flatten()
         joint_network.numVars += small_network_inputVars.shape[0]
 
@@ -123,8 +127,6 @@ class MarabouOnlyCompressionVerificationStrategy(CompressionVerificationStrategy
         joint_network.outputVars[0] = np.concatenate((large_network_outputVars, small_network_outputVars)).reshape((1, -1))
 
         return joint_network, large_network_outputVars, small_network_outputVars
-
-
 
 
 class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrategy):
@@ -163,26 +165,23 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         _LOCAL.onnx_model = evaluate
         _LOCAL.small_network = load_onnx_model(small_network_onnx_path)
 
-
     def verify(self, large_network_dynamics, small_network_onnx_path, precision=1e-6, batch_size=20, plotter=None):
-        self.pool = Pool(self.num_workers, initializer=self.initialize_pool, initargs=(large_network_dynamics.onnx_path, small_network_onnx_path))
+        self.pool = Pool(self.num_workers, initializer=self.initialize_pool, initargs=(
+            large_network_dynamics.onnx_path, small_network_onnx_path))
 
         factory = BoundModelFactory()
         self.bound_network = factory.build(large_network_dynamics.network.network)
 
         # Generate initial set of samples
         delta = np.full(large_network_dynamics.input_dim, large_network_dynamics.delta)
-        X_train, _ = generate_grid(large_network_dynamics.input_dim, dynamics_model.input_domain, delta=delta)
-        output_dim = dynamics_model.output_dim
+        X_train, _ = generate_grid(large_network_dynamics.input_dim, large_network_dynamics.input_domain, delta=delta)
+        output_dim = large_network_dynamics.output_dim
         samples = [
             CertificationRegion(x, delta, j)
             for j in range(output_dim) for x in X_train
         ]
 
-        # Calculate the total domain size
-        total_domain_size = sum(sample.lebesguemeasure() for sample in samples)
-        certified_domain_size = 0.0
-        uncertified_domain_size = 0.0
+        statistics = executors.Statistics(samples)
 
         queue = LifoQueue()
         for sample in samples:
@@ -191,6 +190,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         awaiting_results = []
 
         agg = None
+        start_time = None
 
         with tqdm(desc="Overall Progress", smoothing=0.1) as pbar:
             while not queue.empty() or awaiting_results:
@@ -209,23 +209,22 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                         awaiting_results.remove(async_result)
 
                         for result in results:
-                            if result.issat():
-                                # Sample was succesfully verified, no new samples to process
-                                # Update certified domain size in a thread-safe manner
-                                certified_domain_size += result.lebesguemeasure()
-                                # Update visualization if plotter is provided
-                                if plotter is not None:
-                                    plotter.update_figure(result)
+                            if start_time is None:
+                                start_time = result.start_time
+                            else:
+                                start_time = min(start_time, result.start_time)
 
-                            if result.isunsat():
-                                # Sample was not verified, add to the uncertified domain size
-                                uncertified_domain_size += result.lebesguemeasure()
-                                # Update visualization if plotter is provided
-                                if plotter is not None:
-                                    plotter.update_figure(result)
+                            # Update statistics
+                            statistics.add_sample(result)
 
+                            # Update visualization if plotter is provided
+                            if result.isleaf() and plotter is not None:
+                                plotter.update_figure(result)
+
+                            # Store results however caller wants
                             agg = aggregate(agg, result)
 
+                            # Add new results to the queue
                             if result.hasnewsamples():
                                 # Get the new samples
                                 new_samples = result.newsamples()
@@ -235,17 +234,20 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                                     queue.put(new_sample)
 
                         pbar.update(len(results))
-                        certified_percentage = (certified_domain_size / total_domain_size) * 100
-                        uncertified_percentage = (uncertified_domain_size / total_domain_size) * 100
-
                         pbar.set_description_str(
-                            f"Overall Progress (remaining samples: {queue.qsize()}, certified: {certified_percentage:.4f}%, uncertified: {uncertified_percentage:.4f}%)"
+                            f"Overall Progress (remaining samples: {queue.qsize()}, "
+                            f"certified: {statistics.get_certified_percentage():.4f}%, "
+                            f"uncertified: {statistics.get_uncertified_percentage():.4f}%)"
                         )
 
-        return agg, certified_percentage, uncertified_percentage
+        end_time = time.time()
+        computation_time = end_time - start_time
+
+        return agg, statistics.get_certified_percentage(), statistics.get_uncertified_percentage(), computation_time
 
     def verify_batch(self, large_network_dynamics, batch, precision=1e-6):
-        linear_bounds = self.taylor_expansion(large_network_dynamics.network, batch, device=large_network_dynamics.network.device)
+        linear_bounds = self.taylor_expansion(large_network_dynamics.network, batch,
+                                              device=large_network_dynamics.network.device)
 
         A_gap = linear_bounds.upper[0] - linear_bounds.lower[0]
         b_gap = linear_bounds.upper[1] - linear_bounds.lower[1]
@@ -262,7 +264,8 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
         samples = [(sample, linear_bounds[i], max_gap[i]) for i, sample in enumerate(batch)]
 
-        process_sample = partial(self.verify_sample, large_network_dynamics.epsilon, large_network_dynamics.input_dim, precision=precision)
+        process_sample = partial(self.verify_sample, large_network_dynamics.epsilon,
+                                 large_network_dynamics.input_dim, precision=precision)
 
         results = self.pool.starmap_async(process_sample, samples)
         # results = [process_sample(sample, linear_bounds, max_gap) for sample, linear_bounds, max_gap in samples]
@@ -296,10 +299,12 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
         max_gap = max_gap[j].item()
 
+        mlb = mean_linear_bound(A_lower, b_lower, A_upper, b_upper)
+
         # Check if we need to split based on remainder bounds
         if max_gap > epsilon:
             # Try and see if splitting the input_dimension is helpful
-            split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+            split_dim = sample.nextsplitdim(mlb, numpy_model)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(sample, delta, split_dim)
                 end_time = time.time()
@@ -329,7 +334,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         # Find a counterexample for upper bound
         res, vals, stats = small_network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
-            split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+            split_dim = sample.nextsplitdim(mlb, numpy_model)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(sample, delta, split_dim)
                 end_time = time.time()
@@ -358,7 +363,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
             nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = onnx_model([cex])[0].flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+                split_dim = sample.nextsplitdim(mlb, numpy_model)
                 sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
                 end_time = time.time()
                 return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
@@ -380,7 +385,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         # Find a counterexample for lower bound
         res, vals, stats = small_network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
-            split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+            split_dim = sample.nextsplitdim(mlb, numpy_model)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(sample, delta, split_dim)
                 end_time = time.time()
@@ -389,7 +394,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
                 print("No split dimension found, returning UNSAT")
                 end_time = time.time()
                 return SampleResultUNSAT(sample, end_time - start_time, [])
-            
+
         if res == "sat":
             cex = np.empty(len(inputVars))
             for i, inputVar in enumerate(inputVars):
@@ -408,7 +413,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
             nn_cex = small_network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = onnx_model([cex])[0].flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon:
-                split_dim = sample.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), numpy_model)
+                split_dim = sample.nextsplitdim(mlb, numpy_model)
                 sample_left, sample_right = split_sample(sample, sample.radius, split_dim)
                 end_time = time.time()
                 return SampleResultMaybe(sample, end_time - start_time, [sample_left, sample_right])
@@ -421,8 +426,10 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
 
     @torch.no_grad()
     def taylor_expansion(self, network, batch, device=None):
-        lower = torch.stack([torch.as_tensor(sample.center - sample.radius, dtype=torch.float32, device=device) for sample in batch])
-        upper = torch.stack([torch.as_tensor(sample.center + sample.radius, dtype=torch.float32, device=device) for sample in batch])
+        lower = torch.stack([torch.as_tensor(sample.center - sample.radius,
+                            dtype=torch.float32, device=device) for sample in batch])
+        upper = torch.stack([torch.as_tensor(sample.center + sample.radius,
+                            dtype=torch.float32, device=device) for sample in batch])
 
         input_region = HyperRectangle(lower, upper)
         linear_bounds = self.bound_network.crown(input_region)
@@ -430,33 +437,28 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
         return linear_bounds
 
 
-if __name__ == "__main__":
-    dynamics_model = LorenzAttractor()
-
-    # Example usage
+def verify_compression(dynamics_model, num_workers=8):
     large_network = load_torch_model("data/compression_ground_truth.pth",
                                      input_size=dynamics_model.input_dim,
                                      hidden_sizes=[1024, 1024, 1024, 1024, 1024],
                                      output_size=dynamics_model.output_dim)
     large_network_dynamics = NNDynamics(large_network, dynamics_model.input_domain)
-    large_network_dynamics.torch_params = ("data/compression_ground_truth.pth", dynamics_model.input_dim, [1024, 1024, 1024, 1024, 1024], dynamics_model.output_dim)
     large_network_dynamics.onnx_path = "data/compression_ground_truth.onnx"
     large_network_dynamics.delta = dynamics_model.delta
     large_network_dynamics.epsilon = dynamics_model.epsilon
-    # small_network = load_onnx_model("data/compression_compressed.onnx")
     small_network = "data/compression_compressed.onnx"
 
-    strategy = TaylorMarabouCompressionVerificationStrategy(num_workers=8)
+    strategy = TaylorMarabouCompressionVerificationStrategy(num_workers=num_workers)
     precision = 1e-6
 
-    t1 = time.time()
-    cex_list, certified_percentage, uncertified_percentage = strategy.verify(large_network_dynamics, small_network, precision)
-    t2 = time.time()
+    cex_list, certified_percentage, uncertified_percentage, computation_time = \
+        strategy.verify(large_network_dynamics, small_network, precision)
 
     num_cex = len(cex_list) if cex_list else 0
 
-    computation_time = t2 - t1
-
     print(f"Number of counterexamples found: {num_cex}")
-    print(f"Certified percentage: {certified_percentage}%, uncertified percentage: {uncertified_percentage}%, computation time: {computation_time:.2f} seconds")
-    print("Finished")
+    print(
+        f"Certified percentage: {certified_percentage:.4f}%, "
+        f"uncertified percentage: {uncertified_percentage:.4f}%, "
+        f"computation time: {computation_time:.2f} seconds"
+    )

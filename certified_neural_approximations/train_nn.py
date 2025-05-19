@@ -31,7 +31,7 @@ class SimpleNN(nn.Module):
 
 
 # Train the neural network
-def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4096, residual=False, leaky_relu=False):
+def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4096, leaky_relu=False):
 
     if hasattr(dynamics_model, 'leaky_relu'):
         leaky_relu = dynamics_model.leaky_relu
@@ -48,7 +48,7 @@ def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4
     # Add variable to store the best model state
     best_model_state = None
 
-    model = SimpleNN(input_size, hidden_sizes, output_size, residual=residual, leaky_relu=leaky_relu)
+    model = SimpleNN(input_size, hidden_sizes, output_size, leaky_relu=leaky_relu)
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)  # Use AdamW optimizer
     scheduler = optim.lr_scheduler.CosineAnnealingLR(

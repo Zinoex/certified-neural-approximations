@@ -4,7 +4,7 @@ import os
 import torch
 from certified_neural_approximations.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
     NonLipschitzVectorField1, NonLipschitzVectorField2
-from certified_neural_approximations.dynamics import VanDerPolOscillator, Sine2D, NonlinearOscillator, QuadraticSystem
+from certified_neural_approximations.dynamics import VanDerPolOscillator, Sine2D, NonlinearOscillator
 
 from certified_neural_approximations.train_nn import train_nn, save_model
 from certified_neural_approximations.verify_nn import verify_nn
@@ -27,7 +27,6 @@ NEW_SYSTEMS = [
     VanDerPolOscillator,
     Sine2D,
     NonlinearOscillator,
-    # QuadraticSystem,
 ]
 
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS
@@ -95,32 +94,16 @@ def verify_64_models():
         print(f"Verification completed for {dynamics.system_name} system")
 
 
-def verify_other_models():
-    for dynamics_cls in SYSTEMS:
-        dynamics = dynamics_cls()
-
-        if hasattr(dynamics, 'small_epsilon'):
-            dynamics.epsilon = dynamics.small_epsilon
-
-        path = os.path.join(DATA_DIR, f"{dynamics.system_name}_nn.onnx")
-
-        print(f"\nVerifying model {dynamics.system_name}")
-        verify_nn(
-            onnx_path=path,
-            dynamics_model=dynamics,
-            visualize=False
-        )
-        print(f"Verification completed for {dynamics.system_name} system")
-
-
-def main():
+def main(train=True, verify=True):
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # train_na_models()
-    # train_64_models()
-    # verify_na_models()
-    verify_64_models()
-    verify_other_models()
+    if train:
+        train_na_models()
+        train_64_models()
+
+    if verify:
+        verify_na_models()
+        verify_64_models()
 
 
 if __name__ == "__main__":
