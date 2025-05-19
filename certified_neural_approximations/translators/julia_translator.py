@@ -117,16 +117,6 @@ class JuliaTranslator:
         """
         return self.jl.maximum(a)
 
-    def cat(self, a):
-        """
-        Stack a list of numpy arrays vertically
-
-        :param a: list of numpy arrays
-
-        :return: np.ndarray
-        """
-        return self.stack(a)
-
     def stack(self, a):
         """
         Stack a list of numpy arrays vertically
@@ -136,6 +126,16 @@ class JuliaTranslator:
         :return: np.ndarray
         """
         return self.jl.reduce(self.jl.vcat, a)
+
+    def cat(self, a):
+        """
+        Stack a list of numpy arrays vertically
+
+        :param a: list of numpy arrays
+
+        :return: np.ndarray
+        """
+        return self.stack(a)
 
     def hstack(self, a):
         """

@@ -12,6 +12,8 @@ def Constant(a):
 
 class WrappedBPOperation(nn.Module):
     def __init__(self, op, x=None):
+        super().__init__()
+
         if isinstance(x, WrappedBPOperation):
             op = nn.Sequential(
                 x.op,
