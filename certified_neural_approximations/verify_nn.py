@@ -7,6 +7,7 @@ from certified_neural_approximations.executors import (
 )
 
 from certified_neural_approximations.verification import MarabouTaylorStrategy
+from certified_neural_approximations.linearization import default_linearization
 from certified_neural_approximations.certification_results import CertificationRegion
 
 from certified_neural_approximations.generate_data import generate_grid
@@ -38,6 +39,7 @@ def verify_nn(
     onnx_path, dynamics_model, num_workers=8, visualize=True
 ):
     strategy = MarabouTaylorStrategy()
+    linearization = default_linearization(dynamics_model)
 
     input_dim = dynamics_model.input_dim
     onnx_input_dim = onnx_input_shape(onnx_path)
@@ -45,7 +47,8 @@ def verify_nn(
     assert onnx_input_dim[0] == input_dim, f"Input dim mismatch: {onnx_input_dim[0]} != {input_dim}"
 
     network = load_onnx_model(onnx_path)
-    partial_process_sample = partial(strategy.verify, network, dynamics_model, epsilon=dynamics_model.epsilon)
+    partial_process_sample = partial(strategy.verify, network, dynamics_model,
+                                     epsilon=dynamics_model.epsilon, linearization=linearization)
 
     X_train, _ = generate_grid(input_dim, dynamics_model.input_domain, delta=dynamics_model.delta)
     output_dim = dynamics_model.output_dim
@@ -53,8 +56,6 @@ def verify_nn(
         CertificationRegion(x, dynamics_model.delta, j)
         for j in range(output_dim) for x in X_train
     ]
-
-    prepare_strategy = partial(strategy.prepare_strategy, dynamics_model)
 
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
@@ -68,11 +69,11 @@ def verify_nn(
     if num_workers == 1:
         executor = SinglethreadExecutor()
         # Pass the plotter to the executor
-        cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(prepare_strategy, partial_process_sample, aggregate, samples, plotter)
+        cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(partial_process_sample, aggregate, samples, plotter)
     elif num_workers > 1:
         executor = MultiprocessExecutor(num_workers)
         # Note: Visualization is not supported in multiprocessing mode
-        cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(prepare_strategy, partial_process_sample, aggregate, samples)
+        cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(partial_process_sample, aggregate, samples)
 
     num_cex = len(cex_list) if cex_list else 0
 

@@ -5,9 +5,8 @@ from queue import LifoQueue
 
 
 class SinglethreadExecutor:
-    def execute(self, initializer, process_sample, aggregate, samples, plotter=None):
+    def execute(self, process_sample, aggregate, samples, plotter=None):
         agg = None
-        initializer()
 
         # Calculate the total domain size
         total_domain_size = sum(sample.lebesguemeasure() for sample in samples)

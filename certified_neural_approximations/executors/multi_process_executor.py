@@ -162,7 +162,7 @@ class MultiprocessExecutor:
 
     def execute(
         self,
-        initializer, process_sample, aggregate, samples, plotter=None
+        process_sample, aggregate, samples, plotter=None
     ):
         agg = None
         
@@ -171,7 +171,7 @@ class MultiprocessExecutor:
         certified_domain_size = 0.0
         uncertified_domain_size = 0.0
 
-        with ProcessPoolExecutor(max_workers=self.num_workers, initializer=initializer) as executor:
+        with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
             executor._work_ids = LifoQueue()
 
             with tqdm(desc="Overall Progress", smoothing=0.1) as pbar:

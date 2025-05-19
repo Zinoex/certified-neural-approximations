@@ -1,13 +1,11 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import time
-from certified_neural_approximations.translators.bound_propagation_translator import BoundPropagationTranslator
-from bound_propagation import LinearBounds
 import numpy as np
-from maraboupy import MarabouCore, MarabouUtils
 
-from certified_neural_approximations.taylor_expansion import first_order_certified_taylor_expansion, prepare_taylor_expansion
-from certified_neural_approximations.certification_results import SampleResultSAT, SampleResultUNSAT, SampleResultMaybe, CertificationRegion
+from certified_neural_approximations.certification_results import SampleResultSAT, SampleResultUNSAT, \
+    SampleResultMaybe, CertificationRegion
+
 
 def split_sample(data, delta, split_dim):
     split_radius = delta[split_dim] / 2
@@ -24,7 +22,7 @@ def split_sample(data, delta, split_dim):
     return sample_left, sample_right
 
 
-def mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper):
+def mean_linear_bound(A_lower, b_lower, A_upper, b_upper):
     """
     Evaluate the Taylor approximation at a given point x.
 
@@ -34,7 +32,11 @@ def mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper):
     """
     A = (A_upper + A_lower) / 2
     b = (b_upper + b_lower) / 2
-    return np.dot(A, x) + b
+
+    def mean_linear_bound(x):
+        return np.dot(A, x) + b
+
+    return mean_linear_bound
 
 
 class VerificationStrategy(ABC):
@@ -56,83 +58,38 @@ class VerificationStrategy(ABC):
 
 
 class MarabouTaylorStrategy(VerificationStrategy):
-    @staticmethod
-    def prepare_strategy(dynamics):
-        prepare_taylor_expansion(dynamics.input_dim)
 
     @staticmethod
-    def verify(network, dynamics, data: CertificationRegion, epsilon, precision=1e-6):
+    def verify(network, dynamics, data: CertificationRegion, epsilon, linearization, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
-        from maraboupy import Marabou
+        from maraboupy import Marabou, MarabouCore, MarabouUtils
         options = Marabou.createOptions(verbosity=0, timeoutInSeconds=2, lpSolver="native")
-
-        sample, delta, j = data  # Unpack the data tuple
 
         # Run the first-order Taylor expansion twice to not count the precompilation time
         # as part of the verification time (the first run is for precompilation).
         # This is a bit of a hack, but it works.
-        first_order_certified_taylor_expansion(
-            dynamics, sample, delta
-        )
+        linearization.linearize_sample(data)
 
         start_time = time.time()
 
-        taylor_pol_lower, taylor_pol_upper = first_order_certified_taylor_expansion(
-            dynamics, sample, delta
-        )
+        data = linearization.linearize_sample(data)
+        sample, delta, j = data  # Unpack the data tuple
 
-        # Unpack the Taylor expansion components
-        # taylor_pol_lower <-- (f(c), Df(c), R_min)
-        # taylor_pol_upper <-- (f(c), Df(c), R_max)
-        f_c_lower = taylor_pol_lower[0]  # f(c) - function value at center
-        f_c_upper = taylor_pol_upper[0]  # f(c) - function value at center
-        df_c_lower = taylor_pol_lower[1]  # Df(c) - gradient at center
-        df_c_upper = taylor_pol_upper[1]  # Df(c) - gradient at center
-        r_lower = taylor_pol_lower[2]  # Minimum remainder term
-        r_upper = taylor_pol_upper[2]  # Maximum remainder term
+        A_lower = data.first_order_model[0][0]
+        b_lower = data.first_order_model[0][1]
 
-        A_upper = df_c_upper[j]
-        b_upper = -np.dot(df_c_upper[j], sample) + f_c_upper[j] + r_upper[j]
+        A_upper = data.first_order_model[1][0]
+        b_upper = data.first_order_model[1][1]
 
-        A_lower = df_c_lower[j]
-        b_lower = -np.dot(df_c_lower[j], sample) + f_c_lower[j] + r_lower[j]
+        max_gap = data.first_order_model[2]
 
-        max_gap = r_upper[j] - r_lower[j]
-
-        # Special case if the certified bounds of the Taylor expansion are not finite
-        # Then use bound_propagation to get linear bounds
-        if (not np.isfinite(A_upper).all()) or (not np.isfinite(b_upper).all()) or \
-           (not np.isfinite(A_lower).all()) or (not np.isfinite(b_lower).all()):
-            translator = BoundPropagationTranslator()
-            x = translator.to_format(sample)
-            y = dynamics.compute_dynamics(x, translator)
-            linear_bounds = translator.bound(y, sample, delta)
-
-            A_lower = linear_bounds.lower[0]
-            b_lower = linear_bounds.lower[1]
-
-            A_upper = linear_bounds.upper[0]
-            b_upper = linear_bounds.upper[1]
-
-            A_gap = A_upper - A_lower
-            b_gap = b_upper - b_lower
-            lbp_gap = LinearBounds(linear_bounds.region, None, (A_gap, b_gap))
-            interval_gap = lbp_gap.concretize()  # Turn linear bounds into interval bounds
-
-            # Select the j-th output dimension
-            max_gap = interval_gap.upper[0, j].item()
-
-            A_lower = A_lower[j].numpy()
-            b_lower = b_lower[j].numpy()
-
-            A_upper = A_upper[j].numpy()
-            b_upper = b_upper[j].numpy()
+        mlb = mean_linear_bound(A_lower, b_lower, A_upper, b_upper)
 
         # Check if we need to split based on remainder bounds
         if max_gap > epsilon:
             # Try and see if splitting the input_dimension is helpful
-            split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
+            split_dim = data.nextsplitdim(mlb, dynamics)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, start_time, [sample_left, sample_right])
@@ -158,7 +115,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Find a counterexample for upper bound
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
-            split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
+            split_dim = data.nextsplitdim(mlb, dynamics)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, start_time, [sample_left, sample_right])
@@ -185,14 +142,12 @@ class MarabouTaylorStrategy(VerificationStrategy):
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
-                split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
+                split_dim = data.nextsplitdim(mlb, dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
                     return SampleResultMaybe(data, start_time, [sample_left, sample_right])
                 else:
                     print("No split dimension found, returning UNSAT")
-            #else:
-            #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
             return SampleResultUNSAT(data, start_time, [cex])
 
@@ -202,7 +157,6 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # x df_c - nn_output <= -epsilon + c df_c - f(c) - r_lower
         equation_LE = MarabouUtils.Equation(MarabouCore.Equation.LE)
         for i, inputVar in enumerate(inputVars):
-            # j is the output dimension, i is the input dimension, thus df_c[j, i] is the partial derivative of the j-th output with respect to the i-th input
             equation_LE.addAddend(A_lower[i], inputVar)
         equation_LE.addAddend(-1, outputVar)
         equation_LE.setScalar(-epsilon - b_lower)
@@ -211,7 +165,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Find a counterexample for lower bound
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
-            split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
+            split_dim = data.nextsplitdim(mlb, dynamics)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, start_time, [sample_left, sample_right])
@@ -236,15 +190,12 @@ class MarabouTaylorStrategy(VerificationStrategy):
             nn_cex = network.evaluateWithMarabou([cex])[0].flatten()
             f_cex = dynamics(cex).flatten()
             if np.abs(nn_cex - f_cex)[j] < epsilon - precision:
-                split_dim = data.nextsplitdim(lambda x: mean_linear_bound(x, A_lower, b_lower, A_upper, b_upper), dynamics)
+                split_dim = data.nextsplitdim(mlb, dynamics)
                 if split_dim is not None:
                     sample_left, sample_right = split_sample(data, delta, split_dim)
-                    end_time = time.time()
                     return SampleResultMaybe(data, start_time, [sample_left, sample_right])
                 else:
                     print("No split dimension found, returning UNSAT")
-            #else:
-            #    print("Counterexample found |N(cex) - f(cex)! > epsilon")
 
             return SampleResultUNSAT(data, start_time, [cex])
 

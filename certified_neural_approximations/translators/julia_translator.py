@@ -1,6 +1,8 @@
 class JuliaTranslator:
-    def __init__(self):
-        from juliacall import Main as jl
+    def __init__(self, jl=None):
+        if jl is None:
+            from juliacall import Main as jl
+
         self.jl = jl
 
     def matrix_vector(self, a, b):
