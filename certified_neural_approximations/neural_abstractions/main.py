@@ -85,4 +85,4 @@ def verify_neural_abstractions(config: Config):
         delta_t = t1 - t0
         found, cex = res_queue.get()
         print("Result: {}, {}".format(found, cex))
-        print("Verifier Timers: {} \n".format(delta_t))
+        print("Verifier Timers: {}".format(delta_t))
