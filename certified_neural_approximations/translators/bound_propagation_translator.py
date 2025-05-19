@@ -1,16 +1,16 @@
 from torch import nn
-import bound_propagation
+import bound_propagation as bp
 import torch
 
 
 def Constant(a):
-    return bound_propagation.FixedLinear(
+    return bp.FixedLinear(
         torch.zeros(a.shape[0], a.shape[0]),
         a,
     )
 
 
-class WrappedBPOperation:
+class WrappedBPOperation(nn.Module):
     def __init__(self, op, x=None):
         if isinstance(x, WrappedBPOperation):
             op = nn.Sequential(
@@ -23,7 +23,7 @@ class WrappedBPOperation:
     def __add__(self, other):
         if isinstance(other, WrappedBPOperation):
             return WrappedBPOperation(
-                bound_propagation.Add(self.op, other.op),
+                bp.Add(self.op, other.op),
             )
         else:
             if torch.is_tensor(other):
@@ -39,7 +39,7 @@ class WrappedBPOperation:
                 raise ValueError("Unsupported type for addition")
 
             return WrappedBPOperation(
-                bound_propagation.Add(self.op, Constant(other))
+                bp.Add(self.op, Constant(other))
             )
 
     def __radd__(self, other):
@@ -48,7 +48,7 @@ class WrappedBPOperation:
     def __sub__(self, other):
         if isinstance(other, WrappedBPOperation):
             return WrappedBPOperation(
-                bound_propagation.Sub(self.op, other.op),
+                bp.Sub(self.op, other.op),
             )
         else:
             if torch.is_tensor(other):
@@ -64,13 +64,13 @@ class WrappedBPOperation:
                 raise ValueError("Unsupported type for subtraction")
 
             return WrappedBPOperation(
-                bound_propagation.Sub(self.op, Constant(other))
+                bp.Sub(self.op, Constant(other))
             )
 
     def __rsub__(self, other):
         if isinstance(other, WrappedBPOperation):
             return WrappedBPOperation(
-                bound_propagation.Sub(other.op, self.op),
+                bp.Sub(other.op, self.op),
             )
         else:
             if torch.is_tensor(other):
@@ -86,7 +86,7 @@ class WrappedBPOperation:
                 raise ValueError("Unsupported type for subtraction")
 
             return WrappedBPOperation(
-                bound_propagation.Sub(Constant(other), self.op)
+                bp.Sub(Constant(other), self.op)
             )
 
 
@@ -109,7 +109,7 @@ class WrappedBPVector(WrappedBPOperation):
             raise ValueError("Unsupported type for indexing")
 
         return WrappedBPOperation(
-            bound_propagation.Select(item)
+            bp.Select(item)
         )
 
 
@@ -134,7 +134,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats [n]
         """
-        return WrappedBPOperation(bound_propagation.FixedLinear(a, None), b)
+        return WrappedBPOperation(bp.FixedLinear(a, None), b)
 
     def sin(self, a):
         """
@@ -144,7 +144,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Sin(), a)
+        return WrappedBPOperation(bp.Sin(), a)
 
     def cos(self, a):
         """
@@ -154,8 +154,8 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Cos(), a)
-    
+        return WrappedBPOperation(bp.Cos(), a)
+
     def exp(self, a):
         """
         Element-wise exponential
@@ -164,8 +164,8 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Exp(), a)
-    
+        return WrappedBPOperation(bp.Exp(), a)
+
     def log(self, a):
         """
         Element-wise logarithm
@@ -174,7 +174,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Log(), a)
+        return WrappedBPOperation(bp.Log(), a)
 
     def sqrt(self, a):
         """
@@ -184,7 +184,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Sqrt(), a)
+        return WrappedBPOperation(bp.Sqrt(), a)
 
     def cbrt(self, a):
         """
@@ -194,7 +194,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Cbrt(), a)
+        return WrappedBPOperation(bp.Cbrt(), a)
 
     def pow(self, a, b):
         """
@@ -205,7 +205,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor of floats
         """
-        return WrappedBPOperation(bound_propagation.Pow(b), a)  # a^b
+        return WrappedBPOperation(bp.Pow(b), a)  # a^b
 
     def stack(self, xs):
         """
@@ -215,7 +215,7 @@ class BoundPropagationTranslator:
 
         :return: torch.tensor
         """
-        return WrappedBPOperation(bound_propagation.Parallel(*[bound_propgation_unwrap(x) for x in xs]))
+        return WrappedBPOperation(bp.Parallel(*[bound_propgation_unwrap(x) for x in xs]))
 
     def to_format(self, x):
         """
@@ -235,15 +235,15 @@ class BoundPropagationTranslator:
         if not torch.is_tensor(epsilon):
             epsilon = torch.as_tensor(epsilon, dtype=torch.float32)
 
-        input_bounds = bound_propagation.HyperRectangle.from_eps(x.unsqueeze(0), epsilon.unsqueeze(0))
+        input_bounds = bp.HyperRectangle.from_eps(x.unsqueeze(0), epsilon.unsqueeze(0))
 
-        factory = bound_propagation.BoundModelFactory()
+        factory = bp.BoundModelFactory()
         module = wrapped_op.op
         bound_module = factory.build(module)
 
         linear_bounds = bound_module.crown(input_bounds)
-        linear_bounds = bound_propagation.LinearBounds(linear_bounds.region, 
-                                     (linear_bounds.lower[0][0], linear_bounds.lower[1][0]),
-                                     (linear_bounds.upper[0][0], linear_bounds.upper[1][0]))
+        linear_bounds = bp.LinearBounds(linear_bounds.region,
+                                        (linear_bounds.lower[0][0], linear_bounds.lower[1][0]),
+                                        (linear_bounds.upper[0][0], linear_bounds.upper[1][0]))
 
         return linear_bounds
