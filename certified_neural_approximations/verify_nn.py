@@ -13,12 +13,11 @@ from certified_neural_approximations.certification_results import CertificationR
 from certified_neural_approximations.generate_data import generate_grid
 
 
-
 def onnx_input_shape(onnx_path):
     """
     Get the input shape of the ONNX model.
     """
-    
+
     from maraboupy import Marabou
     network = Marabou.read_onnx(onnx_path)
     inputVars = network.inputVars
@@ -31,7 +30,7 @@ def aggregate(agg, result):
 
     if agg is None:
         return result.counterexamples()
-    
+
     return agg + result.counterexamples()
 
 
@@ -56,6 +55,11 @@ def verify_nn(
         for j in range(output_dim) for x in X_train
     ]
 
+    if num_workers == 0:
+        executor = SinglethreadExecutor()
+    elif num_workers >= 1:
+        executor = MultiprocessExecutor(num_workers)
+
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
     if visualize and input_dim in [1, 2] and num_workers == 0:
@@ -65,14 +69,9 @@ def verify_nn(
         plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))
         print(f"Initialized visualization for {input_dim}D dynamics")
 
-    if num_workers == 0:
-        executor = SinglethreadExecutor()
-        # Pass the plotter to the executor
-        cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(strategy.initialize_worker, partial_process_sample, aggregate, samples, plotter)
-    elif num_workers >= 1:
-        executor = MultiprocessExecutor(num_workers)
-        # Note: Visualization is not supported in multiprocessing mode
-        cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(strategy.initialize_worker, partial_process_sample, aggregate, samples)
+    # Pass the plotter to the executor
+    cex_list, certified_percentage, uncertified_percentage, computation_time = \
+        executor.execute(strategy.initialize_worker, partial_process_sample, aggregate, samples, plotter)
 
     num_cex = len(cex_list) if cex_list else 0
 

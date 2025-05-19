@@ -13,7 +13,7 @@ from bound_propagation import HyperRectangle, BoundModelFactory, LinearBounds
 
 import onnxruntime
 from certified_neural_approximations.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
-from certified_neural_approximations.dynamics import LorenzAttractor, NNDynamics, Quadcopter
+from certified_neural_approximations.dynamics import LorenzAttractor, NNDynamics
 from certified_neural_approximations.train_nn import load_onnx_model, load_torch_model
 from certified_neural_approximations.verification import mean_linear_bound, split_sample
 from certified_neural_approximations.verify_nn import aggregate
