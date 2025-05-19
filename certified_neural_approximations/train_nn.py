@@ -5,53 +5,26 @@ import torch.optim as optim
 from .generate_data import generate_data
 
 
-class LinearResidual(nn.Module):
-    def __init__(self, size, leaky_relu=False, device=None):
-        super().__init__()
-        self.linear = nn.Linear(size, size, device=device)
-        self.residual_linear = nn.Linear(size, size, device=device)
-
-        if leaky_relu:
-            self.act = nn.LeakyReLU()
-        else:
-            self.act = nn.ReLU()
-
-    def forward(self, x):
-        return self.linear(self.act(x)) + self.residual_linear(x)
-
-
 # Define the neural network
 class SimpleNN(nn.Module):
-    def __init__(self, input_size, hidden_sizes, output_size, leaky_relu=False, residual=False, device=None):
+    def __init__(self, input_size, hidden_sizes, output_size, leaky_relu=False, device=None):
         super(SimpleNN, self).__init__()
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = device
 
-        if residual:
-            common_hidden_size = hidden_sizes[0]
-
-            layers = [nn.Linear(input_size, common_hidden_size, device=self.device)]
-
-            for hidden_size in hidden_sizes:
-                assert hidden_size == common_hidden_size
-                layers.append(LinearResidual(hidden_size, leaky_relu=leaky_relu, device=self.device))  # Create layer on device
-
-            layers.append(nn.Linear(common_hidden_size, output_size, device=self.device))  # Create layer on device
-            self.network = nn.Sequential(*layers)
-        else:
-            layers = []
-            prev_size = input_size
-            for hidden_size in hidden_sizes:
-                layers.append(nn.Linear(prev_size, hidden_size, device=self.device))  # Create layer on device
-                if leaky_relu:
-                    layers.append(nn.LeakyReLU())
-                else:
-                    layers.append(nn.ReLU())
-                prev_size = hidden_size
-            layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
-            self.network = nn.Sequential(*layers)
+        layers = []
+        prev_size = input_size
+        for hidden_size in hidden_sizes:
+            layers.append(nn.Linear(prev_size, hidden_size, device=self.device))  # Create layer on device
+            if leaky_relu:
+                layers.append(nn.LeakyReLU())
+            else:
+                layers.append(nn.ReLU())
+            prev_size = hidden_size
+        layers.append(nn.Linear(prev_size, output_size, device=self.device))  # Create layer on device
+        self.network = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.network(x)
@@ -67,13 +40,10 @@ def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4
     hidden_sizes = dynamics_model.hidden_sizes  # Get hidden sizes from dynamics model
     output_size = dynamics_model.output_dim  # Update output size to match target size
     input_domain = dynamics_model.input_domain  # Get input domain from dynamics model
-    epsilon = dynamics_model.epsilon  # Get epsilon from dynamics model
 
     # Add parameters for gradient clipping and early stopping
     max_grad_norm = 1.0
-    patience = 5000
     best_loss = float('inf')
-    patience_counter = 0
 
     # Add variable to store the best model state
     best_model_state = None
@@ -112,7 +82,7 @@ def train_nn(dynamics_model, learning_rate=0.001, num_epochs=50000, batch_size=4
             )
 
         # Early stopping logic and best model tracking
-        if max_loss < best_loss and epoch > 2500:
+        if max_loss < best_loss:
             best_loss = max_loss.detach().item()
             # Save the best model state
             best_model_state = model.state_dict().copy()
