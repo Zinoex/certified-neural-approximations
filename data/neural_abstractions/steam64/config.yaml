@@ -1,6 +1,6 @@
 benchmark: steam
 width: [64, 64, 64]
-model-path: SteamGovenor_64_simple_nn.pth
+model-path: SteamGovernor_64_simple_nn.pth
 quiet: True
 scalar: False
 stopping-criterion:

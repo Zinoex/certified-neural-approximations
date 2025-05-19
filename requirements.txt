@@ -2,6 +2,8 @@
 tqdm
 juliacall
 shortuuid
+ConfigArgParse
+PyYaml
 
 # Functionality
 numpy
@@ -17,9 +19,7 @@ z3-solver
 dreal
 pyinterval
 sympy
-ConfigArgParse
 pycddlib
-PyYaml
 scipy
 
 #Plotting

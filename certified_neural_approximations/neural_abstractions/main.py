@@ -14,14 +14,14 @@ import torch
 from torch import nn
 import numpy as np
 
-from benchmarks import read_benchmark
+from .benchmarks import read_benchmark
 from certified_neural_approximations.train_nn import SimpleNN
-from verifier import DRealVerifier
-from translator import Translator
-from config import Config
+from .verifier import DRealVerifier
+from .translator import Translator
+from .config import Config
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_DIR = os.path.dirname(BASE_DIR)
+REPO_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
 DATA_DIR = os.path.join(REPO_DIR, "data")
 
 

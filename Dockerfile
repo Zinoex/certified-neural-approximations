@@ -8,11 +8,13 @@ RUN apt-get update &&\
 RUN wget -O - https://raw.githubusercontent.com/dreal/dreal4/master/setup/ubuntu/22.04/install_prereqs.sh | bash &&\
     wget -O - https://raw.githubusercontent.com/dreal/dreal4/master/setup/ubuntu/22.04/install.sh | bash
 
-COPY ./requirements.txt ./neural-abstraction/requirements.txt
+COPY ./requirements.txt ./certified-neural-approximations/requirements.txt
 
-RUN pip3 install -r neural-abstraction/requirements.txt
+RUN pip3 install -r certified-neural-approximations/requirements.txt
 
-COPY . ./neural-abstraction
-WORKDIR /neural-abstraction
+COPY . ./certified-neural-approximations
+WORKDIR /certified-neural-approximations
+
+RUN pip3 install -e .
 
 ENTRYPOINT [ "bash" ]

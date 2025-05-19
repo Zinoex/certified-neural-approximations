@@ -14,7 +14,7 @@ import sympy as sp
 from interval import imath, interval
 import numpy as np
 import torch
-from domains import Rectangle, Sphere
+from .domains import Rectangle, Sphere
 
 
 class Benchmark:

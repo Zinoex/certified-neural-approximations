@@ -11,7 +11,7 @@ import dreal
 import torch
 import z3
 
-from utils import vprint, Timer, timer
+from .utils import vprint, Timer, timer
 
 T = Timer()
 
