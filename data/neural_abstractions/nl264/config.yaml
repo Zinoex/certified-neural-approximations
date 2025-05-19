@@ -1,0 +1,26 @@
+benchmark: nl2
+width: [64, 64, 64]
+model-path: NonLipschitzVectorField2_64_simple_nn.pth
+quiet: True
+scalar: False
+stopping-criterion:
+  mode: loss   # Train to target error or loss minimum
+  target-error: 0.02
+  loss-stop: 6.7e-5
+  loss-grad-stop: .inf
+  loss-grad-grad-stop: .inf
+optimizer:
+  type: AdamW   #AdamW, SGD
+  lr: 1e-3
+  momentum: 0.99 # SGD only
+output-type: [plot] # None, xml, plot, csv
+output-file: nl2-model  # Exclude extension 
+iterative: False
+reduction: 0.6
+timeout: False
+timeout-duration: 120
+seed: 0
+repeat: 1
+save-net: True
+bounded-time: True
+time-horizon: 1.5

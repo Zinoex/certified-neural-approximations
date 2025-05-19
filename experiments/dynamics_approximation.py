@@ -6,6 +6,8 @@ from certified_neural_approximations.dynamics import WaterTank, JetEngine, Steam
     NonLipschitzVectorField1, NonLipschitzVectorField2
 from certified_neural_approximations.dynamics import VanDerPolOscillator, Sine2D, NonlinearOscillator
 
+from certified_neural_approximations.neural_abstractions.cli import get_config
+from certified_neural_approximations.neural_abstractions.main import verify_neural_abstractions
 from certified_neural_approximations.train_nn import train_nn, save_model
 from certified_neural_approximations.verify_nn import verify_nn
 
@@ -15,25 +17,25 @@ REPO_DIR = os.path.dirname(BASE_DIR)
 DATA_DIR = os.path.join(REPO_DIR, "data")
 
 NA_SYSTEMS = [
-    WaterTank,
-    JetEngine,
-    SteamGovernor,
-    Exponential,
-    NonLipschitzVectorField1,
-    NonLipschitzVectorField2,
+    (WaterTank, "watertank/config.yaml"),
+    (JetEngine, "jet/config.yaml"),
+    (SteamGovernor, "steam/config.yaml"),
+    (Exponential, "exp/config.yaml"),
+    (NonLipschitzVectorField1, "nl1/config.yaml"),
+    (NonLipschitzVectorField2, "nl2/config.yaml"),
 ]
 
 NEW_SYSTEMS = [
-    VanDerPolOscillator,
-    Sine2D,
-    NonlinearOscillator,
+    (VanDerPolOscillator, "vdp/config.yaml"),
+    (Sine2D, "sine2d/config.yaml"),
+    (NonlinearOscillator, "nonlin-osc/config.yaml"),
 ]
 
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS
 
 
 def train_na_models():
-    for dynamics_cls in NA_SYSTEMS:
+    for (dynamics_cls, _) in NA_SYSTEMS:
         dynamics = dynamics_cls()
         torch.manual_seed(0)
 
@@ -47,7 +49,7 @@ def train_na_models():
 
 
 def train_64_models():
-    for dynamics_cls in SYSTEMS:
+    for (dynamics_cls, _) in SYSTEMS:
         dynamics = dynamics_cls()
         dynamics.hidden_sizes = [64, 64, 64]
         torch.manual_seed(0)
@@ -62,7 +64,7 @@ def train_64_models():
 
 
 def verify_na_models():
-    for dynamics_cls in NA_SYSTEMS:
+    for (dynamics_cls, _) in NA_SYSTEMS:
         dynamics = dynamics_cls()
         path = os.path.join(DATA_DIR, f"{dynamics.system_name}_simple_nn.onnx")
 
@@ -76,7 +78,7 @@ def verify_na_models():
 
 
 def verify_64_models():
-    for dynamics_cls in SYSTEMS:
+    for (dynamics_cls, _) in SYSTEMS:
         dynamics = dynamics_cls()
         dynamics.hidden_sizes = [64, 64, 64]
 
@@ -94,6 +96,31 @@ def verify_64_models():
         print(f"Verification completed for {dynamics.system_name} system")
 
 
+def verify_models_dreal_simple():
+    for (dynamics_cls, config_path) in SYSTEMS:
+        dynamics = dynamics_cls()
+
+        path = os.path.join(DATA_DIR, "neural_abstractions", config_path)
+
+        print(f"\nVerifying model {dynamics.system_name} with DReal")
+        c = get_config(["-c", path])
+        verify_neural_abstractions(c)
+        print(f"Verification completed for {dynamics.system_name} system")
+
+
+def verify_models_dreal_larger():
+    for (dynamics_cls, config_path) in NA_SYSTEMS:
+        dynamics = dynamics_cls()
+
+        config_path = config_path.replace("/", "64/")
+        path = os.path.join(DATA_DIR, "neural_abstractions", config_path)
+
+        print(f"\nVerifying model {dynamics.system_name} (3x[64]) with DReal")
+        c = get_config(["-c", path])
+        verify_neural_abstractions(c)
+        print(f"Verification completed for {dynamics.system_name} system")
+
+
 def main(train=True, verify=True):
     os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -104,6 +131,8 @@ def main(train=True, verify=True):
     if verify:
         verify_na_models()
         verify_64_models()
+        verify_models_dreal_simple()
+        verify_models_dreal_larger()
 
 
 if __name__ == "__main__":

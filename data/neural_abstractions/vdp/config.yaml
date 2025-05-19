@@ -1,0 +1,26 @@
+benchmark: vdp
+width: [64, 64, 64]
+model-path: VanDerPolOscillator_64_simple_nn.pth
+quiet: True
+scalar: False
+stopping-criterion:
+  mode: loss   # Train to target error or loss minimum
+  target-error: 0.21
+  loss-stop: 4e-4
+  loss-grad-stop: .inf
+  loss-grad-grad-stop: .inf
+optimizer:
+  type: AdamW   #AdamW, SGD
+  lr: 1e-3
+  momentum: 0.99 # SGD only
+output-type: [xml] # None, xml, plot, csv
+output-file: vdp-model  # Exclude extension 
+iterative: False
+reduction: 0.9
+timeout: False
+timeout-duration: 120
+seed: 0
+repeat: 1
+save-net: True
+bounded-time: True
+time-horizon: 2.0

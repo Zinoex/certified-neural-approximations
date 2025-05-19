@@ -5,6 +5,7 @@ shortuuid
 
 # Functionality
 numpy
+pandas
 torch
 maraboupy
 onnx
@@ -12,6 +13,15 @@ onnxruntime
 bound_propagation==0.4.5
 scipy
 dlkoopman
+z3-solver
+dreal
+pyinterval
+sympy
+ConfigArgParse
+pycddlib
+PyYaml
+scipy
 
 #Plotting
 matplotlib
+seaborn
