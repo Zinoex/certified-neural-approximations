@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import time
+import types
 import numpy as np
 
 from certified_neural_approximations.certification_results import SampleResultSAT, SampleResultUNSAT, \
@@ -58,9 +59,31 @@ class VerificationStrategy(ABC):
 
 
 class MarabouTaylorStrategy(VerificationStrategy):
+    def __init__(self, network, dynamics, linearization):
+        self.network = network
+        self.dynamics = dynamics
+        self.linearization = linearization
+
+    def initialize_worker(self):
+        global _LOCAL
+        _LOCAL = types.SimpleNamespace()
+        _LOCAL.network = self.network
+        _LOCAL.dynamics = self.dynamics
+        _LOCAL.linearization = self.linearization
 
     @staticmethod
-    def verify(network, dynamics, data: CertificationRegion, epsilon, linearization, precision=1e-6):
+    def verify(data: CertificationRegion, epsilon, precision=1e-6):
+        return MarabouTaylorStrategy._verify(
+            _LOCAL.network,
+            _LOCAL.dynamics,
+            _LOCAL.linearization,
+            data,
+            epsilon,
+            precision=precision,
+        )
+
+    @staticmethod
+    def _verify(network, dynamics, linearization, data: CertificationRegion, epsilon, precision=1e-6):
         outputVars = network.outputVars[0].flatten()
         inputVars = network.inputVars[0].flatten()
         from maraboupy import Marabou, MarabouCore, MarabouUtils

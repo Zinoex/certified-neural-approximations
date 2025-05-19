@@ -161,14 +161,11 @@ class MultiprocessExecutor:
         # If num_workers is not provided, use the default of ProcessPoolExecutor os.process_cpu_count()
         self.num_workers = num_workers
 
-    def execute(
-        self,
-        process_sample, aggregate, samples, plotter=None
-    ):
+    def execute(self, initializer, process_sample, aggregate, samples, plotter=None):
         agg = None
         statistics = Statistics(samples)
 
-        with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+        with ProcessPoolExecutor(max_workers=self.num_workers, initializer=initializer) as executor:
             # Use a LifoQueue to achieve DFS (Depth-First Search)-like behavior.
             # For a single-threaded executor, this is true DFS, but for a multi-threaded
             # executor, it depends on the order results are available.

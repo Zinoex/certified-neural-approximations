@@ -6,7 +6,9 @@ from .stats import Statistics
 
 
 class SinglethreadExecutor:
-    def execute(self, process_sample, aggregate, samples, plotter=None):
+    def execute(self, initializer, process_sample, aggregate, samples, plotter=None):
+        initializer()
+
         agg = None
         statistics = Statistics(samples)
 
