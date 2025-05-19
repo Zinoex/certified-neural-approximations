@@ -12,9 +12,9 @@ from tqdm import tqdm
 from bound_propagation import HyperRectangle, BoundModelFactory, LinearBounds
 
 import onnxruntime
-from certified_neural_approximations import executors
+from certified_neural_approximations.executors.stats import Statistics
 from certified_neural_approximations.certification_results import CertificationRegion, SampleResultMaybe, SampleResultSAT, SampleResultUNSAT
-from certified_neural_approximations.dynamics import LorenzAttractor, NNDynamics
+from certified_neural_approximations.dynamics import NNDynamics
 from certified_neural_approximations.train_nn import load_onnx_model, load_torch_model
 from certified_neural_approximations.verification import mean_linear_bound, split_sample
 from certified_neural_approximations.verify_nn import aggregate
@@ -181,7 +181,7 @@ class TaylorMarabouCompressionVerificationStrategy(CompressionVerificationStrate
             for j in range(output_dim) for x in X_train
         ]
 
-        statistics = executors.Statistics(samples)
+        statistics = Statistics(samples)
 
         queue = LifoQueue()
         for sample in samples:
