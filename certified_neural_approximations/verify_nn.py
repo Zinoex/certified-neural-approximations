@@ -59,18 +59,18 @@ def verify_nn(
 
     # Initialize plotter if visualization is enabled (supports both 1D and 2D)
     plotter = None
-    if visualize and input_dim in [1, 2] and num_workers == 1:
+    if visualize and input_dim in [1, 2] and num_workers == 0:
         from .visualization import DynamicsNetworkPlotter  # Import the new plotter
         from maraboupy import Marabou
         # Create a plotter for 1D or 2D dynamics
         plotter = DynamicsNetworkPlotter(dynamics_model, Marabou.read_onnx(onnx_path))
         print(f"Initialized visualization for {input_dim}D dynamics")
 
-    if num_workers == 1:
+    if num_workers == 0:
         executor = SinglethreadExecutor()
         # Pass the plotter to the executor
         cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(partial_process_sample, aggregate, samples, plotter)
-    elif num_workers > 1:
+    elif num_workers >= 1:
         executor = MultiprocessExecutor(num_workers)
         # Note: Visualization is not supported in multiprocessing mode
         cex_list, certified_percentage, uncertified_percentage, computation_time = executor.execute(partial_process_sample, aggregate, samples)
@@ -78,5 +78,8 @@ def verify_nn(
     num_cex = len(cex_list) if cex_list else 0
 
     print(f"Number of counterexamples found: {num_cex}")
-    print(f"Certified percentage: {certified_percentage}%, uncertified percentage: {uncertified_percentage}%, computation time: {computation_time:.2f} seconds")
-    print("Finished")
+    print(
+        f"Certified percentage: {certified_percentage:.4f}%, "
+        f"uncertified percentage: {uncertified_percentage:.4f}%, "
+        f"computation time: {computation_time:.2f} seconds"
+    )

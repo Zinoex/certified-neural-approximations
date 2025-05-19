@@ -5,6 +5,7 @@ import time
 
 from tqdm import tqdm  # Added tqdm for progress tracking
 
+from .stats import Statistics
 
 
 # Possible future states (for internal use by the futures package).
@@ -19,6 +20,7 @@ FINISHED = 'FINISHED'
 
 class _Waiter(object):
     """Provides the event that wait() and as_completed() block on."""
+
     def __init__(self):
         self.event = threading.Event()
         self.finished_futures = []
@@ -119,8 +121,8 @@ class ExpandableAsCompleted:
 
         with _AcquireFutures(self.fs):
             finished = set(
-                    f for f in self.fs
-                    if f._state in [CANCELLED_AND_NOTIFIED, FINISHED])
+                f for f in self.fs
+                if f._state in [CANCELLED_AND_NOTIFIED, FINISHED])
             self.create_and_install_as_completed_waiter()
         finished = list(finished)
 
@@ -134,7 +136,7 @@ class ExpandableAsCompleted:
                     wait_timeout = end_time - time.monotonic()
                     if wait_timeout < 0:
                         raise TimeoutError(
-                                '%d futures unfinished' % len(self.fs))
+                            '%d futures unfinished' % len(self.fs))
 
                 self.waiter.event.wait(wait_timeout)
 
@@ -155,7 +157,6 @@ class ExpandableAsCompleted:
 
 
 class MultiprocessExecutor:
-
     def __init__(self, num_workers=None):
         # If num_workers is not provided, use the default of ProcessPoolExecutor os.process_cpu_count()
         self.num_workers = num_workers
@@ -165,13 +166,12 @@ class MultiprocessExecutor:
         process_sample, aggregate, samples, plotter=None
     ):
         agg = None
-        
-        # Calculate the total domain size
-        total_domain_size = sum(sample.lebesguemeasure() for sample in samples)
-        certified_domain_size = 0.0
-        uncertified_domain_size = 0.0
+        statistics = Statistics(samples)
 
         with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+            # Use a LifoQueue to achieve DFS (Depth-First Search)-like behavior.
+            # For a single-threaded executor, this is true DFS, but for a multi-threaded
+            # executor, it depends on the order results are available.
             executor._work_ids = LifoQueue()
 
             with tqdm(desc="Overall Progress", smoothing=0.1) as pbar:
@@ -187,46 +187,43 @@ class MultiprocessExecutor:
                 for future in waiter.as_completed():
                     result = future.result()
 
+                    # Take earliest start time from all futures.
+                    # This is to subtract the process spawn time
+                    # from the computation time.
                     if start_time is None:
                         start_time = result.start_time
                     else:
                         start_time = min(start_time, result.start_time)
-                
-                    if result.issat():
-                        # Sample was succesfully verified, no new samples to process
-                        # Update certified domain size in a thread-safe manner
-                        certified_domain_size += result.lebesguemeasure()
-                        # Update visualization if plotter is provided
-                        if plotter is not None:
-                            plotter.update_figure(result)
-                    
-                    if result.isunsat():
-                        # Sample was not verified, add to the uncertified domain size
-                        uncertified_domain_size += result.lebesguemeasure()
-                        # Update visualization if plotter is provided
-                        if plotter is not None:
-                            plotter.update_figure(result)
 
+                    # Update statistics
+                    statistics.add_sample(result)
+
+                    # Update visualization if plotter is provided
+                    if result.isleaf() and plotter is not None:
+                        plotter.update_figure(result)
+
+                    # Store results however caller wants
                     agg = aggregate(agg, result)
 
+                    # Add new results to the queue
                     if result.hasnewsamples():
                         # Put the new samples into the queue
                         new_samples = result.newsamples()
-                        
+
                         # Submit new samples to the executor
                         for new_sample in new_samples:
                             new_future = executor.submit(process_sample, new_sample)
                             new_future.add_done_callback(lambda p: pbar.update())
                             waiter.add(new_future)
-                
-                    certified_percentage = (certified_domain_size / total_domain_size) * 100
-                    uncertified_percentage = (uncertified_domain_size / total_domain_size) * 100
-                    
+
+                    # Update the progress bar
                     pbar.set_description_str(
-                        f"Overall Progress (remaining samples: {len(waiter)}, certified: {certified_percentage:.4f}%, uncertified: {uncertified_percentage:.4f}%)"
+                        f"Overall Progress (remaining samples: {len(waiter)}, "
+                        f"certified: {statistics.get_certified_percentage():.4f}%, "
+                        f"uncertified: {statistics.get_uncertified_percentage():.4f}%)"
                     )
 
         end_time = time.time()
         computation_time = end_time - start_time
 
-        return agg, certified_percentage, uncertified_percentage, computation_time
+        return agg, statistics.get_certified_percentage(), statistics.get_uncertified_percentage(), computation_time

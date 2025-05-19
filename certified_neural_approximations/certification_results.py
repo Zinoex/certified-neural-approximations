@@ -92,13 +92,13 @@ class CertificationRegion:
 
 
 class AugmentedSample(CertificationRegion):
-    def __init__(self, center, radius, first_order_model, output_dim=None, split_dim=None, seed=255):
-        super().__init__(center, radius, output_dim, split_dim, seed)
+    def __init__(self, center, radius, first_order_model, output_dim=None, split_dim=None):
+        super().__init__(center, radius, output_dim, split_dim)
         self.first_order_model = first_order_model
 
     @staticmethod
     def from_certification_region(region, first_order_model):
-        return AugmentedSample(region.center, region.radius, first_order_model, region.output_dim, region.split_dim, region.seed)
+        return AugmentedSample(region.center, region.radius, first_order_model, region.output_dim, region.split_dim)
 
     def isfinite(self):
         return np.isfinite(self.first_order_model[0][0]).all() and np.isfinite(self.first_order_model[0][1]).all() and \
@@ -117,6 +117,9 @@ class SampleResult(abc.ABC):
     @abc.abstractmethod
     def isunsat(self) -> bool:
         pass
+
+    def isleaf(self) -> bool:
+        return self.issat() or self.isunsat()
 
     @abc.abstractmethod
     def hasnewsamples(self) -> bool:
