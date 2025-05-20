@@ -121,7 +121,7 @@ def verify_models_dreal_larger():
         print(f"Verification completed for {dynamics.system_name} system")
 
 
-def main(train=True, verify=True):
+def main(train=False, verify=True):
     os.makedirs(DATA_DIR, exist_ok=True)
 
     if train:

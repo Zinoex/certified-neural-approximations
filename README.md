@@ -1,85 +1,51 @@
+# Certified Neural Approximations
 
-# Python Project Template
+This repository contains the code and data underlying the publication "Certified Neural Approximations of Nonlinear Dynamics" by anonymous authors. The idea is to provide a framework for verifying that a neural network approximates a nonlinear dynamical system with a certain degree of accuracy. 
 
-A low dependency and really simple to start project template for Python Projects.
+The code is based on Marabou 2.0 and certified first-order Taylor expansions. 
 
-See also 
-- [Flask-Project-Template](https://github.com/rochacbruno/flask-project-template/) for a full feature Flask project including database, API, admin interface, etc.
-- [FastAPI-Project-Template](https://github.com/rochacbruno/fastapi-project-template/) The base to start an openapi project featuring: SQLModel, Typer, FastAPI, JWT Token Auth, Interactive Shell, Management Commands.
+## Prerequisites
+- Docker
 
-### HOW TO USE THIS TEMPLATE
+## Reproducibility
+We provide this respository as a reproducibility package for the publication. For reproducibility, we set an explicit seed with `torch.manual_seed` for each benchmark, i.e. to ensure same initialization of weights for every run. In addition, we provide .pth and .onnx files for each benchmark; as an added benefit, it also enables one to run the verification that is the focus of the paper without having to train the networks.
 
-> **DO NOT FORK** this is meant to be used from **[Use this template](https://github.com/rochacbruno/python-project-template/generate)** feature.
-
-1. Click on **[Use this template](https://github.com/rochacbruno/python-project-template/generate)**
-3. Give a name to your project  
-   (e.g. `my_awesome_project` recommendation is to use all lowercase and underscores separation for repo names.)
-3. Wait until the first run of CI finishes  
-   (Github Actions will process the template and commit to your new repo)
-4. If you want [codecov](https://about.codecov.io/sign-up/) Reports and Automatic Release to [PyPI](https://pypi.org)  
-  On the new repository `settings->secrets` add your `PYPI_API_TOKEN` and `CODECOV_TOKEN` (get the tokens on respective websites)
-4. Read the file [CONTRIBUTING.md](CONTRIBUTING.md)
-5. Then clone your new project and happy coding!
-
-> **NOTE**: **WAIT** until first CI run on github actions before cloning your new project.
-
-### What is included on this template?
-
-- 🖼️ Templates for starting multiple application types:
-  * **Basic low dependency** Python program (default) [use this template](https://github.com/rochacbruno/python-project-template/generate)
-  * **Flask** with database, admin interface, restapi and authentication [use this template](https://github.com/rochacbruno/flask-project-template/generate).
-  **or Run `make init` after cloning to generate a new project based on a template.**
-- 📦 A basic [setup.py](setup.py) file to provide installation, packaging and distribution for your project.  
-  Template uses setuptools because it's the de-facto standard for Python packages, you can run `make switch-to-poetry` later if you want.
-- 🤖 A [Makefile](Makefile) with the most useful commands to install, test, lint, format and release your project.
-- 📃 Documentation structure using [mkdocs](http://www.mkdocs.org)
-- 💬 Auto generation of change log using **gitchangelog** to keep a HISTORY.md file automatically based on your commit history on every release.
-- 🐋 A simple [Containerfile](Containerfile) to build a container image for your project.  
-  `Containerfile` is a more open standard for building container images than Dockerfile, you can use buildah or docker with this file.
-- 🧪 Testing structure using [pytest](https://docs.pytest.org/en/latest/)
-- ✅ Code linting using [flake8](https://flake8.pycqa.org/en/latest/)
-- 📊 Code coverage reports using [codecov](https://about.codecov.io/sign-up/)
-- 🛳️ Automatic release to [PyPI](https://pypi.org) using [twine](https://twine.readthedocs.io/en/latest/) and github actions.
-- 🎯 Entry points to execute your program using `python -m <certified_neural_approximations>` or `$ certified_neural_approximations` with basic CLI argument parsing.
-- 🔄 Continuous integration using [Github Actions](.github/workflows/) with jobs to lint, test and release your project on Linux, Mac and Windows environments.
-
-> Curious about architectural decisions on this template? read [ABOUT_THIS_TEMPLATE.md](ABOUT_THIS_TEMPLATE.md)  
-> If you want to contribute to this template please open an [issue](https://github.com/rochacbruno/python-project-template/issues) or fork and send a PULL REQUEST.
-
-[❤️ Sponsor this project](https://github.com/sponsors/rochacbruno/)
-
-<!--  DELETE THE LINES ABOVE THIS AND WRITE YOUR PROJECT README BELOW -->
-
----
-# certified_neural_approximations
-
-[![codecov](https://codecov.io/gh/<Username>/certified-neural-approximations/branch/main/graph/badge.svg?token=certified-neural-approximations_token_here)](https://codecov.io/gh/<Username>/certified-neural-approximations)
-[![CI](https://github.com/<Username>/certified-neural-approximations/actions/workflows/main.yml/badge.svg)](https://github.com/<Username>/certified-neural-approximations/actions/workflows/main.yml)
-
-Awesome certified_neural_approximations created by <Username>
-
-## Install it from PyPI
+We provide a Dockerfile to run all three sets of benchmarks. To access the Docker image, first build a Docker image with the following command:
 
 ```bash
-pip install -e .
+docker build -t ubuntu:cna .
 ```
 
-## Usage
-
-```py
-from certified_neural_approximations import BaseClass
-from certified_neural_approximations import base_function
-
-BaseClass().base_method()
-base_function()
-```
-
+Then start a container with:
 ```bash
-$ python -m certified_neural_approximations
-#or
-$ certified_neural_approximations
+docker run --name cna --rm -v $(pwd)/:/certified-neural-approximations/ -it ubuntu:cna
 ```
 
-## Development
+Inside the container, the initial directory is `/certified-neural-approximations`, which contains the contents of this repository.
 
-Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
+### Dynamics approximation
+
+To run the dynamics approximation benchmarks where we compare with state-of-the-art verification based on dReal, execute the following sequence of commands:
+1. `cd experiments` (to navigate to the `experiments`).
+2. `python3 dynamics_approximation.py`
+
+Executing the above will perform the verification with both our proposed approach and with dReal. If you want to train the networks from scratch before verifying them, modify `main` in `dynamics_approximation.py` to read `train=True` (can be done in command line via `nano`).
+
+<!-- #TODO: Describe the expected output -->
+
+### Compression
+
+To run the compression benchmark where a larger network is trained from trajectories to well-approximate a dynamical system and then a smaller network is trained to approximate the larger to a high degree of accuracy, execute the following sequence of commands:
+1. `cd experiments` (to navigate to the `experiments`).
+2. `python3 compression.py`
+
+Executing the above will perform the verification with both our proposed approach and with dReal. If you want to train the networks from scratch before verifying them, modify `main` in `compression.py` to read `train=True` (can be done in command line via `nano`).
+
+
+### Koopman auto-encoder verification
+
+To run the Koopman auto-encoder verification benchmark where an auto-encoder is trained as a Koopman embedding encoder of a dynamical system, execute the following sequence of commands:
+1. `cd experiments` (to navigate to the `experiments`).
+2. `python3 koopman_verification.py`
+
+Executing the above will perform the verification with both our proposed approach and with dReal. If you want to train the networks from scratch before verifying them, modify `main` in `koopman_verification.py` to read `train=True` (can be done in command line via `nano`).

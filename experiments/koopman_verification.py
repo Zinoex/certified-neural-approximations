@@ -46,7 +46,7 @@ def verify_koopman_model():
     print(f"Verification completed for {dynamics.system_name} system")
 
 
-def main(train=True, verify=True):
+def main(train=False, verify=True):
     if train:
         # Train Koopman model
         train_koopman_model()
