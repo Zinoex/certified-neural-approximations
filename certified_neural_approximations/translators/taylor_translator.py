@@ -161,10 +161,11 @@ class CertifiedFirstOrderTaylorExpansion:
             assert np.all(self.expansion_point == other.expansion_point), "Expansion points must match for TE * TE"
             assert np.all(self.domain[0] == other.domain[0]) and np.all(self.domain[1] == other.domain[1]), "Domains must match for TE * TE"
 
-            y0_op1, J_op1 = self.linear_approximation
+            # Extract components: (Jacobian, constant)
+            J_op1, y0_op1 = self.linear_approximation
             R_op1_low, R_op1_high = self.remainder
 
-            y0_op2, J_op2 = other.linear_approximation
+            J_op2, y0_op2 = other.linear_approximation
             R_op2_low, R_op2_high = other.remainder
             
             y0_op1 = np.atleast_1d(y0_op1)
@@ -719,15 +720,18 @@ class TaylorTranslator:
         the trivial Taylor expansion of f(x) = x, the identity; with a given
         expansion point and domain, and a linear approximation of the identity.
         The remainder is set to zero.
-        :param a: torch.tensor of floats
-        :return: torch.tensor of floats
+        :param point: expansion point
+        :param lower: lower bounds of domain
+        :param upper: upper bounds of domain
+        :return: CertifiedFirstOrderTaylorExpansion
         """
 
         # for f(x) = x, the Taylor expansion is c + (x - c) \oplus R where R = 0
+        # The Jacobian should be the identity matrix of appropriate size
         return CertifiedFirstOrderTaylorExpansion(
             expansion_point=point,
             domain=(lower, upper),
-            linear_approximation=(np.ones(point.shape[0]), point),
+            linear_approximation=(np.eye(point.shape[0]), point),
             remainder=(np.zeros(point.shape[0]), np.zeros(point.shape[0]))
         )
 

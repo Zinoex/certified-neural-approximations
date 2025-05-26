@@ -112,6 +112,43 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.remainder[0], self.remainder[1] * scalar)
         assert np.allclose(result.remainder[1], self.remainder[0] * scalar)
 
+    def test_multiplication_with_te(self):
+        """Test multiplication of two TaylorExpansions using product rule."""
+        other = CertifiedFirstOrderTaylorExpansion(
+            self.expansion_point, self.domain,
+            (np.array([[0.5, 1.0], [1.0, 0.5]]), np.array([0.5, 1.0])),
+            (np.array([-0.05, -0.1]), np.array([0.05, 0.1]))
+        )
+        
+        result = self.te * other
+        
+        # Expected values using product rule: f*g = f(c)*g(c) + [f(c)*∇g + g(c)*∇f]*(x-c) + HOT
+        y0_self = self.linear_approx[1]  # f(c)
+        J_self = self.linear_approx[0]   # ∇f(c)
+        y0_other = other.linear_approximation[1]  # g(c)
+        J_other = other.linear_approximation[0]   # ∇g(c)
+        
+        # Product rule for constant: f(c) * g(c)
+        expected_constant = y0_self * y0_other
+        
+        # Product rule for Jacobian: f(c)*∇g(c) + g(c)*∇f(c)
+        expected_jacobian = (y0_self.reshape(-1, 1) * J_other + 
+                           y0_other.reshape(-1, 1) * J_self)
+        
+        assert np.allclose(result.linear_approximation[1], expected_constant)
+        assert np.allclose(result.linear_approximation[0], expected_jacobian)
+        
+        # Check that expansion point and domain are preserved
+        assert np.array_equal(result.expansion_point, self.expansion_point)
+        assert np.array_equal(result.domain[0], self.domain[0])
+        assert np.array_equal(result.domain[1], self.domain[1])
+        
+        # Check that remainders are properly computed (should be non-zero due to propagation and HOT)
+        assert result.remainder[0] is not None
+        assert result.remainder[1] is not None
+        assert len(result.remainder[0]) == len(self.expansion_point)
+        assert len(result.remainder[1]) == len(self.expansion_point)
+
     def test_division_by_scalar(self):
         """Test division by scalar."""
         scalar = 2.0
@@ -182,7 +219,8 @@ class TestTaylorTranslator:
         assert np.array_equal(result.expansion_point, point)
         assert np.array_equal(result.domain[0], lower)
         assert np.array_equal(result.domain[1], upper)
-        assert np.array_equal(result.linear_approximation[0], np.ones(point.shape[0]))
+        # For identity function f(x) = x, the Jacobian should be the identity matrix
+        assert np.array_equal(result.linear_approximation[0], np.eye(point.shape[0]))
         assert np.array_equal(result.linear_approximation[1], point)
         assert np.array_equal(result.remainder[0], np.zeros(point.shape[0]))
         assert np.array_equal(result.remainder[1], np.zeros(point.shape[0]))
