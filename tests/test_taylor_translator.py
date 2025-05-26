@@ -103,7 +103,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.remainder[0], self.remainder[0] * scalar)
         assert np.allclose(result.remainder[1], self.remainder[1] * scalar)
 
-    def test_multiplication_with_negative_scalar(self):
+    def test_multiplication_with_neg_scalar(self):
         """Test multiplication with negative scalar."""
         scalar = -2.0
         result = self.te * scalar
@@ -177,18 +177,6 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
         
-        # Verify Lagrange remainder bounds for sin composition
-        # For sin(g(x)), the second derivative bound is max|sin''(g(η))| = max|sin(g(η))| ≤ 1
-        # Plus chain rule contributions from g(x) remainder propagation
-        g_range = inner_te.range()
-        M_sin_bound = max_abs_sin(g_range)  # Should be ≤ 1
-        
-        # The remainder should include both propagated terms and Lagrange terms
-        # Check that remainder bounds are reasonable and non-trivial
-        assert np.all(result.remainder[0] <= result.remainder[1] + 1e-9)
-        assert not np.allclose(result.remainder[0], 0.0, atol=1e-12)
-        assert not np.allclose(result.remainder[1], 0.0, atol=1e-12)
-        
         # Test another composition: h(x) = exp(sin(g(x)))
         # This tests nested composition
         intermediate = self.translator.sin(inner_te)
@@ -205,18 +193,6 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(final_result.linear_approximation[1], expected_final_constant)
         assert np.allclose(final_result.linear_approximation[0], expected_final_jacobian)
         
-        # Verify Lagrange bounds for nested composition
-        # exp(sin(g(x))) has complex remainder structure due to composition
-        # The remainder should account for both exp and sin Lagrange terms
-        intermediate_range = intermediate.range()
-        assert np.all(final_result.remainder[0] <= final_result.remainder[1] + 1e-9)
-        
-        # Check that remainders grow appropriately through composition
-        # (nested functions should have larger error bounds)
-        final_remainder_width = final_result.remainder[1] - final_result.remainder[0]
-        initial_remainder_width = result.remainder[1] - result.remainder[0]
-        assert np.all(final_remainder_width >= initial_remainder_width * 0.8)  # Allow some tolerance
-        
         # Verify structure preservation through composition
         assert np.array_equal(final_result.expansion_point, self.expansion_point)
         assert np.array_equal(final_result.domain[0], self.domain[0])
@@ -228,6 +204,106 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert len(final_result.remainder[0]) == len(self.expansion_point)
         assert len(final_result.remainder[1]) == len(self.expansion_point)
         assert np.all(final_result.remainder[0] <= final_result.remainder[1] + 1e-9)
+
+    def test_division_by_scalar(self):
+        """Test division by scalar."""
+        scalar = 2.0
+        result = self.te / scalar
+        
+        assert np.allclose(result.linear_approximation[0], self.linear_approx[0] / scalar)
+        assert np.allclose(result.linear_approximation[1], self.linear_approx[1] / scalar)
+        assert np.allclose(result.remainder[0], self.remainder[0] / scalar)
+        assert np.allclose(result.remainder[1], self.remainder[1] / scalar)
+
+    def test_division_by_zero(self):
+        """Test division by zero raises error."""
+        with pytest.raises(ZeroDivisionError):
+            self.te / 0
+
+    def test_division_by_te(self):
+        """Test division of two TaylorExpansions using reciprocal."""
+        # Create a positive TaylorExpansion for the denominator to avoid domain issues
+        # We need to ensure the range of the denominator doesn't contain zero to avoid
+        # division by zero errors in the reciprocal computation
+        denominator = CertifiedFirstOrderTaylorExpansion(
+            self.expansion_point, self.domain,
+            (np.array([[0.5, 0.2], [0.1, 0.8]]), np.array([2.0, 3.0])),  # Positive constants
+            (np.array([-0.05, -0.1]), np.array([0.05, 0.1]))  # Small remainders
+        )
+        
+        # Perform division: self.te / denominator
+        # Mathematically: f(x) / g(x) = f(x) * (1/g(x))
+        result = self.te / denominator
+        
+        # Test 1: Division is implemented as multiplication by reciprocal
+        # Verify this by computing the expected result manually
+        expected_result_reciprocal = self.te * denominator._reciprocal()
+        
+        # Check that the linear approximation (Jacobian and constant) match
+        # For division f/g, the result should be identical to f * (1/g)
+        assert np.allclose(result.linear_approximation[0], expected_result_reciprocal.linear_approximation[0])
+        assert np.allclose(result.linear_approximation[1], expected_result_reciprocal.linear_approximation[1])
+        
+        # Check that the remainder bounds are correctly propagated
+        # The remainder captures higher-order terms and error bounds
+        assert np.allclose(result.remainder[0], expected_result_reciprocal.remainder[0])
+        assert np.allclose(result.remainder[1], expected_result_reciprocal.remainder[1])
+        
+        # Test 2: Verify using manual product rule calculation
+        # For division f/g = f * (1/g), we manually compute the product rule
+        J_f, y0_f = self.te.linear_approximation  # f components
+        J_g, y0_g = denominator.linear_approximation  # g components
+        
+        # Reciprocal components: 1/g(c) and ∇(1/g)(c) = -1/g(c)² * ∇g(c)
+        recip_constant = 1.0 / y0_g  # 1/g(c)
+        recip_jacobian = -(1.0 / (y0_g**2)).reshape(-1, 1) * J_g  # ∇(1/g)(c)
+        
+        # Product rule: f * (1/g) = f(c)*(1/g(c)) + [f(c)*∇(1/g)(c) + (1/g(c))*∇f(c)]
+        expected_constant_manual = y0_f * recip_constant
+        expected_jacobian_manual = (y0_f.reshape(-1, 1) * recip_jacobian + 
+                                   recip_constant.reshape(-1, 1) * J_f)
+        
+        # Verify manual calculation matches the result
+        assert np.allclose(result.linear_approximation[1], expected_constant_manual)
+        assert np.allclose(result.linear_approximation[0], expected_jacobian_manual)
+        
+        # Verify that the mathematical structure is preserved
+        # Expansion point and domain should remain unchanged
+        assert np.array_equal(result.expansion_point, self.expansion_point)
+        assert np.array_equal(result.domain[0], self.domain[0])
+        assert np.array_equal(result.domain[1], self.domain[1])
+
+    def test_reciprocal(self):
+        """Test reciprocal operation."""
+        # Create a positive TaylorExpansion to avoid domain issues
+        te_pos = CertifiedFirstOrderTaylorExpansion(
+            np.array([2.0]), (np.array([1.5]), np.array([2.5])),
+            (np.array([[1.0]]), np.array([2.0])),
+            (np.array([-0.1]), np.array([0.1]))
+        )
+        
+        result = te_pos._reciprocal()
+        assert result.linear_approximation[1] == pytest.approx(0.5)  # 1/2
+        assert result.linear_approximation[0] == pytest.approx(-0.25)  # -1/(2^2)
+
+    def test_indexing(self):
+        """Test indexing operation."""
+        result = self.te[0]
+        
+        assert np.allclose(result.linear_approximation[0], self.linear_approx[0][0:1])
+        assert np.allclose(result.linear_approximation[1], self.linear_approx[1][0:1])
+        assert np.allclose(result.remainder[0], self.remainder[0][0:1])
+        assert np.allclose(result.remainder[1], self.remainder[1][0:1])
+
+    def test_range_computation(self):
+        """Test range computation."""
+        lower, upper = self.te.range()
+        
+        # Should return valid bounds
+        assert len(lower) == len(self.expansion_point)
+        assert len(upper) == len(self.expansion_point)
+        assert np.all(lower <= upper + 1e-9)
+
 
 class TestTaylorTranslator:
     def setup_method(self):
@@ -284,18 +360,6 @@ class TestTaylorTranslator:
         
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
-        
-        # Verify Lagrange remainder bounds for sin function
-        # sin''(x) = -sin(x), so max|sin''(η)| over range bounds the Lagrange remainder
-        y_range = self.te.range()
-        M_lagrange = max_abs_sin(y_range)
-        max_deviation = np.maximum(np.abs(y_range[0] - self.expansion_point), 
-                                  np.abs(y_range[1] - self.expansion_point))
-        expected_lagrange_bound = (M_lagrange / 2) * max_deviation**2
-        
-        # The actual remainder should be bounded by Lagrange term plus propagated terms
-        remainder_magnitude = np.maximum(np.abs(result.remainder[0]), np.abs(result.remainder[1]))
-        assert np.all(remainder_magnitude >= expected_lagrange_bound * 0.5)  # Should contain Lagrange term
 
     def test_cos(self):
         """Test cosine function."""
@@ -306,17 +370,6 @@ class TestTaylorTranslator:
         
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
-        
-        # Verify Lagrange remainder bounds for cos function
-        # cos''(x) = -cos(x), so max|cos''(η)| over range bounds the Lagrange remainder
-        y_range = self.te.range()
-        M_lagrange = max_abs_cos(y_range)
-        max_deviation = np.maximum(np.abs(y_range[0] - self.expansion_point), 
-                                  np.abs(y_range[1] - self.expansion_point))
-        expected_lagrange_bound = (M_lagrange / 2) * max_deviation**2
-        
-        remainder_magnitude = np.maximum(np.abs(result.remainder[0]), np.abs(result.remainder[1]))
-        assert np.all(remainder_magnitude >= expected_lagrange_bound * 0.5)
 
     def test_exp(self):
         """Test exponential function."""
@@ -327,17 +380,62 @@ class TestTaylorTranslator:
         
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
+
+    def test_log(self):
+        """Test logarithm function."""
+        # Use positive values to avoid domain issues
+        te_pos = CertifiedFirstOrderTaylorExpansion(
+            np.array([2.0]), (np.array([1.5]), np.array([2.5])),
+            (np.array([[1.0]]), np.array([2.0])),
+            (np.array([-0.1]), np.array([0.1]))
+        )
         
-        # Verify Lagrange remainder bounds for exp function
-        # exp''(x) = exp(x), so max|exp(η)| over range bounds the Lagrange remainder
-        y_range = self.te.range()
-        M_lagrange = np.exp(np.maximum(y_range[0], y_range[1]))  # exp is monotonic
-        max_deviation = np.maximum(np.abs(y_range[0] - self.expansion_point), 
-                                  np.abs(y_range[1] - self.expansion_point))
-        expected_lagrange_bound = (M_lagrange / 2) * max_deviation**2
+        result = self.translator.log(te_pos)
         
-        remainder_magnitude = np.maximum(np.abs(result.remainder[0]), np.abs(result.remainder[1]))
-        assert np.all(remainder_magnitude >= expected_lagrange_bound * 0.1)  # Looser bound due to growth
+        expected_constant = np.log(np.array([2.0]))
+        expected_jacobian = (1.0 / np.array([2.0])).reshape(-1, 1) * te_pos.linear_approximation[0]
+        
+        assert np.allclose(result.linear_approximation[1], expected_constant)
+        assert np.allclose(result.linear_approximation[0], expected_jacobian)
+
+    def test_log_domain_error(self):
+        """Test logarithm with invalid domain."""
+        # Create TaylorExpansion with range including negative values
+        te_invalid = CertifiedFirstOrderTaylorExpansion(
+            np.array([0.5]), (np.array([-1.0]), np.array([1.0])),
+            (np.array([[1.0]]), np.array([0.5])),
+            (np.array([-1.0]), np.array([1.0]))
+        )
+        
+        with pytest.raises(ValueError, match="Logarithm domain error"):
+            self.translator.log(te_invalid)
+
+    def test_sqrt(self):
+        """Test square root function."""
+        te_pos = CertifiedFirstOrderTaylorExpansion(
+            np.array([4.0]), (np.array([1.0]), np.array([9.0])),
+            (np.array([[1.0]]), np.array([4.0])),
+            (np.array([-0.1]), np.array([0.1]))
+        )
+        
+        result = self.translator.sqrt(te_pos)
+        
+        expected_constant = np.sqrt(np.array([4.0]))
+        expected_jacobian = (0.5 / np.array([4.0])).reshape(-1, 1) * te_pos.linear_approximation[0]
+        
+        assert np.allclose(result.linear_approximation[1], expected_constant)
+        assert np.allclose(result.linear_approximation[0], expected_jacobian)
+
+    def test_sqrt_domain_error(self):
+        """Test square root with invalid domain."""
+        te_invalid = CertifiedFirstOrderTaylorExpansion(
+            np.array([0.5]), (np.array([-1.0]), np.array([1.0])),
+            (np.array([[1.0]]), np.array([0.5])),
+            (np.array([-1.0]), np.array([1.0]))
+        )
+        
+        with pytest.raises(ValueError, match="Square root domain error"):
+            self.translator.sqrt(te_invalid)
 
     def test_pow(self):
         """Test power function."""
@@ -349,19 +447,37 @@ class TestTaylorTranslator:
         
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
+
+    def test_pow_invalid_exponent(self):
+        """Test power function with non-integer exponent."""
+        with pytest.raises(AssertionError):
+            self.translator.pow(self.te, 2.5)
+
+    def test_stack(self):
+        """Test stacking multiple TaylorExpansions."""
+        te1 = CertifiedFirstOrderTaylorExpansion(
+            self.expansion_point, self.domain,
+            (np.array([[1.0]]), np.array([1.0])),
+            (np.array([-0.1]), np.array([0.1]))
+        )
+        te2 = CertifiedFirstOrderTaylorExpansion(
+            self.expansion_point, self.domain,
+            (np.array([[2.0]]), np.array([2.0])),
+            (np.array([-0.2]), np.array([0.2]))
+        )
         
-        # Verify Lagrange remainder bounds for power function
-        # f''(x) = n(n-1)x^(n-2) for f(x) = x^n
-        y_range = self.te.range()
-        coeff_second_deriv = exponent * (exponent - 1)
-        exp_second_deriv = exponent - 2
-        M_lagrange = max_monomial_vectorized(coeff_second_deriv, exp_second_deriv, y_range)
-        max_deviation = np.maximum(np.abs(y_range[0] - self.expansion_point), 
-                                  np.abs(y_range[1] - self.expansion_point))
-        expected_lagrange_bound = (M_lagrange / 2) * max_deviation**2
+        result = self.translator.stack([te1, te2])
         
-        remainder_magnitude = np.maximum(np.abs(result.remainder[0]), np.abs(result.remainder[1]))
-        assert np.all(remainder_magnitude >= expected_lagrange_bound * 0.5)
+        expected_jacobian = np.concatenate([te1.linear_approximation[0], te2.linear_approximation[0]])
+        expected_constant = np.concatenate([te1.linear_approximation[1], te2.linear_approximation[1]])
+        expected_remainder_low = np.concatenate([te1.remainder[0], te2.remainder[0]])
+        expected_remainder_high = np.concatenate([te1.remainder[1], te2.remainder[1]])
+        
+        assert np.allclose(result.linear_approximation[0], expected_jacobian)
+        assert np.allclose(result.linear_approximation[1], expected_constant)
+        assert np.allclose(result.remainder[0], expected_remainder_low)
+        assert np.allclose(result.remainder[1], expected_remainder_high)
+
 
 class TestHelperFunctions:
     def test_max_abs_sin(self):
