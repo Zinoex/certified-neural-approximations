@@ -37,7 +37,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.array_equal(self.te.remainder[0], self.remainder[0])
         assert np.array_equal(self.te.remainder[1], self.remainder[1])
 
-    def test_addition_with_te(self):
+    def test_addition(self):
         """Test addition of two TaylorExpansions."""
         other = CertifiedFirstOrderTaylorExpansion(
             self.expansion_point, self.domain,
@@ -59,9 +59,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.linear_approximation[1], expected_linear[1])
         assert np.allclose(result.remainder[0], expected_remainder[0])
         assert np.allclose(result.remainder[1], expected_remainder[1])
-
-    def test_addition_with_scalar(self):
-        """Test addition with scalar."""
+    
+        # Test addition with scalar
         scalar = 5.0
         result = self.te + scalar
         
@@ -70,7 +69,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.remainder[0], self.remainder[0])
         assert np.allclose(result.remainder[1], self.remainder[1])
 
-    def test_subtraction_with_te(self):
+    def test_subtraction(self):
         """Test subtraction of two TaylorExpansions."""
         other = CertifiedFirstOrderTaylorExpansion(
             self.expansion_point, self.domain,
@@ -93,8 +92,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.remainder[0], expected_remainder[0])
         assert np.allclose(result.remainder[1], expected_remainder[1])
 
-    def test_multiplication_with_scalar(self):
-        """Test multiplication with scalar."""
+        # Test subtraction with positive and negative scalar."""
         scalar = 2.0
         result = self.te * scalar
         
@@ -103,8 +101,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.remainder[0], self.remainder[0] * scalar)
         assert np.allclose(result.remainder[1], self.remainder[1] * scalar)
 
-    def test_multiplication_with_neg_scalar(self):
-        """Test multiplication with negative scalar."""
+        # Test with negative scalar
         scalar = -2.0
         result = self.te * scalar
         
@@ -113,8 +110,27 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.remainder[0], self.remainder[1] * scalar)
         assert np.allclose(result.remainder[1], self.remainder[0] * scalar)
 
-    def test_multiplication_with_te(self):
+    def test_multiplication(self):
         """Test multiplication of two TaylorExpansions using product rule."""
+        # Test multiplication with scalar (positive)
+        scalar = 2.0
+        result = self.te * scalar
+        
+        assert np.allclose(result.linear_approximation[0], self.linear_approx[0] * scalar)
+        assert np.allclose(result.linear_approximation[1], self.linear_approx[1] * scalar)
+        assert np.allclose(result.remainder[0], self.remainder[0] * scalar)
+        assert np.allclose(result.remainder[1], self.remainder[1] * scalar)
+
+        # Test multiplication with negative scalar
+        scalar = -2.0
+        result = self.te * scalar
+        
+        assert np.allclose(result.linear_approximation[0], self.linear_approx[0] * scalar)
+        assert np.allclose(result.linear_approximation[1], self.linear_approx[1] * scalar)
+        assert np.allclose(result.remainder[0], self.remainder[1] * scalar)
+        assert np.allclose(result.remainder[1], self.remainder[0] * scalar)
+
+        # Test multiplication of two TaylorExpansions
         other = CertifiedFirstOrderTaylorExpansion(
             self.expansion_point, self.domain,
             (np.array([[0.5, 1.0], [1.0, 0.5]]), np.array([0.5, 1.0])),
@@ -205,7 +221,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert len(final_result.remainder[1]) == len(self.expansion_point)
         assert np.all(final_result.remainder[0] <= final_result.remainder[1] + 1e-9)
 
-    def test_division_by_scalar(self):
+    def test_division(self):
         """Test division by scalar."""
         scalar = 2.0
         result = self.te / scalar
@@ -215,16 +231,14 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.remainder[0], self.remainder[0] / scalar)
         assert np.allclose(result.remainder[1], self.remainder[1] / scalar)
 
-    def test_division_by_zero(self):
-        """Test division by zero raises error."""
+        # Test division by zero
         with pytest.raises(ZeroDivisionError):
             self.te / 0
 
-    def test_division_by_te(self):
-        """Test division of two TaylorExpansions using reciprocal."""
-        # Create a positive TaylorExpansion for the denominator to avoid domain issues
-        # We need to ensure the range of the denominator doesn't contain zero to avoid
-        # division by zero errors in the reciprocal computation
+        # Test division of two TaylorExpansions
+        #    - Create a positive TaylorExpansion for the denominator to avoid domain issues
+        #    - We need to ensure the range of the denominator doesn't contain zero to avoid
+        #    - division by zero errors in the reciprocal computation
         denominator = CertifiedFirstOrderTaylorExpansion(
             self.expansion_point, self.domain,
             (np.array([[0.5, 0.2], [0.1, 0.8]]), np.array([2.0, 3.0])),  # Positive constants
