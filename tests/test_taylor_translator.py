@@ -318,6 +318,60 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert len(upper) == len(self.expansion_point)
         assert np.all(lower <= upper + 1e-9)
 
+    def test_monotonic_functions(self):
+        """Test bounds for monotonic functions using second derivative evaluation at endpoints."""
+        # Test a monotonically increasing function: f(x) = x^3
+        exponent = 3
+        te_increasing = CertifiedFirstOrderTaylorExpansion(
+            self.expansion_point, self.domain,
+            (np.array([[3.0, 0.0], [0.0, 3.0]]), np.array([1.0, 8.0])),  # f(c) = [1^3, 2^3]
+            (np.array([-0.1, -0.2]), np.array([0.1, 0.2]))
+        )
+        
+        # Compute the second derivative bounds for f(x) = x^3
+        # f''(x) = 6x, so evaluate at the endpoints of the domain
+        lower_bound = self.domain[0]  # x_min
+        upper_bound = self.domain[1]  # x_max
+        second_derivative_lower = 6 * lower_bound
+        second_derivative_upper = 6 * upper_bound
+        
+        # If f''(x) is increasing, max is at x_max
+        max_second_derivative = second_derivative_upper
+        min_second_derivative = second_derivative_lower
+        
+        # Verify that the remainder bounds are consistent with the second derivative
+        max_deviation = np.maximum(np.abs(self.domain[0] - self.expansion_point), 
+                                   np.abs(self.domain[1] - self.expansion_point))
+        expected_remainder_bound_upper = (max_second_derivative / 2) * max_deviation**2
+        expected_remainder_bound_lower = (min_second_derivative / 2) * max_deviation**2
+
+        assert np.all(te_increasing.remainder[1] == expected_remainder_bound_upper)
+        assert np.all(te_increasing.remainder[0] == expected_remainder_bound_lower)
+
+        # Test a monotonically decreasing function: f(x) = -x^3
+        te_decreasing = CertifiedFirstOrderTaylorExpansion(
+            self.expansion_point, self.domain,
+            (np.array([[-3.0, 0.0], [0.0, -3.0]]), np.array([-1.0, -8.0])),  # f(c) = -[1^3, 2^3]
+            (np.array([-0.1, -0.2]), np.array([0.1, 0.2]))
+        )
+        
+        # Compute the second derivative bounds for f(x) = -x^3
+        # f''(x) = -6x, so evaluate at the endpoints of the domain
+        second_derivative_lower = -6 * lower_bound
+        second_derivative_upper = -6 * upper_bound
+        
+        # If f''(x) is decreasing, min is at x_max (negative max)
+        min_second_derivative = second_derivative_upper
+        max_second_derivative = second_derivative_lower
+        
+        # Verify that the remainder bounds are consistent with the second derivative
+        max_deviation = np.maximum(np.abs(self.domain[0] - self.expansion_point), 
+                                   np.abs(self.domain[1] - self.expansion_point))
+        expected_remainder_bound_upper = (max_second_derivative / 2) * max_deviation**2
+        expected_remainder_bound_lower = (min_second_derivative / 2) * max_deviation**2
+
+        assert np.all(te_increasing.remainder[1] == expected_remainder_bound_upper)
+        assert np.all(te_increasing.remainder[0] == expected_remainder_bound_lower)
 
 class TestTaylorTranslator:
     def setup_method(self):
