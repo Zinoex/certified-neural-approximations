@@ -261,11 +261,8 @@ class CertifiedFirstOrderTaylorExpansion:
 
         # Check that zero is not in the range to avoid division by zero
         a_range_lower, a_range_upper = self.range()
-        if np.any((a_range_lower <= 1e-9) & (a_range_upper >= -1e-9) & (np.sign(a_range_lower) != np.sign(a_range_upper))):
-             if np.any(np.abs(a_range_lower) < 1e-9) and np.any(np.abs(a_range_upper) < 1e-9):
-                 pass # Allow if exactly zero (edge case)
-             elif np.any( (a_range_lower <= 0) & (a_range_upper >=0) ):
-                raise ValueError("Reciprocal of a Taylor expansion whose range contains zero is undefined.")
+        if np.any((a_range_lower <= 0) & (a_range_upper >= 0)):
+            raise ValueError("Reciprocal of a Taylor expansion whose range contains zero is undefined.")
 
         # g(y₀) = 1/y₀
         new_const = 1.0 / y0
@@ -280,8 +277,10 @@ class CertifiedFirstOrderTaylorExpansion:
         propagated_rem_lower = np.minimum(prop_rem_term1, prop_rem_term2)
         propagated_rem_upper = np.maximum(prop_rem_term1, prop_rem_term2)
 
-        # Second-order remainder: g''(y) = 2/y³, so Lagrange remainder involves max |1/η³|
-        M_g_double_prime_factor = max_monomial_vectorized(1.0, -3, (a_range_lower, a_range_upper))
+        # Second-order remainder: g''(y) = 2/y³, so Lagrange remainder involves max |2/η³|
+        coeff_f_double_prime = 2.0
+        exponent_f_double_prime = -3
+        M_g_double_prime_factor = max_monomial_vectorized(coeff_f_double_prime, exponent_f_double_prime, (a_range_lower, a_range_upper))
         
         max_abs_y_minus_y0 = np.maximum(np.abs(a_range_lower - y0), np.abs(a_range_upper - y0))
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
@@ -666,20 +665,22 @@ class TaylorTranslator:
         assert isinstance(exponent_b, int), "Exponent must be an integer"
 
         y0 = a.linear_approximation[1]
-        f_y0 = np.pow(y0, exponent_b)
-        grad_f_y0 = exponent_b * np.pow(y0, exponent_b - 1)
+        f_y0 = np.power(y0, exponent_b)
+        grad_f_y0 = exponent_b * np.power(y0, exponent_b - 1)
 
         linear_term_jacobian = grad_f_y0.reshape(-1, 1) * a.linear_approximation[0]
 
         range_of_y = a.range()
         coeff_f_double_prime = exponent_b * (exponent_b - 1)
         exponent_f_double_prime = exponent_b - 2
-        M_lagrange = max_monomial_vectorized(coeff_f_double_prime, exponent_f_double_prime, range_of_y)
+        M_lagrange_max = max_monomial_vectorized(coeff_f_double_prime, exponent_f_double_prime, range_of_y)
+        M_lagrange_min = min_monomial_vectorized(coeff_f_double_prime, exponent_f_double_prime, range_of_y)
         
         max_abs_y_minus_y0 = np.maximum(np.abs(range_of_y[0] - y0), np.abs(range_of_y[1] - y0))
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
         
-        local_error_magnitude = (M_lagrange / 2) * max_sq_y_minus_y0
+        local_error_magnitude_max = (M_lagrange_max / 2) * max_sq_y_minus_y0
+        local_error_magnitude_min = (M_lagrange_min / 2) * max_sq_y_minus_y0
 
         prop_rem_lower_y, prop_rem_upper_y = a.remainder
         
@@ -689,8 +690,8 @@ class TaylorTranslator:
         propagated_taylor_rem_lower = np.minimum(term1_rem, term2_rem)
         propagated_taylor_rem_upper = np.maximum(term1_rem, term2_rem)
 
-        final_rem_lower = propagated_taylor_rem_lower - local_error_magnitude
-        final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude
+        final_rem_lower = propagated_taylor_rem_lower + local_error_magnitude_min
+        final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude_max
         
         remainder = (final_rem_lower, final_rem_upper)
 
@@ -804,7 +805,42 @@ def max_abs_cos(intervals):
 
 def max_monomial_vectorized(c, n, intervals):
     """
-    Bound the value of a univariate monomial f(x) = c * x^n over multiple intervals.
+    Bound the maximum value of a univariate monomial f(x) = c * x^n over multiple intervals.
+    :param c: Coefficient of the monomial (scalar or array-like of shape (m,)).
+    :param n: Degree of the monomial (scalar or array-like of shape (m,)).
+    :param intervals: tuple(np.ndarray, np.ndarray), both of shape (m,).
+    :return: np.ndarray of shape (m,).
+    """
+    a, b = intervals
+
+    # Evaluate f(x) at the endpoints
+    f_a = c * np.power(a, n)
+    f_b = c * np.power(b, n)
+
+    # Initialize bounds with endpoint values
+    max_values = np.maximum(f_a, f_b)
+
+    # Check critical point at x = 0 (only if 0 is in the interval and n > 0)
+    zero_in_interval = (a <= 0) & (b >= 0) & (n > 0)
+    if np.any(zero_in_interval):
+        f_0 = c * np.power(0, n)  # f(0) = 0
+        max_values[zero_in_interval] = np.maximum(max_values[zero_in_interval], f_0[zero_in_interval])
+
+    # Check critical points for even powers (n > 0 and n is even)
+    even_power = (n > 0) & (n % 2 == 0)
+    if np.any(even_power):
+        # For even powers, the maximum absolute value occurs at the endpoint with the largest magnitude
+        abs_a = np.abs(a)
+        abs_b = np.abs(b)
+        critical_max = np.maximum(abs_a, abs_b)
+        max_values[even_power] = np.maximum(max_values[even_power], (c * np.power(critical_max, n))[even_power])
+
+    return max_values
+
+
+def min_monomial_vectorized(c, n, intervals):
+    """
+    Bound the minimum value of a univariate monomial f(x) = c * x^n over multiple intervals.
     :param c: Coefficient of the monomial (scalar or array-like of shape (m,)).
     :param n: Degree of the monomial (scalar or array-like of shape (m,)).
     :param intervals: tuple(np.ndarray, np.ndarray), both of shape (m,).
@@ -818,17 +854,23 @@ def max_monomial_vectorized(c, n, intervals):
 
     # Initialize bounds with endpoint values
     min_values = np.minimum(f_a, f_b)
-    max_values = np.maximum(f_a, f_b)
 
-    # Check critical point at x = 0 (only if 0 is in the interval)
-    zero_in_interval = (a <= 0) & (b >= 0)
+    # Check critical point at x = 0 (only if 0 is in the interval and n > 0)
+    zero_in_interval = (a <= 0) & (b >= 0) & (n > 0)
     if np.any(zero_in_interval):
         f_0 = c * np.power(0, n)  # f(0) = 0
-        min_values[zero_in_interval] = np.minimum(min_values[zero_in_interval], f_0)
-        max_values[zero_in_interval] = np.maximum(max_values[zero_in_interval], f_0)
+        min_values[zero_in_interval] = np.minimum(min_values[zero_in_interval], f_0[zero_in_interval])
 
-    # Combine min and max values into a single array
-    return np.maximum(np.abs(min_values), np.abs(max_values))
+    # Check critical points for even powers (n > 0 and n is even)
+    even_power = (n > 0) & (n % 2 == 0)
+    if np.any(even_power):
+        # For even powers, the minimum absolute value occurs at the endpoint with the smallest magnitude
+        abs_a = np.abs(a)
+        abs_b = np.abs(b)
+        critical_min = np.minimum(abs_a, abs_b)
+        min_values[even_power] = np.minimum(min_values[even_power], (c * np.power(critical_min, n))[even_power])
+
+    return min_values
 
 # Helper function for TE * TE multiplication remainder calculation
 def _mat_interval_vec_mul(M, v_low, v_high):
