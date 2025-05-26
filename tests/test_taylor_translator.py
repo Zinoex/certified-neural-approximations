@@ -20,8 +20,10 @@ class TestCertifiedFirstOrderTaylorExpansion:
         self.translator = TaylorTranslator()
         self.expansion_point = np.array([1.0, 2.0])
         self.domain = (np.array([0.5, 1.5]), np.array([1.5, 2.5]))
-        self.linear_approx = (np.array([[1.0, 0.5], [0.0, 1.0]]), np.array([1.0, 2.0]))
-        self.remainder = (np.array([-0.1, -0.2]), np.array([0.1, 0.2]))
+
+        # Start with f(x) = x
+        self.linear_approx = (np.array([[1.0, 0.0], [0.0, 1.0]]), np.array([1.0, 2.0]))
+        self.remainder = (np.array([0.0, 0.0]), np.array([0.0, 0.0]))
         
         self.te = CertifiedFirstOrderTaylorExpansion(
             self.expansion_point, self.domain, self.linear_approx, self.remainder
@@ -322,11 +324,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         """Test bounds for monotonic functions using second derivative evaluation at endpoints."""
         # Test a monotonically increasing function: f(x) = x^3
         exponent = 3
-        te_increasing = CertifiedFirstOrderTaylorExpansion(
-            self.expansion_point, self.domain,
-            (np.array([[3.0, 0.0], [0.0, 3.0]]), np.array([1.0, 8.0])),  # f(c) = [1^3, 2^3]
-            (np.array([-0.1, -0.2]), np.array([0.1, 0.2]))
-        )
+        te_increasing = self.translator.pow(self.te, exponent)
         
         # Compute the second derivative bounds for f(x) = x^3
         # f''(x) = 6x, so evaluate at the endpoints of the domain
@@ -349,11 +347,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.all(te_increasing.remainder[0] == expected_remainder_bound_lower)
 
         # Test a monotonically decreasing function: f(x) = -x^3
-        te_decreasing = CertifiedFirstOrderTaylorExpansion(
-            self.expansion_point, self.domain,
-            (np.array([[-3.0, 0.0], [0.0, -3.0]]), np.array([-1.0, -8.0])),  # f(c) = -[1^3, 2^3]
-            (np.array([-0.1, -0.2]), np.array([0.1, 0.2]))
-        )
+        te_decreasing = -te_increasing
         
         # Compute the second derivative bounds for f(x) = -x^3
         # f''(x) = -6x, so evaluate at the endpoints of the domain
@@ -466,9 +460,8 @@ class TestTaylorTranslator:
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
-    def test_log_domain_error(self):
-        """Test logarithm with invalid domain."""
-        # Create TaylorExpansion with range including negative values
+        # Test logarithm with invalid domain.
+        # - Create TaylorExpansion with range including negative values
         te_invalid = CertifiedFirstOrderTaylorExpansion(
             np.array([0.5]), (np.array([-1.0]), np.array([1.0])),
             (np.array([[1.0]]), np.array([0.5])),
@@ -494,8 +487,7 @@ class TestTaylorTranslator:
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
-    def test_sqrt_domain_error(self):
-        """Test square root with invalid domain."""
+        # Test square root with invalid domain.
         te_invalid = CertifiedFirstOrderTaylorExpansion(
             np.array([0.5]), (np.array([-1.0]), np.array([1.0])),
             (np.array([[1.0]]), np.array([0.5])),
@@ -516,8 +508,7 @@ class TestTaylorTranslator:
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
-    def test_pow_invalid_exponent(self):
-        """Test power function with non-integer exponent."""
+        # Test power function with non-integer exponent
         with pytest.raises(AssertionError):
             self.translator.pow(self.te, 2.5)
 
