@@ -390,6 +390,20 @@ class CertifiedFirstOrderTaylorExpansion:
 
         return (total_range_lower, total_range_upper)
 
+    def __neg__(self):
+        """
+        Negation operation for Taylor expansions.
+        
+        Returns:
+            CertifiedFirstOrderTaylorExpansion: Negated Taylor expansion
+        """
+        return CertifiedFirstOrderTaylorExpansion(
+            expansion_point=self.expansion_point,
+            domain=self.domain,
+            linear_approximation=(-self.linear_approximation[0], -self.linear_approximation[1]),
+            remainder=(-self.remainder[1], -self.remainder[0])
+        )
+
 
 class TaylorTranslator:
     def matrix_vector(self, a, b: CertifiedFirstOrderTaylorExpansion):

@@ -364,8 +364,55 @@ class TestCertifiedFirstOrderTaylorExpansion:
         expected_remainder_bound_upper = (max_second_derivative / 2) * max_deviation**2
         expected_remainder_bound_lower = (min_second_derivative / 2) * max_deviation**2
 
-        assert np.all(te_increasing.remainder[1] == expected_remainder_bound_upper)
-        assert np.all(te_increasing.remainder[0] == expected_remainder_bound_lower)
+        assert np.all(te_decreasing.remainder[1] == expected_remainder_bound_upper)
+        assert np.all(te_decreasing.remainder[0] == expected_remainder_bound_lower)
+
+    def test_negation(self):
+        """Test negation of a Taylor expansion."""
+        negated_te = -self.te
+
+        # Check that the linear approximation is negated
+        assert np.allclose(negated_te.linear_approximation[0], -self.te.linear_approximation[0])
+        assert np.allclose(negated_te.linear_approximation[1], -self.te.linear_approximation[1])
+
+        # Check that the remainder bounds are swapped and negated
+        assert np.allclose(negated_te.remainder[0], -self.te.remainder[1])
+        assert np.allclose(negated_te.remainder[1], -self.te.remainder[0])
+
+        # Ensure the expansion point and domain remain unchanged
+        assert np.array_equal(negated_te.expansion_point, self.te.expansion_point)
+        assert np.array_equal(negated_te.domain[0], self.te.domain[0])
+        assert np.array_equal(negated_te.domain[1], self.te.domain[1])
+
+        negated_te = (-1) * self.te
+
+        # Check that the linear approximation is negated
+        assert np.allclose(negated_te.linear_approximation[0], -self.te.linear_approximation[0])
+        assert np.allclose(negated_te.linear_approximation[1], -self.te.linear_approximation[1])
+
+        # Check that the remainder bounds are swapped and negated
+        assert np.allclose(negated_te.remainder[0], -self.te.remainder[1])
+        assert np.allclose(negated_te.remainder[1], -self.te.remainder[0])
+
+        # Ensure the expansion point and domain remain unchanged
+        assert np.array_equal(negated_te.expansion_point, self.te.expansion_point)
+        assert np.array_equal(negated_te.domain[0], self.te.domain[0])
+        assert np.array_equal(negated_te.domain[1], self.te.domain[1])
+
+        negated_te = self.te/(-1)
+
+        # Check that the linear approximation is negated
+        assert np.allclose(negated_te.linear_approximation[0], -self.te.linear_approximation[0])
+        assert np.allclose(negated_te.linear_approximation[1], -self.te.linear_approximation[1])
+
+        # Check that the remainder bounds are swapped and negated
+        assert np.allclose(negated_te.remainder[0], -self.te.remainder[1])
+        assert np.allclose(negated_te.remainder[1], -self.te.remainder[0])
+
+        # Ensure the expansion point and domain remain unchanged
+        assert np.array_equal(negated_te.expansion_point, self.te.expansion_point)
+        assert np.array_equal(negated_te.domain[0], self.te.domain[0])
+        assert np.array_equal(negated_te.domain[1], self.te.domain[1])
 
 class TestTaylorTranslator:
     def setup_method(self):
