@@ -462,13 +462,53 @@ class TestTaylorTranslator:
 
     def test_sin(self):
         """Test sine function."""
-        result = self.translator.sin(self.te)
         
-        expected_constant = np.sin(self.expansion_point)
-        expected_jacobian = np.cos(self.expansion_point).reshape(-1, 1) * self.te.linear_approximation[0]
-        
-        assert np.allclose(result.linear_approximation[1], expected_constant)
-        assert np.allclose(result.linear_approximation[0], expected_jacobian)
+        intervals_list = [
+            (np.array([-1]), np.array([1])),
+            (np.array([0.0]), np.array([1])), 
+            (np.array([np.pi / 4]), np.array([4*np.pi / 5])),
+            (np.array([-np.pi]), np.array([0.0]))
+        ]
+
+        M = [
+            np.array([np.sin(-1.0), np.sin(1.0)]),
+            np.array([np.sin(0.0), np.sin(1.0)]),
+            np.array([np.sin(4*np.pi / 5), 1.0]),
+            np.array([-1.0, 0.0])
+        ]
+
+        expected_remainder_bounds = [
+            0.5 * M[i] * ((intervals_list[i][1] - intervals_list[i][0])/2)**2
+            for i in range(len(intervals_list))
+        ]
+
+        for i, interval in enumerate(intervals_list):
+            # Define the expansion point as the midpoint of the interval
+            expansion_point = (interval[0] + interval[1]) / 2
+
+            # Create a Taylor expansion for sin(x) around the expansion point
+            te = CertifiedFirstOrderTaylorExpansion(
+                expansion_point=expansion_point,
+                domain=interval
+            )
+
+            # Compute the sine function using the translator
+            translator = TaylorTranslator()
+            result = translator.sin(te)
+            
+            expected_constant = np.sin(expansion_point)
+            expected_jacobian = np.cos(expansion_point).reshape(-1, 1) * te.linear_approximation[0]
+            
+            assert np.allclose(result.linear_approximation[1], expected_constant)
+            assert np.allclose(result.linear_approximation[0], expected_jacobian)
+  
+            expected_remainder_bound = expected_remainder_bounds[i]
+
+            # Verify the computed remainder bounds
+            assert np.allclose(result.remainder[0], expected_remainder_bound[0])
+            assert np.allclose(result.remainder[1], expected_remainder_bound[1])
+
+
 
     def test_cos(self):
         """Test cosine function."""
