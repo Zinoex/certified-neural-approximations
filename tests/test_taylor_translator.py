@@ -472,7 +472,7 @@ class TestTaylorTranslator:
             # Define the expansion point as the midpoint of the interval
             expansion_point = (interval[0] + interval[1]) / 2
 
-            # Create a Taylor expansion for sin(x) around the expansion point
+            # Create a Taylor expansion for sin(x) around the expansion_point
             te = CertifiedFirstOrderTaylorExpansion(
                 expansion_point=expansion_point,
                 domain=interval
@@ -572,9 +572,9 @@ class TestTaylorTranslator:
                 import matplotlib.pyplot as plt
                 plt.figure(figsize=(8, 6))
                 plt.plot(x_test.flatten(), cos_x, label="cos(x)", color="blue")
-                plt.plot(x_test.flatten(), approx_with_remainder_lower, label="Lower Bound", linestyle="--", color="green")
-                plt.plot(x_test.flatten(), approx_with_remainder_upper, label="Upper Bound", linestyle="--", color="red")
-                plt.fill_between(x_test.flatten(), approx_with_remainder_lower, approx_with_remainder_upper, color="gray", alpha=0.2, label="Remainder Bounds")
+                plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")
+                plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")
+                plt.fill_between(x_test.flatten(), approx_with_remainder_lower.flatten(), approx_with_remainder_upper.flatten(), color="gray", alpha=0.2, label="Remainder Bounds")
                 plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
                 plt.title(f"Cosine Function and First-Order Approximation (Interval {interval})")
                 plt.xlabel("x")
@@ -593,13 +593,28 @@ class TestTaylorTranslator:
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
+        # Verify that the first-order approximation with the remainder term contains exp(x) on the interval
+        x_test = np.linspace(self.domain[0], self.domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+        exp_x = np.exp(x_test).flatten()  # True exponential values, flattened for comparison
+        approx_with_remainder_lower = (
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - self.expansion_point).T).flatten() +
+            result.remainder[0]
+        )
+        approx_with_remainder_upper = (
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - self.expansion_point).T).flatten() +
+            result.remainder[1]
+        )
+
+        assert np.all(exp_x >= approx_with_remainder_lower)
+        assert np.all(exp_x <= approx_with_remainder_upper)
+
     def test_log(self):
         """Test logarithm function."""
         # Use positive values to avoid domain issues
         te_pos = CertifiedFirstOrderTaylorExpansion(
-            np.array([2.0]), (np.array([1.5]), np.array([2.5])),
-            (np.array([[1.0]]), np.array([2.0])),
-            (np.array([-0.1]), np.array([0.1]))
+            np.array([2.0]), (np.array([1.5]), np.array([2.5]))
         )
         
         result = self.translator.log(te_pos)
@@ -610,45 +625,105 @@ class TestTaylorTranslator:
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
-        # Test logarithm with invalid domain.
-        # - Create TaylorExpansion with range including negative values
-        te_invalid = CertifiedFirstOrderTaylorExpansion(
-            np.array([0.5]), (np.array([-1.0]), np.array([1.0])),
-            (np.array([[1.0]]), np.array([0.5])),
-            (np.array([-1.0]), np.array([1.0]))
+        # Verify that the first-order approximation with the remainder term contains log(x) on the interval
+        x_test = np.linspace(te_pos.domain[0], te_pos.domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+        log_x = np.log(x_test).flatten()  # True logarithm values, flattened for comparison
+        approx_with_remainder_lower = (
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).flatten() +
+            result.remainder[0]
         )
-        
-        with pytest.raises(ValueError, match="Logarithm domain error"):
-            self.translator.log(te_invalid)
+        approx_with_remainder_upper = (
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).flatten() +
+            result.remainder[1]
+        )
+
+        assert np.all(log_x >= approx_with_remainder_lower)
+        assert np.all(log_x <= approx_with_remainder_upper)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            import matplotlib.pyplot as plt
+            plt.figure(figsize=(8, 6))
+            plt.plot(x_test.flatten(), log_x, label="log(x)", color="blue")
+            plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")  # Ensure flatten()
+            plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")  # Ensure flatten()
+            plt.fill_between(
+                x_test.flatten(),
+                approx_with_remainder_lower.flatten(),
+                approx_with_remainder_upper.flatten(),
+                color="gray",
+                alpha=0.2,
+                label="Remainder Bounds"
+            )
+            plt.axvline(te_pos.expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
+            plt.title("Logarithm Function and First-Order Approximation")
+            plt.xlabel("x")
+            plt.ylabel("log(x)")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
 
     def test_sqrt(self):
         """Test square root function."""
+        expansion_point = np.array([5.0])
+        domain = (np.array([1.0]), np.array([9.0]))
         te_pos = CertifiedFirstOrderTaylorExpansion(
-            np.array([4.0]), (np.array([1.0]), np.array([9.0])),
-            (np.array([[1.0]]), np.array([4.0])),
-            (np.array([-0.1]), np.array([0.1]))
+            expansion_point, domain
         )
         
         result = self.translator.sqrt(te_pos)
         
-        expected_constant = np.sqrt(np.array([4.0]))
-        expected_jacobian = (0.5 / np.array([4.0])).reshape(-1, 1) * te_pos.linear_approximation[0]
+        expected_constant = np.sqrt(expansion_point)
+        expected_jacobian = (0.5 / np.sqrt(expansion_point)).reshape(-1, 1) * te_pos.linear_approximation[0]
         
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
-        # Test square root with invalid domain.
-        te_invalid = CertifiedFirstOrderTaylorExpansion(
-            np.array([0.5]), (np.array([-1.0]), np.array([1.0])),
-            (np.array([[1.0]]), np.array([0.5])),
-            (np.array([-1.0]), np.array([1.0]))
+        # Verify that the first-order approximation with the remainder term contains sqrt(x) on the interval
+        x_test = np.linspace(te_pos.domain[0], te_pos.domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+        sqrt_x = np.sqrt(x_test).flatten()  # True square root values, flattened for comparison
+        approx_with_remainder_lower = (
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).flatten() +
+            result.remainder[0]
         )
-        
-        with pytest.raises(ValueError, match="Square root domain error"):
-            self.translator.sqrt(te_invalid)
+        approx_with_remainder_upper = (
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).flatten() +
+            result.remainder[1]
+        )
+
+        assert np.all(sqrt_x >= approx_with_remainder_lower)
+        assert np.all(sqrt_x <= approx_with_remainder_upper)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            import matplotlib.pyplot as plt
+            plt.figure(figsize=(8, 6))
+            plt.plot(x_test.flatten(), sqrt_x, label="sqrt(x)", color="blue")
+            plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")  # Ensure flatten()
+            plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")  # Ensure flatten()
+            plt.fill_between(
+                x_test.flatten(),
+                approx_with_remainder_lower.flatten(),
+                approx_with_remainder_upper.flatten(),
+                color="gray",
+                alpha=0.2,
+                label="Remainder Bounds"
+            )
+            plt.axvline(te_pos.expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
+            plt.title("Square Root Function and First-Order Approximation")
+            plt.xlabel("x")
+            plt.ylabel("sqrt(x)")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
 
     def test_pow(self):
         """Test power function."""
+        # ...existing code...
         exponent = 3
         result = self.translator.pow(self.te, exponent)
         

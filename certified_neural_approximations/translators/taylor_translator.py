@@ -665,38 +665,52 @@ class TaylorTranslator:
         :param a: CertifiedFirstOrderTaylorExpansion
         :return: CertifiedFirstOrderTaylorExpansion
         """
-        # Incoming Taylor approximation: y = f(x0) + Df(x0) @ (x - x0) + R
-        # Local Taylor expansion of sqrt(y): sqrt(y0) + 1/2*sqrt(y0) .* (y - y0) + T where y0 = f(x0)
-        # Substituting: sqrt(y0) + 1/2*sqrt(y0) .* (y0 + Df(x0) @ (x - x0) + R - y0) + T
-        # Rearranging:  sqrt(y0) + 1/2*sqrt(y0) .* Df(x0) @ (x - x0) + 1/2*sqrt(y0) .* R + T
-
         y0 = a.linear_approximation[1]
         sqrt_y0 = np.sqrt(y0)
-        grad_y0 = 0.5 / y0
+        grad_y0 = 0.5 / sqrt_y0
 
         linear_term = grad_y0.reshape(grad_y0.shape[0], 1) * a.linear_approximation[0]
 
         # Use monotonicity of sqrt
-        range = a.range()
-        if np.any(range[0] < 0):
+        range_lower, range_upper = a.range()
+        if np.any(range_lower < 0):
             raise ValueError("Square root domain error: range[0] must be non-negative")
 
-        local_remainder = (
-            np.minimum(
-                np.sqrt(range[0]) - (sqrt_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[0] - y0)),
-                np.sqrt(range[1]) - (sqrt_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[1] - y0))
-            ),
-            0.0
+        # Compute the second derivative bounds for sqrt(x): f''(x) = -1/(4 * x^(3/2))
+        second_derivative_lower = -1 / (4 * np.power(range_lower, 1.5))
+        second_derivative_upper = -1 / (4 * np.power(range_upper, 1.5))
+
+        # Ensure valid bounds
+        second_derivative_lower = np.minimum(second_derivative_lower, 0)
+        second_derivative_upper = np.maximum(second_derivative_upper, 0)
+
+        # Compute the maximum deviation from the expansion point
+        max_deviation = np.maximum(
+            np.abs(range_lower - a.expansion_point),
+            np.abs(range_upper - a.expansion_point)
         )
 
-        remainder1, remainder2 = grad_y0 * a.remainder[0], grad_y0 * a.remainder[1]
-        remainder = np.minimum(remainder1, remainder2) + local_remainder[0], np.maximum(remainder1, remainder2) + local_remainder[1]
+        # Compute the remainder bounds using the second derivative
+        remainder_lower = (second_derivative_lower / 2) * max_deviation**2
+        remainder_upper = (second_derivative_upper / 2) * max_deviation**2
+
+        # Propagate the remainder through the derivative
+        prop_rem_lower, prop_rem_upper = a.remainder
+        term1_rem = grad_y0 * prop_rem_lower
+        term2_rem = grad_y0 * prop_rem_upper
+
+        propagated_rem_lower = np.minimum(term1_rem, term2_rem)
+        propagated_rem_upper = np.maximum(term1_rem, term2_rem)
+
+        # Combine propagated and second derivative remainders
+        final_rem_lower = propagated_rem_lower + remainder_lower
+        final_rem_upper = propagated_rem_upper + remainder_upper
 
         return CertifiedFirstOrderTaylorExpansion(
             a.expansion_point,
             a.domain,
             (linear_term, sqrt_y0),
-            remainder
+            (final_rem_lower, final_rem_upper)
         )
 
     def cbrt(self, a):
