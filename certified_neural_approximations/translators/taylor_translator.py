@@ -18,7 +18,7 @@ class CertifiedFirstOrderTaylorExpansion:
         remainder (tuple): (lower, upper) certified bounds on the remainder term
     """
     
-    def __init__(self, expansion_point, domain, linear_approximation, remainder):
+    def __init__(self, expansion_point, domain, linear_approximation = None, remainder=None):
         """
         Initialize a certified first-order Taylor expansion.
         
@@ -30,8 +30,13 @@ class CertifiedFirstOrderTaylorExpansion:
         """
         self.expansion_point = expansion_point
         self.domain = domain
-        self.linear_approximation = linear_approximation
-        self.remainder = remainder
+        if linear_approximation is None:
+            # Default f(x) = x
+            self.linear_approximation = (np.ones_like(expansion_point), expansion_point)
+            self.remainder = (np.zeros_like(expansion_point), np.zeros_like(expansion_point))
+        else:
+            self.linear_approximation = linear_approximation
+            self.remainder = remainder
 
     def __add__(self, other):
         """
