@@ -442,36 +442,70 @@ class TaylorTranslator:
         """
 
         y0 = a.linear_approximation[1]  # Center of expansion for y
-        sin_y0_val = np.sin(y0)         # sin(y0)
-        grad_sin_y0 = np.cos(y0)        # cos(y0), derivative of sin(y) at y0
+        f_y0_val = np.sin(y0)         # sin(y0)
+        grad_f_y0 = np.cos(y0)        # cos(y0), derivative of sin(y) at y0
 
-        linear_term_jacobian = grad_sin_y0.reshape(-1, 1) * a.linear_approximation[0]
+        linear_term_jacobian = grad_f_y0.reshape(-1, 1) * a.linear_approximation[0]
 
-        range_of_y = a.range()
-        M_lagrange = max_abs_sin(range_of_y) 
-        
-        max_abs_y_minus_y0 = np.maximum(np.abs(range_of_y[0] - y0), np.abs(range_of_y[1] - y0))
+        # Lagrange remainder for sin:
+        domain_low, domain_high = a.range()
+
+        # Check if any point x = k*2pi + pi/2 (where sin(x) = +1) is within [a, b]
+        # This is true if there is an integer k such that:
+        # a <= k*pi + pi/2 <= b  =>  (a - pi/2)/pi <= k <= (b - pi/2)/pi
+        # So, we check if floor((b - pi/2)/pi) >= ceil((a - pi/2)/pi)
+
+        # Lower bound for k (must be an integer, so use ceil)
+        k_lower_bound = np.ceil((domain_low - 3*np.pi/2) / (2*np.pi))
+        # Upper bound for k (must be an integer, so use floor)
+        k_upper_bound = np.floor((domain_high - 3*np.pi/2) / (2*np.pi))
+        contains_trough = k_lower_bound <= k_upper_bound
+
+        # If no crest, the maximum value of |sin(x)| is at the endpoints
+        M_lagrange_max = np.maximum(-np.sin(domain_low), -np.sin(domain_high))
+        M_lagrange_max[contains_trough] = 1.0  # If contains trough, max is 1.0
+        M_lagrange_max = np.maximum(M_lagrange_max, 0.0)  # Ensure non-negative max
+                
+        max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
+        min_abs_y_minus_peak = np.minimum(np.abs(k_lower_bound*2*np.pi + np.pi/2 - a.expansion_point), np.abs(k_upper_bound*2*np.pi + np.pi/2 - a.expansion_point))
+        max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_peak)
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
+        local_error_magnitude_max = (M_lagrange_max / 2) * max_sq_y_minus_y0
         
-        local_error_magnitude = (M_lagrange / 2) * max_sq_y_minus_y0
+        # Lower bound for k (must be an integer, so use ceil)
+        k_lower_bound = np.ceil((domain_low - np.pi/2) / (2*np.pi))
+        # Upper bound for k (must be an integer, so use floor)
+        k_upper_bound = np.floor((domain_high - np.pi/2) / (2*np.pi))
+        contains_crest = k_lower_bound <= k_upper_bound
+
+        # If no trough, the minimum value of |sin(x)| is at the endpoints
+        M_lagrange_min = np.minimum(-np.sin(domain_low), -np.sin(domain_high))
+        M_lagrange_min[contains_crest] = -1.0  # If contains crest, min is -1.0
+        M_lagrange_min = np.minimum(M_lagrange_min, 0.0)  # Ensure non-negative max
+        
+        max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
+        min_abs_y_minus_trough = np.minimum(np.abs(k_lower_bound*2*np.pi + 3*np.pi/2 - a.expansion_point), np.abs(k_upper_bound*2*np.pi + 3*np.pi/2 - a.expansion_point))
+        max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_trough)
+        max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
+        local_error_magnitude_min = (M_lagrange_min / 2) * max_sq_y_minus_y0
 
         prop_rem_lower_y, prop_rem_upper_y = a.remainder
         
-        term1_rem = grad_sin_y0 * prop_rem_lower_y
-        term2_rem = grad_sin_y0 * prop_rem_upper_y
+        term1_rem = grad_f_y0 * prop_rem_lower_y
+        term2_rem = grad_f_y0 * prop_rem_upper_y
         
         propagated_taylor_rem_lower = np.minimum(term1_rem, term2_rem)
         propagated_taylor_rem_upper = np.maximum(term1_rem, term2_rem)
 
-        final_rem_lower = propagated_taylor_rem_lower - local_error_magnitude
-        final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude
-        
+        final_rem_lower = propagated_taylor_rem_lower + local_error_magnitude_min
+        final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude_max
+
         remainder = (final_rem_lower, final_rem_upper)
 
         return CertifiedFirstOrderTaylorExpansion(
             a.expansion_point,
             a.domain,
-            (linear_term_jacobian, sin_y0_val),
+            (linear_term_jacobian, f_y0_val),
             remainder
         )
 
@@ -487,25 +521,59 @@ class TaylorTranslator:
 
         linear_term_jacobian = grad_cos_y0.reshape(-1, 1) * a.linear_approximation[0]
 
-        range_of_y = a.range()
-        M_lagrange = max_abs_cos(range_of_y)
+        # Lagrange remainder for cos:
+        domain_low, domain_high = a.range()
 
-        max_abs_y_minus_y0 = np.maximum(np.abs(range_of_y[0] - y0), np.abs(range_of_y[1] - y0))
+        # Check if any point x = k*2pi (where cos(x) = +1) is within [a, b]
+        # This is true if there is an integer k such that:
+        # a <= k*2pi <= b  =>  (a)/2pi <= k <= (b)/2pi
+        
+        # Lower bound for k (must be an integer, so use ceil)
+        k_lower_bound = np.ceil((domain_low - np.pi) / (2*np.pi))
+        # Upper bound for k (must be an integer, so use floor)
+        k_upper_bound = np.floor((domain_high - np.pi) / (2*np.pi))
+        contains_trough = k_lower_bound <= k_upper_bound
+
+        # If no crest, the maximum value of -cos(x) is at the endpoints
+        M_lagrange_max = np.maximum(-np.cos(domain_low), -np.cos(domain_high))
+        M_lagrange_max[contains_trough] = 1.0  # If contains trough, max is 1.0
+        M_lagrange_max = np.maximum(M_lagrange_max, 0.0)  # Ensure non-negative max
+                
+        max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
+        min_abs_y_minus_peak = np.minimum(np.abs(k_lower_bound*2*np.pi - a.expansion_point), np.abs(k_upper_bound*2*np.pi - a.expansion_point))
+        max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_peak)
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
-        
-        local_error_magnitude = (M_lagrange / 2) * max_sq_y_minus_y0
+        local_error_magnitude_max = (M_lagrange_max / 2) * max_sq_y_minus_y0
 
-        prop_rem_lower_y, prop_rem_upper_y = a.remainder
+        # Lower bound for k (must be an integer, so use ceil)
+        k_lower_bound = np.ceil(domain_low / (2*np.pi))
+        # Upper bound for k (must be an integer, so use floor)
+        k_upper_bound = np.floor(domain_high/ (2*np.pi))
+        contains_crest = k_lower_bound <= k_upper_bound
+
+        # If no trough, the minimum value of -cos(x) is at the endpoints
+        M_lagrange_min = np.minimum(-np.cos(domain_low), -np.cos(domain_high))
+        M_lagrange_min[contains_crest] = -1.0  # If contains crest, min is -1.0
+        M_lagrange_min = np.minimum(M_lagrange_min, 0.0)  # Ensure non-negative max
         
+        
+        max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
+        min_abs_y_minus_trough = np.minimum(np.abs(k_lower_bound*2*np.pi + np.pi - a.expansion_point), np.abs(k_upper_bound*2*np.pi + np.pi - a.expansion_point))
+        max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_trough)
+        max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
+        local_error_magnitude_min = (M_lagrange_min / 2) * max_sq_y_minus_y0
+
+        # Propagate remainder through the derivative
+        prop_rem_lower_y, prop_rem_upper_y = a.remainder
         term1_rem = grad_cos_y0 * prop_rem_lower_y
         term2_rem = grad_cos_y0 * prop_rem_upper_y
-        
+
         propagated_taylor_rem_lower = np.minimum(term1_rem, term2_rem)
         propagated_taylor_rem_upper = np.maximum(term1_rem, term2_rem)
 
-        final_rem_lower = propagated_taylor_rem_lower - local_error_magnitude
-        final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude
-        
+        final_rem_lower = propagated_taylor_rem_lower + local_error_magnitude_min
+        final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude_max
+
         remainder = (final_rem_lower, final_rem_upper)
 
         return CertifiedFirstOrderTaylorExpansion(
@@ -754,72 +822,6 @@ class TaylorTranslator:
             linear_approximation=(np.eye(point.shape[0]), point),
             remainder=(np.zeros(point.shape[0]), np.zeros(point.shape[0]))
         )
-
-
-def max_abs_sin(intervals):
-    """
-    Find the maximum of |sin(x)| for x in the given intervals.
-    :param intervals: tuple(np.ndarray, np.ndarray) both of shape (n,).
-                      intervals[0] is the array of lower bounds (a_i).
-                      intervals[1] is the array of upper bounds (b_i).
-    :return: np.ndarray of shape (n,) containing the maximum value of |sin(x)| for each interval.
-    """
-    a, b = intervals
-    
-    # Calculate |sin(x)| at the endpoints
-    abs_sin_a = np.abs(np.sin(a))
-    abs_sin_b = np.abs(np.sin(b))
-    max_vals = np.maximum(abs_sin_a, abs_sin_b)
-
-    # Check if any point x = k*pi + pi/2 (where sin(x) = +/-1) is within [a, b]
-    # This is true if there is an integer k such that:
-    # a <= k*pi + pi/2 <= b  =>  (a - pi/2)/pi <= k <= (b - pi/2)/pi
-    # So, we check if floor((b - pi/2)/pi) >= ceil((a - pi/2)/pi)
-    
-    # Lower bound for k (must be an integer, so use ceil)
-    k_lower_bound = np.ceil((a - np.pi/2) / np.pi)
-    # Upper bound for k (must be an integer, so use floor)
-    k_upper_bound = np.floor((b - np.pi/2) / np.pi)
-    
-    # If k_lower_bound <= k_upper_bound, then there is an integer k in the range,
-    # meaning a peak of |sin(x)| = 1 is included in the interval.
-    contains_peak = k_lower_bound <= k_upper_bound
-    max_vals[contains_peak] = 1.0
-    
-    return max_vals
-
-
-def max_abs_cos(intervals):
-    """
-    Find the maximum of |cos(x)| for x in the given intervals.
-    :param intervals: tuple(np.ndarray, np.ndarray) both of shape (n,).
-                      intervals[0] is the array of lower bounds (a_i).
-                      intervals[1] is the array of upper bounds (b_i).
-    :return: np.ndarray of shape (n,) containing the maximum value of |cos(x)| for each interval.
-    """
-    a, b = intervals
-
-    # Calculate |cos(x)| at the endpoints
-    abs_cos_a = np.abs(np.cos(a))
-    abs_cos_b = np.abs(np.cos(b))
-    max_vals = np.maximum(abs_cos_a, abs_cos_b)
-
-    # Check if any point x = k*pi (where cos(x) = +/-1) is within [a, b]
-    # This is true if there is an integer k such that:
-    # a <= k*pi <= b  =>  a/pi <= k <= b/pi
-    # So, we check if floor(b/pi) >= ceil(a/pi)
-
-    # Lower bound for k (must be an integer, so use ceil)
-    k_lower_bound = np.ceil(a / np.pi)
-    # Upper bound for k (must be an integer, so use floor)
-    k_upper_bound = np.floor(b / np.pi)
-
-    # If k_lower_bound <= k_upper_bound, then there is an integer k in the range,
-    # meaning a peak of |cos(x)| = 1 is included in the interval.
-    contains_peak = k_lower_bound <= k_upper_bound
-    max_vals[contains_peak] = 1.0
-    
-    return max_vals
 
 
 def max_monomial_vectorized(c, n, intervals):

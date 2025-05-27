@@ -9,8 +9,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from certified_neural_approximations.translators.taylor_translator import (
     CertifiedFirstOrderTaylorExpansion,
     TaylorTranslator,
-    max_abs_sin,
-    max_abs_cos,
     max_monomial_vectorized
 )
 
@@ -470,18 +468,6 @@ class TestTaylorTranslator:
             (np.array([-np.pi]), np.array([0.0]))
         ]
 
-        M = [
-            np.array([np.sin(-1.0), np.sin(1.0)]),
-            np.array([np.sin(0.0), np.sin(1.0)]),
-            np.array([np.sin(4*np.pi / 5), 1.0]),
-            np.array([-1.0, 0.0])
-        ]
-
-        expected_remainder_bounds = [
-            0.5 * M[i] * ((intervals_list[i][1] - intervals_list[i][0])/2)**2
-            for i in range(len(intervals_list))
-        ]
-
         for i, interval in enumerate(intervals_list):
             # Define the expansion point as the midpoint of the interval
             expansion_point = (interval[0] + interval[1]) / 2
@@ -501,24 +487,101 @@ class TestTaylorTranslator:
             
             assert np.allclose(result.linear_approximation[1], expected_constant)
             assert np.allclose(result.linear_approximation[0], expected_jacobian)
-  
-            expected_remainder_bound = expected_remainder_bounds[i]
 
-            # Verify the computed remainder bounds
-            assert np.allclose(result.remainder[0], expected_remainder_bound[0])
-            assert np.allclose(result.remainder[1], expected_remainder_bound[1])
+            # Verify that the first-order approximation with the remainder term contains sin(x) on the interval
+            x_test = np.linspace(interval[0], interval[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+            sin_x = np.sin(x_test).flatten()  # True sine values, flattened for plotting
+            approx_with_remainder_lower = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - expansion_point).T).flatten() +
+                result.remainder[0]
+            )
+            approx_with_remainder_upper = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - expansion_point).T).flatten() +
+                result.remainder[1]
+            )
 
+            assert np.all(sin_x >= approx_with_remainder_lower)
+            assert np.all(sin_x <= approx_with_remainder_upper)
 
+            # Optional plotting for visualization
+            if os.getenv("PLOT_TESTS", "0") == "1":
+                import matplotlib.pyplot as plt
+                plt.figure(figsize=(8, 6))
+                plt.plot(x_test.flatten(), sin_x, label="sin(x)", color="blue")
+                plt.plot(x_test.flatten(), approx_with_remainder_lower, label="Lower Bound", linestyle="--", color="green")
+                plt.plot(x_test.flatten(), approx_with_remainder_upper, label="Upper Bound", linestyle="--", color="red")
+                plt.fill_between(x_test.flatten(), approx_with_remainder_lower, approx_with_remainder_upper, color="gray", alpha=0.2, label="Remainder Bounds")
+                plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")
+                plt.title(f"Sine Function and First-Order Approximation (Interval {interval})")
+                plt.xlabel("x")
+                plt.ylabel("sin(x)")
+                plt.legend()
+                plt.grid(True)
+                plt.show()
 
     def test_cos(self):
         """Test cosine function."""
-        result = self.translator.cos(self.te)
-        
-        expected_constant = np.cos(self.expansion_point)
-        expected_jacobian = -np.sin(self.expansion_point).reshape(-1, 1) * self.te.linear_approximation[0]
-        
-        assert np.allclose(result.linear_approximation[1], expected_constant)
-        assert np.allclose(result.linear_approximation[0], expected_jacobian)
+        intervals_list = [
+            (np.array([-1]), np.array([1])),
+            (np.array([0.0]), np.array([1])),
+            (np.array([np.pi / 4]), np.array([4 * np.pi / 5])),
+            (np.array([-np.pi]), np.array([0.0]))
+        ]
+
+        for i, interval in enumerate(intervals_list):
+            # Define the expansion point as the midpoint of the interval
+            expansion_point = (interval[0] + interval[1]) / 2
+
+            # Create a Taylor expansion for cos(x) around the expansion_point
+            te = CertifiedFirstOrderTaylorExpansion(
+                expansion_point=expansion_point,
+                domain=interval
+            )
+
+            # Compute the cosine function using the translator
+            translator = TaylorTranslator()
+            result = translator.cos(te)
+
+            expected_constant = np.cos(expansion_point)
+            expected_jacobian = -np.sin(expansion_point).reshape(-1, 1) * te.linear_approximation[0]
+
+            assert np.allclose(result.linear_approximation[1], expected_constant)
+            assert np.allclose(result.linear_approximation[0], expected_jacobian)
+
+            # Verify that the first-order approximation with the remainder term contains cos(x) on the interval
+            x_test = np.linspace(interval[0], interval[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+            cos_x = np.cos(x_test).flatten()  # True cosine values, flattened for plotting
+            approx_with_remainder_lower = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - expansion_point).T).flatten() +
+                result.remainder[0]
+            )
+            approx_with_remainder_upper = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - expansion_point).T).flatten() +
+                result.remainder[1]
+            )
+
+            assert np.all(cos_x >= approx_with_remainder_lower)
+            assert np.all(cos_x <= approx_with_remainder_upper)
+
+            # Optional plotting for visualization
+            if os.getenv("PLOT_TESTS", "0") == "1":
+                import matplotlib.pyplot as plt
+                plt.figure(figsize=(8, 6))
+                plt.plot(x_test.flatten(), cos_x, label="cos(x)", color="blue")
+                plt.plot(x_test.flatten(), approx_with_remainder_lower, label="Lower Bound", linestyle="--", color="green")
+                plt.plot(x_test.flatten(), approx_with_remainder_upper, label="Upper Bound", linestyle="--", color="red")
+                plt.fill_between(x_test.flatten(), approx_with_remainder_lower, approx_with_remainder_upper, color="gray", alpha=0.2, label="Remainder Bounds")
+                plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
+                plt.title(f"Cosine Function and First-Order Approximation (Interval {interval})")
+                plt.xlabel("x")
+                plt.ylabel("cos(x)")
+                plt.legend()
+                plt.grid(True)
+                plt.show()
 
     def test_exp(self):
         """Test exponential function."""
@@ -674,37 +737,6 @@ class TestTaylorTranslator:
 
         assert np.allclose(te_final.linear_approximation[1], expected_constant_manual)
         assert np.allclose(te_final.linear_approximation[0], expected_jacobian_manual.reshape(-1, 1))
-
-
-class TestHelperFunctions:
-    def test_max_abs_sin(self):
-        """Test maximum absolute sine function."""
-        # Test intervals without peaks
-        intervals = (np.array([0.1, 2.0]), np.array([0.5, 2.5]))
-        result = max_abs_sin(intervals)
-        
-        assert len(result) == 2
-        assert all(0 <= val <= 1 for val in result)
-        
-        # Test interval containing peak
-        intervals_peak = (np.array([0.0]), np.array([np.pi]))
-        result_peak = max_abs_sin(intervals_peak)
-        assert result_peak[0] == pytest.approx(1.0)
-
-    def test_max_abs_cos(self):
-        """Test maximum absolute cosine function."""
-        # Test intervals without peaks
-        intervals = (np.array([0.5, 2.0]), np.array([1.0, 2.5]))
-        result = max_abs_cos(intervals)
-        
-        assert len(result) == 2
-        assert all(0 <= val <= 1 for val in result)
-        
-        # Test interval containing peak
-        intervals_peak = (np.array([-0.5]), np.array([0.5]))
-        result_peak = max_abs_cos(intervals_peak)
-        assert result_peak[0] == pytest.approx(1.0)
-
 
 if __name__ == "__main__":
     """
