@@ -834,12 +834,6 @@ def max_monomial_vectorized(c, n, intervals):
     # Initialize bounds with endpoint values
     max_values = np.maximum(f_a, f_b)
 
-    # Check critical point at x = 0 (only if 0 is in the interval and n > 0)
-    zero_in_interval = (a <= 0) & (b >= 0) & (n > 0)
-    if np.any(zero_in_interval):
-        f_0 = c * np.power(0, n)  # f(0) = 0
-        max_values[zero_in_interval] = np.maximum(max_values[zero_in_interval], f_0[zero_in_interval])
-
     # Check critical points for even powers (n > 0 and n is even)
     even_power = (n > 0) & (n % 2 == 0)
     if np.any(even_power):
@@ -868,12 +862,6 @@ def min_monomial_vectorized(c, n, intervals):
 
     # Initialize bounds with endpoint values
     min_values = np.minimum(f_a, f_b)
-
-    # Check critical point at x = 0 (only if 0 is in the interval and n > 0)
-    zero_in_interval = (a <= 0) & (b >= 0) & (n > 0)
-    if np.any(zero_in_interval):
-        f_0 = c * np.power(0, n)  # f(0) = 0
-        min_values[zero_in_interval] = np.minimum(min_values[zero_in_interval], f_0[zero_in_interval])
 
     # Check critical points for even powers (n > 0 and n is even)
     even_power = (n > 0) & (n % 2 == 0)

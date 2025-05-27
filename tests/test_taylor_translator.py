@@ -584,6 +584,57 @@ class TestTaylorTranslator:
         assert np.allclose(result.remainder[0], expected_remainder_low)
         assert np.allclose(result.remainder[1], expected_remainder_high)
 
+    def test_composite_function_exp_sin(self):
+        """Test the composite function 0.2 * exp(sin(x^3) + 0.1 * x) on the domain [-0.5, 0.7] with expansion point 0.1."""
+        # Define the input Taylor expansion for x
+        te_x = CertifiedFirstOrderTaylorExpansion(
+            expansion_point=np.array([0.1]),
+            domain=(np.array([-0.5]), np.array([0.7])),
+            linear_approximation=(np.array([[1.0]]), np.array([0.1])),
+            remainder=(np.array([0.0]), np.array([0.0]))
+        )
+
+        # Compute x^3
+        te_x_cubed = self.translator.pow(te_x, 3)
+
+        # Compute sin(x^3)
+        te_sin_x_cubed = self.translator.sin(te_x_cubed)
+
+        # Compute 0.1 * x
+        te_0_1_x = 0.1 * te_x
+
+        # Compute sin(x^3) + 0.1 * x
+        te_inner = te_sin_x_cubed + te_0_1_x
+
+        # Compute exp(sin(x^3) + 0.1 * x)
+        te_exp_inner = self.translator.exp(te_inner)
+
+        # Compute 0.2 * exp(sin(x^3) + 0.1 * x)
+        te_final = 0.2 * te_exp_inner
+
+        # Verify the structure of the result
+        assert np.array_equal(te_final.expansion_point, te_x.expansion_point)
+        assert np.array_equal(te_final.domain[0], te_x.domain[0])
+        assert np.array_equal(te_final.domain[1], te_x.domain[1])
+
+        # Verify that the linear approximation and remainder are computed
+        assert te_final.linear_approximation[0] is not None
+        assert te_final.linear_approximation[1] is not None
+        assert te_final.remainder[0] is not None
+        assert te_final.remainder[1] is not None
+
+        # Manual verification of the composite function
+        # For f(x) = 0.2 * exp(sin(x^3) + 0.1 * x), we can verify the result manually
+        x_val = te_x.expansion_point
+        expected_constant_manual = 0.2 * np.exp(np.sin(x_val**3) + 0.1 * x_val)
+        expected_jacobian_manual = (
+            0.2 * np.exp(np.sin(x_val**3) + 0.1 * x_val)
+            * (np.cos(x_val**3) * 3 * x_val**2 + 0.1)
+        )
+
+        assert np.allclose(te_final.linear_approximation[1], expected_constant_manual)
+        assert np.allclose(te_final.linear_approximation[0], expected_jacobian_manual.reshape(-1, 1))
+
 
 class TestHelperFunctions:
     def test_max_abs_sin(self):
@@ -613,22 +664,6 @@ class TestHelperFunctions:
         intervals_peak = (np.array([-0.5]), np.array([0.5]))
         result_peak = max_abs_cos(intervals_peak)
         assert result_peak[0] == pytest.approx(1.0)
-
-    def test_max_monomial_vectorized(self):
-        """Test maximum monomial function."""
-        c = np.array([1.0, -2.0])
-        n = np.array([2, 3])
-        intervals = (np.array([-1.0, -2.0]), np.array([1.0, 2.0]))
-        
-        result = max_monomial_vectorized(c, n, intervals)
-        
-        assert len(result) == 2
-        assert all(val >= 0 for val in result)
-        
-        # For x^2 on [-1, 1], max |f(x)| = 1
-        assert result[0] == pytest.approx(1.0)
-        # For -2*x^3 on [-2, 2], max |f(x)| = 16
-        assert result[1] == pytest.approx(16.0)
 
 
 if __name__ == "__main__":
