@@ -412,18 +412,6 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.array_equal(negated_te.domain[0], self.te.domain[0])
         assert np.array_equal(negated_te.domain[1], self.te.domain[1])
 
-class TestTaylorTranslator:
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.translator = TaylorTranslator()
-        self.expansion_point = np.array([1.0])
-        self.domain = (np.array([0.5]), np.array([1.5]))
-        self.te = CertifiedFirstOrderTaylorExpansion(
-            self.expansion_point, self.domain,
-            (np.array([[1.0]]), np.array([1.0])),
-            (np.array([-0.1]), np.array([0.1]))
-        )
-
     def test_to_format(self):
         """Test initialization of identity TaylorExpansion."""
         point = np.array([1.0, 2.0])
@@ -465,7 +453,9 @@ class TestTaylorTranslator:
             (np.array([-1]), np.array([1])),
             (np.array([0.0]), np.array([1])), 
             (np.array([np.pi / 4]), np.array([4*np.pi / 5])),
-            (np.array([-np.pi]), np.array([0.0]))
+            (np.array([-np.pi]), np.array([0.0])),
+            (np.array([-10]), np.array([20])),
+            (np.array([-100]), np.array([100]))
         ]
 
         for i, interval in enumerate(intervals_list):
@@ -512,6 +502,11 @@ class TestTaylorTranslator:
                 plt.plot(x_test.flatten(), sin_x, label="sin(x)", color="blue")
                 plt.plot(x_test.flatten(), approx_with_remainder_lower, label="Lower Bound", linestyle="--", color="green")
                 plt.plot(x_test.flatten(), approx_with_remainder_upper, label="Upper Bound", linestyle="--", color="red")
+                approx_function = (
+                    result.linear_approximation[1] +
+                    result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
+                )
+                plt.plot(x_test.flatten(), approx_function, label="Approximation", linestyle=":", color="orange")
                 plt.fill_between(x_test.flatten(), approx_with_remainder_lower, approx_with_remainder_upper, color="gray", alpha=0.2, label="Remainder Bounds")
                 plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")
                 plt.title(f"Sine Function and First-Order Approximation (Interval {interval})")
@@ -527,7 +522,9 @@ class TestTaylorTranslator:
             (np.array([-1]), np.array([1])),
             (np.array([0.0]), np.array([1])),
             (np.array([np.pi / 4]), np.array([4 * np.pi / 5])),
-            (np.array([-np.pi]), np.array([0.0]))
+            (np.array([-np.pi]), np.array([0.0])),
+            (np.array([-10]), np.array([20])),
+            (np.array([-100]), np.array([100]))
         ]
 
         for i, interval in enumerate(intervals_list):
@@ -574,6 +571,11 @@ class TestTaylorTranslator:
                 plt.plot(x_test.flatten(), cos_x, label="cos(x)", color="blue")
                 plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")
                 plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")
+                approx_function = (
+                    result.linear_approximation[1] +
+                    result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
+                )
+                plt.plot(x_test.flatten(), approx_function, label="Approximation", linestyle=":", color="orange")
                 plt.fill_between(x_test.flatten(), approx_with_remainder_lower.flatten(), approx_with_remainder_upper.flatten(), color="gray", alpha=0.2, label="Remainder Bounds")
                 plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
                 plt.title(f"Cosine Function and First-Order Approximation (Interval {interval})")
@@ -585,25 +587,30 @@ class TestTaylorTranslator:
 
     def test_exp(self):
         """Test exponential function."""
-        result = self.translator.exp(self.te)
+        domain = (np.array([-1.0]), np.array([3.1]))
+        expansion_point = (domain[1] - domain[0]) / 2
+        te = CertifiedFirstOrderTaylorExpansion(
+            expansion_point, domain
+        )
+        result = self.translator.exp(te)
         
-        expected_constant = np.exp(self.expansion_point)
-        expected_jacobian = np.exp(self.expansion_point).reshape(-1, 1) * self.te.linear_approximation[0]
+        expected_constant = np.exp(expansion_point)
+        expected_jacobian = np.exp(expansion_point).reshape(-1, 1) * te.linear_approximation[0]
         
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
         # Verify that the first-order approximation with the remainder term contains exp(x) on the interval
-        x_test = np.linspace(self.domain[0], self.domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+        x_test = np.linspace(domain[0], domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
         exp_x = np.exp(x_test).flatten()  # True exponential values, flattened for comparison
         approx_with_remainder_lower = (
             result.linear_approximation[1] +
-            result.linear_approximation[0].dot((x_test - self.expansion_point).T).flatten() +
+            result.linear_approximation[0].dot((x_test - expansion_point).T).flatten() +
             result.remainder[0]
         )
         approx_with_remainder_upper = (
             result.linear_approximation[1] +
-            result.linear_approximation[0].dot((x_test - self.expansion_point).T).flatten() +
+            result.linear_approximation[0].dot((x_test - expansion_point).T).flatten() +
             result.remainder[1]
         )
 
@@ -613,14 +620,16 @@ class TestTaylorTranslator:
     def test_log(self):
         """Test logarithm function."""
         # Use positive values to avoid domain issues
+        domain = (np.array([1.0]), np.array([9.0]))
+        expansion_point = (domain[1] - domain[0]) / 2
         te_pos = CertifiedFirstOrderTaylorExpansion(
-            np.array([2.0]), (np.array([1.5]), np.array([2.5]))
+            expansion_point, domain
         )
         
         result = self.translator.log(te_pos)
         
-        expected_constant = np.log(np.array([2.0]))
-        expected_jacobian = (1.0 / np.array([2.0])).reshape(-1, 1) * te_pos.linear_approximation[0]
+        expected_constant = np.log(expansion_point)
+        expected_jacobian = (1.0 / expansion_point).reshape(-1, 1) * te_pos.linear_approximation[0]
         
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
@@ -649,6 +658,11 @@ class TestTaylorTranslator:
             plt.plot(x_test.flatten(), log_x, label="log(x)", color="blue")
             plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")  # Ensure flatten()
             plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")  # Ensure flatten()
+            approx_function = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
+            )
+            plt.plot(x_test.flatten(), approx_function, label="Approximation", linestyle=":", color="orange")
             plt.fill_between(
                 x_test.flatten(),
                 approx_with_remainder_lower.flatten(),
@@ -667,8 +681,8 @@ class TestTaylorTranslator:
 
     def test_sqrt(self):
         """Test square root function."""
-        expansion_point = np.array([5.0])
         domain = (np.array([1.0]), np.array([9.0]))
+        expansion_point = (domain[1] - domain[0]) / 2
         te_pos = CertifiedFirstOrderTaylorExpansion(
             expansion_point, domain
         )

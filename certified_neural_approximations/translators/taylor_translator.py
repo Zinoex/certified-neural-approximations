@@ -465,9 +465,11 @@ class TaylorTranslator:
         M_lagrange_max = np.maximum(-np.sin(domain_low), -np.sin(domain_high))
         M_lagrange_max[contains_trough] = 1.0  # If contains trough, max is 1.0
         M_lagrange_max = np.maximum(M_lagrange_max, 0.0)  # Ensure non-negative max
-                
-        max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
+
+        # Only need to consider the distance between peaks/troughs and the expansion point
         min_abs_y_minus_peak = np.minimum(np.abs(k_lower_bound*2*np.pi + np.pi/2 - a.expansion_point), np.abs(k_upper_bound*2*np.pi + np.pi/2 - a.expansion_point))
+        
+        max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
         max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_peak)
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
         local_error_magnitude_max = (M_lagrange_max / 2) * max_sq_y_minus_y0
@@ -483,8 +485,10 @@ class TaylorTranslator:
         M_lagrange_min[contains_crest] = -1.0  # If contains crest, min is -1.0
         M_lagrange_min = np.minimum(M_lagrange_min, 0.0)  # Ensure non-negative max
         
-        max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
+        # Only need to consider the distance between peaks/troughs and the expansion point
         min_abs_y_minus_trough = np.minimum(np.abs(k_lower_bound*2*np.pi + 3*np.pi/2 - a.expansion_point), np.abs(k_upper_bound*2*np.pi + 3*np.pi/2 - a.expansion_point))
+        
+        max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
         max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_trough)
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
         local_error_magnitude_min = (M_lagrange_min / 2) * max_sq_y_minus_y0
@@ -538,9 +542,11 @@ class TaylorTranslator:
         M_lagrange_max = np.maximum(-np.cos(domain_low), -np.cos(domain_high))
         M_lagrange_max[contains_trough] = 1.0  # If contains trough, max is 1.0
         M_lagrange_max = np.maximum(M_lagrange_max, 0.0)  # Ensure non-negative max
+
+        # Only need to consider the distance between peaks/troughs and the expansion point      
+        min_abs_y_minus_peak = np.minimum(np.abs(k_lower_bound*2*np.pi - a.expansion_point), np.abs(k_upper_bound*2*np.pi - a.expansion_point))
                 
         max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
-        min_abs_y_minus_peak = np.minimum(np.abs(k_lower_bound*2*np.pi - a.expansion_point), np.abs(k_upper_bound*2*np.pi - a.expansion_point))
         max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_peak)
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
         local_error_magnitude_max = (M_lagrange_max / 2) * max_sq_y_minus_y0
@@ -555,10 +561,11 @@ class TaylorTranslator:
         M_lagrange_min = np.minimum(-np.cos(domain_low), -np.cos(domain_high))
         M_lagrange_min[contains_crest] = -1.0  # If contains crest, min is -1.0
         M_lagrange_min = np.minimum(M_lagrange_min, 0.0)  # Ensure non-negative max
-        
+                      
+        # Only need to consider the distance between peaks/troughs and the expansion point
+        min_abs_y_minus_trough = np.minimum(np.abs(k_lower_bound*2*np.pi + np.pi - a.expansion_point), np.abs(k_upper_bound*2*np.pi + np.pi - a.expansion_point))
         
         max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - a.expansion_point), np.abs(domain_high - a.expansion_point))
-        min_abs_y_minus_trough = np.minimum(np.abs(k_lower_bound*2*np.pi + np.pi - a.expansion_point), np.abs(k_upper_bound*2*np.pi + np.pi - a.expansion_point))
         max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_trough)
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
         local_error_magnitude_min = (M_lagrange_min / 2) * max_sq_y_minus_y0
