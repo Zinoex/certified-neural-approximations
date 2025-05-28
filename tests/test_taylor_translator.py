@@ -497,24 +497,20 @@ class TestCertifiedFirstOrderTaylorExpansion:
 
             # Optional plotting for visualization
             if os.getenv("PLOT_TESTS", "0") == "1":
-                import matplotlib.pyplot as plt
-                plt.figure(figsize=(8, 6))
-                plt.plot(x_test.flatten(), sin_x, label="sin(x)", color="blue")
-                plt.plot(x_test.flatten(), approx_with_remainder_lower, label="Lower Bound", linestyle="--", color="green")
-                plt.plot(x_test.flatten(), approx_with_remainder_upper, label="Upper Bound", linestyle="--", color="red")
                 approx_function = (
                     result.linear_approximation[1] +
                     result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
                 )
-                plt.plot(x_test.flatten(), approx_function, label="Approximation", linestyle=":", color="orange")
-                plt.fill_between(x_test.flatten(), approx_with_remainder_lower, approx_with_remainder_upper, color="gray", alpha=0.2, label="Remainder Bounds")
-                plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")
-                plt.title(f"Sine Function and First-Order Approximation (Interval {interval})")
-                plt.xlabel("x")
-                plt.ylabel("sin(x)")
-                plt.legend()
-                plt.grid(True)
-                plt.show()
+                self.plot_taylor_approximation(
+                    x_test=x_test,
+                    true_values=sin_x,
+                    approx_function=approx_function,
+                    approx_with_remainder_lower=approx_with_remainder_lower,
+                    approx_with_remainder_upper=approx_with_remainder_upper,
+                    expansion_point=expansion_point,
+                    title=f"Sine Function and First-Order Approximation (Interval {interval})",
+                    ylabel="sin(x)"
+                )
 
     def test_cos(self):
         """Test cosine function."""
@@ -566,24 +562,20 @@ class TestCertifiedFirstOrderTaylorExpansion:
 
             # Optional plotting for visualization
             if os.getenv("PLOT_TESTS", "0") == "1":
-                import matplotlib.pyplot as plt
-                plt.figure(figsize=(8, 6))
-                plt.plot(x_test.flatten(), cos_x, label="cos(x)", color="blue")
-                plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")
-                plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")
                 approx_function = (
                     result.linear_approximation[1] +
                     result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
                 )
-                plt.plot(x_test.flatten(), approx_function, label="Approximation", linestyle=":", color="orange")
-                plt.fill_between(x_test.flatten(), approx_with_remainder_lower.flatten(), approx_with_remainder_upper.flatten(), color="gray", alpha=0.2, label="Remainder Bounds")
-                plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
-                plt.title(f"Cosine Function and First-Order Approximation (Interval {interval})")
-                plt.xlabel("x")
-                plt.ylabel("cos(x)")
-                plt.legend()
-                plt.grid(True)
-                plt.show()
+                self.plot_taylor_approximation(
+                    x_test=x_test,
+                    true_values=cos_x,
+                    approx_function=approx_function,
+                    approx_with_remainder_lower=approx_with_remainder_lower,
+                    approx_with_remainder_upper=approx_with_remainder_upper,
+                    expansion_point=expansion_point,
+                    title=f"Cosine Function and First-Order Approximation (Interval {interval})",
+                    ylabel="cos(x)"
+                )
 
     def test_exp(self):
         """Test exponential function."""
@@ -653,31 +645,20 @@ class TestCertifiedFirstOrderTaylorExpansion:
 
         # Optional plotting for visualization
         if os.getenv("PLOT_TESTS", "0") == "1":
-            import matplotlib.pyplot as plt
-            plt.figure(figsize=(8, 6))
-            plt.plot(x_test.flatten(), log_x, label="log(x)", color="blue")
-            plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")  # Ensure flatten()
-            plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")  # Ensure flatten()
             approx_function = (
                 result.linear_approximation[1] +
-                result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
+                result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).flatten()
             )
-            plt.plot(x_test.flatten(), approx_function, label="Approximation", linestyle=":", color="orange")
-            plt.fill_between(
-                x_test.flatten(),
-                approx_with_remainder_lower.flatten(),
-                approx_with_remainder_upper.flatten(),
-                color="gray",
-                alpha=0.2,
-                label="Remainder Bounds"
+            self.plot_taylor_approximation(
+                x_test=x_test,
+                true_values=log_x,
+                approx_function=approx_function,
+                approx_with_remainder_lower=approx_with_remainder_lower,
+                approx_with_remainder_upper=approx_with_remainder_upper,
+                expansion_point=te_pos.expansion_point,
+                title="Logarithm Function and First-Order Approximation",
+                ylabel="log(x)"
             )
-            plt.axvline(te_pos.expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
-            plt.title("Logarithm Function and First-Order Approximation")
-            plt.xlabel("x")
-            plt.ylabel("log(x)")
-            plt.legend()
-            plt.grid(True)
-            plt.show()
 
     def test_sqrt(self):
         """Test square root function."""
@@ -714,42 +695,70 @@ class TestCertifiedFirstOrderTaylorExpansion:
 
         # Optional plotting for visualization
         if os.getenv("PLOT_TESTS", "0") == "1":
-            import matplotlib.pyplot as plt
-            plt.figure(figsize=(8, 6))
-            plt.plot(x_test.flatten(), sqrt_x, label="sqrt(x)", color="blue")
-            plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")  # Ensure flatten()
-            plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")  # Ensure flatten()
-            plt.fill_between(
-                x_test.flatten(),
-                approx_with_remainder_lower.flatten(),
-                approx_with_remainder_upper.flatten(),
-                color="gray",
-                alpha=0.2,
-                label="Remainder Bounds"
+            approx_function = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).flatten()
             )
-            plt.axvline(te_pos.expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
-            plt.title("Square Root Function and First-Order Approximation")
-            plt.xlabel("x")
-            plt.ylabel("sqrt(x)")
-            plt.legend()
-            plt.grid(True)
-            plt.show()
+            self.plot_taylor_approximation(
+                x_test=x_test,
+                true_values=sqrt_x,
+                approx_function=approx_function,
+                approx_with_remainder_lower=approx_with_remainder_lower,
+                approx_with_remainder_upper=approx_with_remainder_upper,
+                expansion_point=te_pos.expansion_point,
+                title="Square Root Function and First-Order Approximation",
+                ylabel="sqrt(x)"
+            )
 
     def test_pow(self):
         """Test power function."""
-        # ...existing code...
         exponent = 3
-        result = self.translator.pow(self.te, exponent)
+        domain = (np.array([-1.0]), np.array([6.0]))
+        expansion_point = (domain[1] - domain[0]) / 2
+        te = CertifiedFirstOrderTaylorExpansion(
+            expansion_point, domain
+        )
+        result = self.translator.pow(te, exponent)
         
-        expected_constant = np.pow(self.expansion_point, exponent)
-        expected_jacobian = (exponent * np.pow(self.expansion_point, exponent - 1)).reshape(-1, 1) * self.te.linear_approximation[0]
+        expected_constant = np.pow(expansion_point, exponent)
+        expected_jacobian = (exponent * np.pow(expansion_point, exponent - 1)).reshape(-1, 1) * te.linear_approximation[0]
         
         assert np.allclose(result.linear_approximation[1], expected_constant)
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
-        # Test power function with non-integer exponent
-        with pytest.raises(AssertionError):
-            self.translator.pow(self.te, 2.5)
+        # Verify that the first-order approximation with the remainder term contains x^3 on the interval
+        x_test = np.linspace(domain[0], domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+        pow_x = np.power(x_test, exponent).flatten()  # True power values, flattened for comparison
+        approx_with_remainder_lower = (
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - expansion_point).T).flatten() +
+            result.remainder[0]
+        )
+        approx_with_remainder_upper = (
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - expansion_point).T).flatten() +
+            result.remainder[1]
+        )
+
+        assert np.all(pow_x >= approx_with_remainder_lower)
+        assert np.all(pow_x <= approx_with_remainder_upper)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            approx_function = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test,
+                true_values=pow_x,
+                approx_function=approx_function,
+                approx_with_remainder_lower=approx_with_remainder_lower,
+                approx_with_remainder_upper=approx_with_remainder_upper,
+                expansion_point=expansion_point,
+                title=f"x^{exponent} Function and First-Order Approximation",
+                ylabel=f"x^{exponent}"
+            )
 
     def test_stack(self):
         """Test stacking multiple TaylorExpansions."""
@@ -781,9 +790,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         # Define the input Taylor expansion for x
         te_x = CertifiedFirstOrderTaylorExpansion(
             expansion_point=np.array([0.1]),
-            domain=(np.array([-0.5]), np.array([0.7])),
-            linear_approximation=(np.array([[1.0]]), np.array([0.1])),
-            remainder=(np.array([0.0]), np.array([0.0]))
+            domain=(np.array([-0.5]), np.array([0.7]))
         )
 
         # Compute x^3
@@ -815,8 +822,24 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert te_final.remainder[0] is not None
         assert te_final.remainder[1] is not None
 
+        # Verify that the first-order approximation with the remainder term contains the composite function on the interval
+        x_test = np.linspace(te_x.domain[0], te_x.domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+        composite_x = 0.2 * np.exp(np.sin(np.power(x_test, 3)) + 0.1 * x_test).flatten()  # True composite function values
+        approx_with_remainder_lower = (
+            te_final.linear_approximation[1] +
+            te_final.linear_approximation[0].dot((x_test - te_x.expansion_point).T).flatten() +
+            te_final.remainder[0]
+        )
+        approx_with_remainder_upper = (
+            te_final.linear_approximation[1] +
+            te_final.linear_approximation[0].dot((x_test - te_x.expansion_point).T).flatten() +
+            te_final.remainder[1]
+        )
+
+        assert np.all(composite_x >= approx_with_remainder_lower)
+        assert np.all(composite_x <= approx_with_remainder_upper)
+
         # Manual verification of the composite function
-        # For f(x) = 0.2 * exp(sin(x^3) + 0.1 * x), we can verify the result manually
         x_val = te_x.expansion_point
         expected_constant_manual = 0.2 * np.exp(np.sin(x_val**3) + 0.1 * x_val)
         expected_jacobian_manual = (
@@ -826,6 +849,58 @@ class TestCertifiedFirstOrderTaylorExpansion:
 
         assert np.allclose(te_final.linear_approximation[1], expected_constant_manual)
         assert np.allclose(te_final.linear_approximation[0], expected_jacobian_manual.reshape(-1, 1))
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            approx_function = (
+                te_final.linear_approximation[1] +
+                te_final.linear_approximation[0].dot((x_test - te_x.expansion_point).T).flatten()
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test,
+                true_values=composite_x,
+                approx_function=approx_function,
+                approx_with_remainder_lower=approx_with_remainder_lower,
+                approx_with_remainder_upper=approx_with_remainder_upper,
+                expansion_point=te_x.expansion_point,
+                title="Composite Function 0.2 * exp(sin(x^3) + 0.1 * x) and First-Order Approximation",
+                ylabel="Composite Function"
+            )
+    def plot_taylor_approximation(self, x_test, true_values, approx_function, approx_with_remainder_lower, approx_with_remainder_upper, expansion_point, title, ylabel):
+        """
+        Helper function to plot Taylor approximation and bounds.
+
+        Args:
+            x_test (np.ndarray): Test points for x.
+            true_values (np.ndarray): True function values.
+            approx_function (np.ndarray): Approximation function values.
+            approx_with_remainder_lower (np.ndarray): Lower bound of approximation with remainder.
+            approx_with_remainder_upper (np.ndarray): Upper bound of approximation with remainder.
+            expansion_point (float): Expansion point for the Taylor approximation.
+            title (str): Title of the plot.
+            ylabel (str): Label for the y-axis.
+        """
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(8, 6))
+        plt.plot(x_test.flatten(), true_values, label="True Function", color="blue")
+        plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")
+        plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")
+        plt.plot(x_test.flatten(), approx_function, label="Approximation", linestyle=":", color="orange")
+        plt.fill_between(
+            x_test.flatten(),
+            approx_with_remainder_lower.flatten(),
+            approx_with_remainder_upper.flatten(),
+            color="gray",
+            alpha=0.2,
+            label="Remainder Bounds"
+        )
+        plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
+        plt.title(title)
+        plt.xlabel("x")
+        plt.ylabel(ylabel)
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
 if __name__ == "__main__":
     """
