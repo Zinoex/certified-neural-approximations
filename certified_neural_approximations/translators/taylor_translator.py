@@ -32,7 +32,7 @@ class CertifiedFirstOrderTaylorExpansion:
         self.domain = domain
         if linear_approximation is None:
             # Default f(x) = x
-            self.linear_approximation = (np.ones_like(expansion_point), expansion_point)
+            self.linear_approximation = (np.eye(expansion_point.size), expansion_point)
             self.remainder = (np.zeros_like(expansion_point), np.zeros_like(expansion_point))
         else:
             self.linear_approximation = linear_approximation

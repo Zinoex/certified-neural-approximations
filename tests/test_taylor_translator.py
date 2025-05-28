@@ -512,6 +512,41 @@ class TestCertifiedFirstOrderTaylorExpansion:
                     ylabel="sin(x)"
                 )
 
+        # Multidimensional test
+        domain = (np.array([-np.pi, 0.0]), np.array([np.pi, np.pi / 2]))
+        expansion_point = (domain[1] - domain[0]) / 2
+        te_multi = CertifiedFirstOrderTaylorExpansion(
+            expansion_point=expansion_point,
+            domain=domain
+        )
+
+        result_multi = self.translator.sin(te_multi)
+
+        expected_constant_multi = np.sin(expansion_point)
+        expected_jacobian_multi = np.cos(expansion_point).reshape(-1, 1) * te_multi.linear_approximation[0]
+
+        assert np.allclose(result_multi.linear_approximation[1], expected_constant_multi)
+        assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            x_test = np.linspace(domain[0], domain[1], 1000).T  # Multidimensional test points
+            sin_x = np.sin(x_test)  # True sine values
+            approx_function = (
+                result_multi.linear_approximation[1] +
+                result_multi.linear_approximation[0].dot((x_test - expansion_point).T).T
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test.flatten(),
+                true_values=sin_x.flatten(),
+                approx_function=approx_function.flatten(),
+                approx_with_remainder_lower=None,  # Multidimensional plotting may omit bounds
+                approx_with_remainder_upper=None,
+                expansion_point=expansion_point.mean(),  # Use mean for visualization
+                title="Multidimensional Sine Function and First-Order Approximation",
+                ylabel="sin(x)"
+            )
+
     def test_cos(self):
         """Test cosine function."""
         intervals_list = [
@@ -576,6 +611,41 @@ class TestCertifiedFirstOrderTaylorExpansion:
                     title=f"Cosine Function and First-Order Approximation (Interval {interval})",
                     ylabel="cos(x)"
                 )
+
+        # Multidimensional test
+        expansion_point = np.array([0.0, np.pi / 4])
+        domain = (np.array([-np.pi, 0.0]), np.array([np.pi, np.pi / 2]))
+        te_multi = CertifiedFirstOrderTaylorExpansion(
+            expansion_point=expansion_point,
+            domain=domain
+        )
+
+        result_multi = self.translator.cos(te_multi)
+
+        expected_constant_multi = np.cos(expansion_point)
+        expected_jacobian_multi = -np.sin(expansion_point).reshape(-1, 1) * te_multi.linear_approximation[0]
+
+        assert np.allclose(result_multi.linear_approximation[1], expected_constant_multi)
+        assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            x_test = np.linspace(domain[0], domain[1], 1000).T  # Multidimensional test points
+            cos_x = np.cos(x_test)  # True cosine values
+            approx_function = (
+                result_multi.linear_approximation[1] +
+                result_multi.linear_approximation[0].dot((x_test - expansion_point).T).T
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test.flatten(),
+                true_values=cos_x.flatten(),
+                approx_function=approx_function.flatten(),
+                approx_with_remainder_lower=None,  # Multidimensional plotting may omit bounds
+                approx_with_remainder_upper=None,
+                expansion_point=expansion_point.mean(),  # Use mean for visualization
+                title="Multidimensional Cosine Function and First-Order Approximation",
+                ylabel="cos(x)"
+            )
 
     def test_exp(self):
         """Test exponential function."""
@@ -660,6 +730,41 @@ class TestCertifiedFirstOrderTaylorExpansion:
                 ylabel="log(x)"
             )
 
+        # Multidimensional test
+        domain = (np.array([1.0, 2.0]), np.array([4.0, 5.0]))
+        expansion_point = (domain[1] - domain[0]) / 2
+        te_multi = CertifiedFirstOrderTaylorExpansion(
+            expansion_point=expansion_point,
+            domain=domain
+        )
+
+        result_multi = self.translator.log(te_multi)
+
+        expected_constant_multi = np.log(expansion_point)
+        expected_jacobian_multi = (1.0 / expansion_point).reshape(-1, 1) * te_multi.linear_approximation[0]
+
+        assert np.allclose(result_multi.linear_approximation[1], expected_constant_multi)
+        assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            x_test = np.linspace(domain[0], domain[1], 1000).T  # Multidimensional test points
+            log_x = np.log(x_test)  # True logarithm values
+            approx_function = (
+                result_multi.linear_approximation[1] +
+                result_multi.linear_approximation[0].dot((x_test - expansion_point).T).T
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test.flatten(),
+                true_values=log_x.flatten(),
+                approx_function=approx_function.flatten(),
+                approx_with_remainder_lower=None,  # Multidimensional plotting may omit bounds
+                approx_with_remainder_upper=None,
+                expansion_point=expansion_point.mean(),  # Use mean for visualization
+                title="Multidimensional Logarithm Function and First-Order Approximation",
+                ylabel="log(x)"
+            )
+
     def test_sqrt(self):
         """Test square root function."""
         domain = (np.array([1.0]), np.array([9.0]))
@@ -710,6 +815,41 @@ class TestCertifiedFirstOrderTaylorExpansion:
                 ylabel="sqrt(x)"
             )
 
+        # Multidimensional test
+        domain = (np.array([1.0, 4.0]), np.array([16.0, 25.0]))
+        expansion_point = (domain[1] - domain[0]) / 2
+        te_multi = CertifiedFirstOrderTaylorExpansion(
+            expansion_point=expansion_point,
+            domain=domain
+        )
+
+        result_multi = self.translator.sqrt(te_multi)
+
+        expected_constant_multi = np.sqrt(expansion_point)
+        expected_jacobian_multi = (0.5 / np.sqrt(expansion_point)).reshape(-1, 1) * te_multi.linear_approximation[0]
+
+        assert np.allclose(result_multi.linear_approximation[1], expected_constant_multi)
+        assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            x_test = np.linspace(domain[0], domain[1], 1000).T  # Multidimensional test points
+            sqrt_x = np.sqrt(x_test)  # True square root values
+            approx_function = (
+                result_multi.linear_approximation[1] +
+                result_multi.linear_approximation[0].dot((x_test - expansion_point).T).T
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test.flatten(),
+                true_values=sqrt_x.flatten(),
+                approx_function=approx_function.flatten(),
+                approx_with_remainder_lower=None,  # Multidimensional plotting may omit bounds
+                approx_with_remainder_upper=None,
+                expansion_point=expansion_point.mean(),  # Use mean for visualization
+                title="Multidimensional Square Root Function and First-Order Approximation",
+                ylabel="sqrt(x)"
+            )
+
     def test_pow(self):
         """Test power function."""
         exponent = 3
@@ -757,6 +897,42 @@ class TestCertifiedFirstOrderTaylorExpansion:
                 approx_with_remainder_upper=approx_with_remainder_upper,
                 expansion_point=expansion_point,
                 title=f"x^{exponent} Function and First-Order Approximation",
+                ylabel=f"x^{exponent}"
+            )
+
+        # Multidimensional test
+        exponent = 3
+        domain = (np.array([1.0, 2.0]), np.array([4.0, 5.0]))
+        expansion_point = (domain[1] - domain[0]) / 2
+        te_multi = CertifiedFirstOrderTaylorExpansion(
+            expansion_point=expansion_point,
+            domain=domain
+        )
+
+        result_multi = self.translator.pow(te_multi, exponent)
+
+        expected_constant_multi = np.power(expansion_point, exponent)
+        expected_jacobian_multi = (exponent * np.power(expansion_point, exponent - 1)).reshape(-1, 1) * te_multi.linear_approximation[0]
+
+        assert np.allclose(result_multi.linear_approximation[1], expected_constant_multi)
+        assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            x_test = np.linspace(domain[0], domain[1], 1000).T  # Multidimensional test points
+            pow_x = np.power(x_test, exponent)  # True power values
+            approx_function = (
+                result_multi.linear_approximation[1] +
+                result_multi.linear_approximation[0].dot((x_test - expansion_point).T).T
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test.flatten(),
+                true_values=pow_x.flatten(),
+                approx_function=approx_function.flatten(),
+                approx_with_remainder_lower=None,  # Multidimensional plotting may omit bounds
+                approx_with_remainder_upper=None,
+                expansion_point=expansion_point.mean(),  # Use mean for visualization
+                title=f"Multidimensional x^{exponent} Function and First-Order Approximation",
                 ylabel=f"x^{exponent}"
             )
 
@@ -866,6 +1042,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
                 title="Composite Function 0.2 * exp(sin(x^3) + 0.1 * x) and First-Order Approximation",
                 ylabel="Composite Function"
             )
+            
     def plot_taylor_approximation(self, x_test, true_values, approx_function, approx_with_remainder_lower, approx_with_remainder_upper, expansion_point, title, ylabel):
         """
         Helper function to plot Taylor approximation and bounds.
