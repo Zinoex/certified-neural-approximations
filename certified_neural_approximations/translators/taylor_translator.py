@@ -803,8 +803,9 @@ class TaylorTranslator:
         max_abs_y_minus_y0 = np.maximum(np.abs(range_of_y[0] - y0), np.abs(range_of_y[1] - y0))
         max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
         
-        local_error_magnitude_max = (M_lagrange_max / 2) * max_sq_y_minus_y0
-        local_error_magnitude_min = (M_lagrange_min / 2) * max_sq_y_minus_y0
+        # Ensure proper ordering: lower bound should be minimum with 0, upper bound should be maximum with 0
+        local_error_magnitude_max = np.maximum(0, (M_lagrange_max / 2) * max_sq_y_minus_y0)
+        local_error_magnitude_min = np.minimum(0, (M_lagrange_min / 2) * max_sq_y_minus_y0)
 
         prop_rem_lower_y, prop_rem_upper_y = a.remainder
         

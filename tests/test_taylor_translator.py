@@ -324,46 +324,35 @@ class TestCertifiedFirstOrderTaylorExpansion:
         exponent = 3
         te_increasing = self.translator.pow(self.te, exponent)
         
-        # Compute the second derivative bounds for f(x) = x^3
-        # f''(x) = 6x, so evaluate at the endpoints of the domain
-        lower_bound = self.domain[0]  # x_min
-        upper_bound = self.domain[1]  # x_max
-        second_derivative_lower = 6 * lower_bound
-        second_derivative_upper = 6 * upper_bound
-        
-        # If f''(x) is increasing, max is at x_max
-        max_second_derivative = second_derivative_upper
-        min_second_derivative = second_derivative_lower
-        
-        # Verify that the remainder bounds are consistent with the second derivative
-        max_deviation = np.maximum(np.abs(self.domain[0] - self.expansion_point), 
-                                   np.abs(self.domain[1] - self.expansion_point))
-        expected_remainder_bound_upper = (max_second_derivative / 2) * max_deviation**2
-        expected_remainder_bound_lower = (min_second_derivative / 2) * max_deviation**2
+        # Verify that the first-order approximation with the remainder term contains x^3 on the interval
+        x_test = np.linspace(self.domain[0], self.domain[1], 1000)  # Test points
+        pow_x = np.power(x_test, exponent)  # True power values
+        approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
+            te_increasing, x_test, self.expansion_point
+        )
 
-        assert np.all(te_increasing.remainder[1] == expected_remainder_bound_upper)
-        assert np.all(te_increasing.remainder[0] == expected_remainder_bound_lower)
+        # Verify that the true function is contained within the bounds
+        assert np.all(pow_x >= approx_with_remainder_lower)
+        assert np.all(pow_x <= approx_with_remainder_upper)
+        
+        # Verify that remainder bounds are properly ordered
+        assert np.all(te_increasing.remainder[0] <= te_increasing.remainder[1] + 1e-9)
 
         # Test a monotonically decreasing function: f(x) = -x^3
         te_decreasing = -te_increasing
         
-        # Compute the second derivative bounds for f(x) = -x^3
-        # f''(x) = -6x, so evaluate at the endpoints of the domain
-        second_derivative_lower = -6 * lower_bound
-        second_derivative_upper = -6 * upper_bound
-        
-        # If f''(x) is decreasing, min is at x_max (negative max)
-        min_second_derivative = second_derivative_upper
-        max_second_derivative = second_derivative_lower
-        
-        # Verify that the remainder bounds are consistent with the second derivative
-        max_deviation = np.maximum(np.abs(self.domain[0] - self.expansion_point), 
-                                   np.abs(self.domain[1] - self.expansion_point))
-        expected_remainder_bound_upper = (max_second_derivative / 2) * max_deviation**2
-        expected_remainder_bound_lower = (min_second_derivative / 2) * max_deviation**2
+        # Verify that the first-order approximation with the remainder term contains -x^3 on the interval
+        neg_pow_x = -pow_x  # True negative power values
+        approx_with_remainder_lower_neg, approx_with_remainder_upper_neg = self.compute_approximation_bounds(
+            te_decreasing, x_test, self.expansion_point
+        )
 
-        assert np.all(te_decreasing.remainder[1] == expected_remainder_bound_upper)
-        assert np.all(te_decreasing.remainder[0] == expected_remainder_bound_lower)
+        # Verify that the true function is contained within the bounds
+        assert np.all(neg_pow_x >= approx_with_remainder_lower_neg)
+        assert np.all(neg_pow_x <= approx_with_remainder_upper_neg)
+        
+        # Verify that remainder bounds are properly ordered
+        assert np.all(te_decreasing.remainder[0] <= te_decreasing.remainder[1])
 
     def test_negation(self):
         """Test negation of a Taylor expansion."""
