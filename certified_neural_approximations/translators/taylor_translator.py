@@ -609,10 +609,10 @@ class TaylorTranslator:
         # Use monotonicity of exp
         range = a.range()
         local_remainder = (
-            0.0,
+            np.zeros_like(np.exp(range[0])),
             np.maximum(
-                np.exp(range[0]) - (exp_y0 + exp_y0.reshape(exp_y0.shape[0], 1) * (range[0] - y0)),
-                np.exp(range[1]) - (exp_y0 + exp_y0.reshape(exp_y0.shape[0], 1) * (range[1] - y0))
+                np.exp(range[0]) - (exp_y0 + exp_y0 * (a.linear_approximation[0] @ (range[0] - y0))),
+                np.exp(range[1]) - (exp_y0 + exp_y0 * (a.linear_approximation[0] @ (range[1] - y0)))
             )
         )
 
@@ -644,26 +644,42 @@ class TaylorTranslator:
         linear_term = grad_y0.reshape(grad_y0.shape[0], 1) * a.linear_approximation[0]
 
         # Use monotonicity of log
-        range = a.range()
-        if np.any(range[0] <= 0):
+        lower, upper = a.range()
+        if np.any(lower <= 0):
             raise ValueError("Logarithm domain error: range[0] must be greater than 0")
 
-        local_remainder = (
-            np.minimum(
-                np.log(range[0]) - (log_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[0] - y0)),
-                np.log(range[1]) - (log_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[1] - y0))
-            ),
-            0.0
+        # Compute the second derivative bounds for log(x): f''(x) = -1/x^2
+        second_derivative_lower = -1 / (lower**2)
+        second_derivative_upper = -1 / (upper**2)
+
+        # Ensure valid bounds
+        second_derivative_lower = np.minimum(second_derivative_lower, 0)
+        second_derivative_upper = np.maximum(second_derivative_upper, 0)
+
+        # Compute the maximum deviation from the expansion point
+        max_deviation = np.maximum(
+            np.abs(lower - y0),
+            np.abs(upper - y0)
         )
 
+        # Compute the remainder bounds using the second derivative
+        remainder_lower = (second_derivative_lower / 2) * max_deviation**2
+        remainder_upper = (second_derivative_upper / 2) * max_deviation**2
+
+        # Propagate the remainder through the derivative
         remainder1, remainder2 = grad_y0 * a.remainder[0], grad_y0 * a.remainder[1]
-        remainder = np.minimum(remainder1, remainder2) + local_remainder[0], np.maximum(remainder1, remainder2) + local_remainder[1]
+        propagated_rem_lower = np.minimum(remainder1, remainder2)
+        propagated_rem_upper = np.maximum(remainder1, remainder2)
+
+        # Combine propagated and second derivative remainders
+        final_rem_lower = propagated_rem_lower + remainder_lower
+        final_rem_upper = propagated_rem_upper + remainder_upper
 
         return CertifiedFirstOrderTaylorExpansion(
             a.expansion_point,
             a.domain,
             (linear_term, log_y0),
-            remainder
+            (final_rem_lower, final_rem_upper)
         )
 
     def sqrt(self, a):

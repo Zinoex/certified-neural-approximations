@@ -564,13 +564,13 @@ class TestCertifiedFirstOrderTaylorExpansion:
 
             # Verify that the first-order approximation with the remainder term contains cos(x) on the interval
             x_test = np.linspace(interval[0], interval[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
-            cos_x = np.cos(x_test).flatten()  # True cosine values
+            cos_x = np.cos(x_test)  # True cosine values
             approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
                 result, x_test, expansion_point
             )
 
-            assert np.all(cos_x >= approx_with_remainder_lower.flatten())
-            assert np.all(cos_x <= approx_with_remainder_upper.flatten())
+            assert np.all(cos_x.T >= approx_with_remainder_lower)
+            assert np.all(cos_x.T <= approx_with_remainder_upper)
 
             # Optional plotting for visualization
             if os.getenv("PLOT_TESTS", "0") == "1":
@@ -697,12 +697,12 @@ class TestCertifiedFirstOrderTaylorExpansion:
         if os.getenv("PLOT_TESTS", "0") == "1":
             approx_function = (
                 result.linear_approximation[1] +
-                result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).flatten()
+                result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).T
             )
             self.plot_taylor_approximation(
-                x_test=x_test,
-                true_values=log_x,
-                approx_function=approx_function,
+                x_test=x_test.flatten(),
+                true_values=log_x.flatten(),
+                approx_function=approx_function.flatten(),
                 approx_with_remainder_lower=approx_with_remainder_lower,
                 approx_with_remainder_upper=approx_with_remainder_upper,
                 expansion_point=te_pos.expansion_point,
@@ -733,8 +733,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result_multi, x_test, expansion_point
         )
 
-        assert np.all(log_x >= approx_with_remainder_lower)
-        assert np.all(log_x <= approx_with_remainder_upper)
+        assert np.all(log_x.T >= approx_with_remainder_lower)
+        assert np.all(log_x.T <= approx_with_remainder_upper)
 
     def test_sqrt(self):
         """Test square root function."""
@@ -811,22 +811,22 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result, x_test, expansion_point
         )
 
-        assert np.all(pow_x >= approx_with_remainder_lower.flatten())
-        assert np.all(pow_x <= approx_with_remainder_upper.flatten())
+        assert np.all(pow_x >= approx_with_remainder_lower)
+        assert np.all(pow_x <= approx_with_remainder_upper)
 
         # Optional plotting for visualization
         if os.getenv("PLOT_TESTS", "0") == "1":
             approx_function = (
-                result.linear_approximation[1] +
-                result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
+                result.linear_approximation[1].reshape(-1, 1) +
+                result.linear_approximation[0].dot((x_test - expansion_point).T)
             )
             self.plot_taylor_approximation(
-                x_test=x_test,
-                true_values=pow_x,
-                approx_function=approx_function,
-                approx_with_remainder_lower=approx_with_remainder_lower,
-                approx_with_remainder_upper=approx_with_remainder_upper,
-                expansion_point=expansion_point,
+                x_test=x_test.flatten(),
+                true_values=pow_x.flatten(),
+                approx_function=approx_function.flatten(),
+                approx_with_remainder_lower=approx_with_remainder_lower.flatten(),
+                approx_with_remainder_upper=approx_with_remainder_upper.flatten(),
+                expansion_point=expansion_point.mean(),
                 title=f"x^{exponent} Function and First-Order Approximation",
                 ylabel=f"x^{exponent}"
             )
@@ -857,6 +857,23 @@ class TestCertifiedFirstOrderTaylorExpansion:
 
         assert np.all(pow_x.T >= approx_with_remainder_lower)
         assert np.all(pow_x.T <= approx_with_remainder_upper)
+
+        # Optional plotting for visualization
+        if os.getenv("PLOT_TESTS", "0") == "1":
+            approx_function = (
+                result_multi.linear_approximation[1].reshape(-1, 1) +
+                result_multi.linear_approximation[0].dot((x_test - expansion_point).T)
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test.flatten(),
+                true_values=pow_x.flatten(),
+                approx_function=approx_function.T.flatten(),
+                approx_with_remainder_lower=approx_with_remainder_lower.T.flatten(),
+                approx_with_remainder_upper=approx_with_remainder_upper.T.flatten(),
+                expansion_point=expansion_point.mean(),
+                title=f"Multidimensional x^{exponent} Function and First-Order Approximation",
+                ylabel=f"x^{exponent}"
+            )
 
     def test_stack(self):
         """Test stacking multiple TaylorExpansions."""
@@ -1014,14 +1031,14 @@ class TestCertifiedFirstOrderTaylorExpansion:
                 approx_function=approx_function.flatten(),
                 approx_with_remainder_lower=None,  # Multidimensional plotting may omit bounds
                 approx_with_remainder_upper=None,
-                expansion_point=expansion_point.mean(),  # Use mean for visualization
+                expansion_point=expansion_point,  # Use mean for visualization
                 title="Dynamics Function and First-Order Approximation",
                 ylabel="Dynamics"
             )
             
     def plot_taylor_approximation(self, x_test, true_values, approx_function, approx_with_remainder_lower, approx_with_remainder_upper, expansion_point, title, ylabel):
         """
-        Helper function to plot Taylor approximation and bounds.
+        Helper function to plot Taylor approximation and bounds for 1D and 2D cases.
 
         Args:
             x_test (np.ndarray): Test points for x.
@@ -1029,31 +1046,60 @@ class TestCertifiedFirstOrderTaylorExpansion:
             approx_function (np.ndarray): Approximation function values.
             approx_with_remainder_lower (np.ndarray): Lower bound of approximation with remainder.
             approx_with_remainder_upper (np.ndarray): Upper bound of approximation with remainder.
-            expansion_point (float): Expansion point for the Taylor approximation.
+            expansion_point (np.ndarray): Expansion point for the Taylor approximation.
             title (str): Title of the plot.
             ylabel (str): Label for the y-axis.
         """
         import matplotlib.pyplot as plt
-        plt.figure(figsize=(8, 6))
-        plt.plot(x_test.flatten(), true_values, label="True Function", color="blue")
-        plt.plot(x_test.flatten(), approx_with_remainder_lower.flatten(), label="Lower Bound", linestyle="--", color="green")
-        plt.plot(x_test.flatten(), approx_with_remainder_upper.flatten(), label="Upper Bound", linestyle="--", color="red")
-        plt.plot(x_test.flatten(), approx_function, label="Approximation", linestyle=":", color="orange")
-        plt.fill_between(
-            x_test.flatten(),
-            approx_with_remainder_lower.flatten(),
-            approx_with_remainder_upper.flatten(),
-            color="gray",
-            alpha=0.2,
-            label="Remainder Bounds"
-        )
-        plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")  # Use .item() to extract scalar
-        plt.title(title)
-        plt.xlabel("x")
-        plt.ylabel(ylabel)
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+
+        if x_test.ndim == 1:  # 1D case
+            plt.figure(figsize=(8, 6))
+            plt.plot(x_test, true_values, label="True Function", color="blue")
+            plt.plot(x_test, approx_with_remainder_lower, label="Lower Bound", linestyle="--", color="green")
+            plt.plot(x_test, approx_with_remainder_upper, label="Upper Bound", linestyle="--", color="red")
+            plt.plot(x_test, approx_function, label="Approximation", linestyle=":", color="orange")
+            plt.fill_between(
+                x_test,
+                approx_with_remainder_lower,
+                approx_with_remainder_upper,
+                color="gray",
+                alpha=0.2,
+                label="Remainder Bounds"
+            )
+            plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")
+            plt.title(title)
+            plt.xlabel("x")
+            plt.ylabel(ylabel)
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        elif x_test.ndim == 2 and x_test.shape[1] == 2:  # 2D case
+            fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+            for i in range(2):
+                ax[i].plot(x_test[:, i], true_values[:, i], label="True Function", color="blue")
+                ax[i].plot(x_test[:, i], approx_with_remainder_lower[:, i], label="Lower Bound", linestyle="--", color="green")
+                ax[i].plot(x_test[:, i], approx_with_remainder_upper[:, i], label="Upper Bound", linestyle="--", color="red")
+                ax[i].plot(x_test[:, i], approx_function[:, i], label="Approximation", linestyle=":", color="orange")
+                ax[i].fill_between(
+                    x_test[:, i],
+                    approx_with_remainder_lower[:, i],
+                    approx_with_remainder_upper[:, i],
+                    color="gray",
+                    alpha=0.2,
+                    label="Remainder Bounds"
+                )
+                ax[i].axvline(expansion_point[i], color="black", linestyle=":", label="Expansion Point")
+                ax[i].set_title(f"{title} (Dimension {i + 1})")
+                ax[i].set_xlabel(f"x[{i}]")
+                ax[i].set_ylabel(ylabel)
+                ax[i].legend()
+                ax[i].grid(True)
+            plt.tight_layout()
+            plt.show()
+
+        else:
+            print("Skipping unsupported dimensionality for plotting.")
 
     def compute_approximation_bounds(self, result, x_test, expansion_point):
         """
