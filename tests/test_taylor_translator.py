@@ -479,20 +479,21 @@ class TestCertifiedFirstOrderTaylorExpansion:
             assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
             # Verify that the first-order approximation with the remainder term contains sin(x) on the interval
-            x_test = np.linspace(interval[0], interval[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
-            sin_x = np.sin(x_test).flatten()  # True sine values, flattened for plotting
+            x_test = np.linspace(interval[0], interval[1], 1000)  # Ensure x_test is a column vector
+            sin_x = np.sin(x_test) # True sine values, flattened for plotting
             approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
                 result, x_test, expansion_point
             )
 
-            assert np.all(sin_x >= approx_with_remainder_lower.flatten())
-            assert np.all(sin_x <= approx_with_remainder_upper.flatten())
+            assert np.all(sin_x >= approx_with_remainder_lower)
+            assert np.all(sin_x <= approx_with_remainder_upper)
 
             # Optional plotting for visualization
-            if os.getenv("PLOT_TESTS", "0") == "1":
+            PLOT_TESTS = False
+            if PLOT_TESTS:
                 approx_function = (
                     result.linear_approximation[1] +
-                    result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
+                    result.linear_approximation[0].dot((x_test - expansion_point).T).T
                 )
                 self.plot_taylor_approximation(
                     x_test=x_test,
@@ -528,8 +529,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result_multi, x_test, expansion_point
         )
 
-        assert np.all(sin_x.T >= approx_with_remainder_lower)
-        assert np.all(sin_x.T <= approx_with_remainder_upper)
+        assert np.all(sin_x >= approx_with_remainder_lower)
+        assert np.all(sin_x <= approx_with_remainder_upper)
 
     def test_cos(self):
         """Test cosine function."""
@@ -563,20 +564,21 @@ class TestCertifiedFirstOrderTaylorExpansion:
             assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
             # Verify that the first-order approximation with the remainder term contains cos(x) on the interval
-            x_test = np.linspace(interval[0], interval[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
+            x_test = np.linspace(interval[0], interval[1], 1000)  # Ensure x_test is a column vector
             cos_x = np.cos(x_test)  # True cosine values
             approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
                 result, x_test, expansion_point
             )
 
-            assert np.all(cos_x.T >= approx_with_remainder_lower)
-            assert np.all(cos_x.T <= approx_with_remainder_upper)
+            assert np.all(cos_x >= approx_with_remainder_lower)
+            assert np.all(cos_x <= approx_with_remainder_upper)
 
             # Optional plotting for visualization
-            if os.getenv("PLOT_TESTS", "0") == "1":
+            PLOT_TESTS = False
+            if PLOT_TESTS:
                 approx_function = (
                     result.linear_approximation[1] +
-                    result.linear_approximation[0].dot((x_test - expansion_point).T).flatten()
+                    result.linear_approximation[0].dot((x_test - expansion_point).T).T
                 )
                 self.plot_taylor_approximation(
                     x_test=x_test,
@@ -612,8 +614,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result_multi, x_test, expansion_point
         )
 
-        assert np.all(cos_x.T >= approx_with_remainder_lower)
-        assert np.all(cos_x.T <= approx_with_remainder_upper)
+        assert np.all(cos_x >= approx_with_remainder_lower)
+        assert np.all(cos_x <= approx_with_remainder_upper)
 
     def test_exp(self):
         """Test exponential function."""
@@ -631,14 +633,14 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
         # Verify that the first-order approximation with the remainder term contains exp(x) on the interval
-        x_test = np.linspace(domain[0], domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
-        exp_x = np.exp(x_test).flatten()  # True exponential values, flattened for comparison
+        x_test = np.linspace(domain[0], domain[1], 1000)  # Ensure x_test is a column vector
+        exp_x = np.exp(x_test)  # True exponential values, flattened for comparison
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result, x_test, expansion_point
         )
 
-        assert np.all(exp_x >= approx_with_remainder_lower.flatten())
-        assert np.all(exp_x <= approx_with_remainder_upper.flatten())
+        assert np.all(exp_x >= approx_with_remainder_lower)
+        assert np.all(exp_x <= approx_with_remainder_upper)
 
         # Multidimensional test
         domain = (np.array([-10, 0.0]), np.array([np.pi, 0.1]))
@@ -663,8 +665,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result_multi, x_test, expansion_point
         )
 
-        assert np.all(exp_x.T >= approx_with_remainder_lower)
-        assert np.all(exp_x.T <= approx_with_remainder_upper)
+        assert np.all(exp_x >= approx_with_remainder_lower)
+        assert np.all(exp_x <= approx_with_remainder_upper)
 
     def test_log(self):
         """Test logarithm function."""
@@ -684,25 +686,26 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
         # Verify that the first-order approximation with the remainder term contains log(x) on the interval
-        x_test = np.linspace(te_pos.domain[0], te_pos.domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
-        log_x = np.log(x_test).flatten()  # True logarithm values, flattened for comparison
+        x_test = np.linspace(te_pos.domain[0], te_pos.domain[1], 1000)  # Ensure x_test is a column vector
+        log_x = np.log(x_test)  # True logarithm values, flattened for comparison
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result, x_test, te_pos.expansion_point
         )
 
-        assert np.all(log_x >= approx_with_remainder_lower.flatten())
-        assert np.all(log_x <= approx_with_remainder_upper.flatten())
+        assert np.all(log_x >= approx_with_remainder_lower)
+        assert np.all(log_x <= approx_with_remainder_upper)
 
         # Optional plotting for visualization
-        if os.getenv("PLOT_TESTS", "0") == "1":
+        PLOT_TESTS = False
+        if PLOT_TESTS:
             approx_function = (
                 result.linear_approximation[1] +
                 result.linear_approximation[0].dot((x_test - te_pos.expansion_point).T).T
             )
             self.plot_taylor_approximation(
-                x_test=x_test.flatten(),
-                true_values=log_x.flatten(),
-                approx_function=approx_function.flatten(),
+                x_test=x_test,
+                true_values=log_x,
+                approx_function=approx_function,
                 approx_with_remainder_lower=approx_with_remainder_lower,
                 approx_with_remainder_upper=approx_with_remainder_upper,
                 expansion_point=te_pos.expansion_point,
@@ -733,8 +736,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result_multi, x_test, expansion_point
         )
 
-        assert np.all(log_x.T >= approx_with_remainder_lower)
-        assert np.all(log_x.T <= approx_with_remainder_upper)
+        assert np.all(log_x >= approx_with_remainder_lower)
+        assert np.all(log_x <= approx_with_remainder_upper)
 
     def test_sqrt(self):
         """Test square root function."""
@@ -753,14 +756,14 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
         # Verify that the first-order approximation with the remainder term contains sqrt(x) on the interval
-        x_test = np.linspace(te_pos.domain[0], te_pos.domain[1], 1000).reshape(-1, 1)  # Multidimensional test points
+        x_test = np.linspace(te_pos.domain[0], te_pos.domain[1], 1000)  # Multidimensional test points
         sqrt_x = np.sqrt(x_test)  # True square root values
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result, x_test, te_pos.expansion_point
         )
 
-        assert np.all(sqrt_x.T >= approx_with_remainder_lower)
-        assert np.all(sqrt_x.T <= approx_with_remainder_upper)
+        assert np.all(sqrt_x >= approx_with_remainder_lower)
+        assert np.all(sqrt_x <= approx_with_remainder_upper)
 
         # Multidimensional test
         domain = (np.array([1.0, 4.0]), np.array([16.0, 25.0]))
@@ -785,8 +788,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result_multi, x_test, expansion_point
         )
 
-        assert np.all(sqrt_x.T >= approx_with_remainder_lower)
-        assert np.all(sqrt_x.T <= approx_with_remainder_upper)
+        assert np.all(sqrt_x >= approx_with_remainder_lower)
+        assert np.all(sqrt_x <= approx_with_remainder_upper)
 
     def test_pow(self):
         """Test power function."""
@@ -805,8 +808,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result.linear_approximation[0], expected_jacobian)
 
         # Verify that the first-order approximation with the remainder term contains x^3 on the interval
-        x_test = np.linspace(domain[0], domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
-        pow_x = np.power(x_test, exponent).flatten()  # True power values, flattened for comparison
+        x_test = np.linspace(domain[0], domain[1], 1000)  # Ensure x_test is a column vector
+        pow_x = np.power(x_test, exponent)  # True power values, flattened for comparison
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result, x_test, expansion_point
         )
@@ -815,20 +818,21 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.all(pow_x <= approx_with_remainder_upper)
 
         # Optional plotting for visualization
-        if os.getenv("PLOT_TESTS", "0") == "1":
+        PLOT_TESTS = False
+        if PLOT_TESTS:
             approx_function = (
-                result.linear_approximation[1].reshape(-1, 1) +
-                result.linear_approximation[0].dot((x_test - expansion_point).T)
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - te.expansion_point).T).T
             )
             self.plot_taylor_approximation(
-                x_test=x_test.flatten(),
-                true_values=pow_x.flatten(),
-                approx_function=approx_function.flatten(),
-                approx_with_remainder_lower=approx_with_remainder_lower.flatten(),
-                approx_with_remainder_upper=approx_with_remainder_upper.flatten(),
-                expansion_point=expansion_point.mean(),
-                title=f"x^{exponent} Function and First-Order Approximation",
-                ylabel=f"x^{exponent}"
+                x_test=x_test,
+                true_values=pow_x,
+                approx_function=approx_function,
+                approx_with_remainder_lower=approx_with_remainder_lower,
+                approx_with_remainder_upper=approx_with_remainder_upper,
+                expansion_point=te.expansion_point,
+                title="Logarithm Function and First-Order Approximation",
+                ylabel="pow(x)"
             )
 
         # Multidimensional test
@@ -855,25 +859,25 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result_multi, x_test, expansion_point
         )
 
-        assert np.all(pow_x.T >= approx_with_remainder_lower)
-        assert np.all(pow_x.T <= approx_with_remainder_upper)
-
-        # Optional plotting for visualization
-        if os.getenv("PLOT_TESTS", "0") == "1":
+        PLOT_TESTS = False
+        if PLOT_TESTS:
             approx_function = (
-                result_multi.linear_approximation[1].reshape(-1, 1) +
-                result_multi.linear_approximation[0].dot((x_test - expansion_point).T)
+                result_multi.linear_approximation[1] +
+                result_multi.linear_approximation[0].dot((x_test - te_multi.expansion_point).T).T
             )
             self.plot_taylor_approximation(
-                x_test=x_test.flatten(),
-                true_values=pow_x.flatten(),
-                approx_function=approx_function.T.flatten(),
-                approx_with_remainder_lower=approx_with_remainder_lower.T.flatten(),
-                approx_with_remainder_upper=approx_with_remainder_upper.T.flatten(),
-                expansion_point=expansion_point.mean(),
-                title=f"Multidimensional x^{exponent} Function and First-Order Approximation",
-                ylabel=f"x^{exponent}"
+                x_test=x_test,
+                true_values=pow_x,
+                approx_function=approx_function,
+                approx_with_remainder_lower=approx_with_remainder_lower,
+                approx_with_remainder_upper=approx_with_remainder_upper,
+                expansion_point=te_multi.expansion_point,
+                title="Logarithm Function and First-Order Approximation",
+                ylabel="pow(x)"
             )
+
+        assert np.all(pow_x >= approx_with_remainder_lower)
+        assert np.all(pow_x <= approx_with_remainder_upper)
 
     def test_stack(self):
         """Test stacking multiple TaylorExpansions."""
@@ -958,22 +962,6 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(te_final.linear_approximation[1], expected_constant_manual)
         assert np.allclose(te_final.linear_approximation[0], expected_jacobian_manual.reshape(-1, 1))
 
-        # Optional plotting for visualization
-        if os.getenv("PLOT_TESTS", "0") == "1":
-            approx_function = (
-                te_final.linear_approximation[1] +
-                te_final.linear_approximation[0].dot((x_test - te_x.expansion_point).T).flatten()
-            )
-            self.plot_taylor_approximation(
-                x_test=x_test,
-                true_values=composite_x,
-                approx_function=approx_function,
-                approx_with_remainder_lower=approx_with_remainder_lower,
-                approx_with_remainder_upper=approx_with_remainder_upper,
-                expansion_point=te_x.expansion_point,
-                title="Composite Function 0.2 * exp(sin(x^3) + 0.1 * x) and First-Order Approximation",
-                ylabel="Composite Function"
-            )
             
     def test_compute_dynamics(self):
         """Test the compute_dynamics method."""
@@ -1013,28 +1001,6 @@ class TestCertifiedFirstOrderTaylorExpansion:
         expected_constant = np.array([dx_expected, dy_expected])
 
         assert np.allclose(result.linear_approximation[1], expected_constant)
-
-        # Optional plotting for visualization
-        if os.getenv("PLOT_TESTS", "0") == "1":
-            x_test = np.linspace(domain[0], domain[1], 1000).T  # Multidimensional test points
-            dynamics_x = np.array([
-                -x_test[1] - 1.5 * x_test[0]**2 - 0.5 * x_test[0]**3 - 0.1,
-                3 * x_test[0] - x_test[1]
-            ])
-            approx_function = (
-                result.linear_approximation[1] +
-                result.linear_approximation[0].dot((x_test - expansion_point).T).T
-            )
-            self.plot_taylor_approximation(
-                x_test=x_test.flatten(),
-                true_values=dynamics_x.flatten(),
-                approx_function=approx_function.flatten(),
-                approx_with_remainder_lower=None,  # Multidimensional plotting may omit bounds
-                approx_with_remainder_upper=None,
-                expansion_point=expansion_point,  # Use mean for visualization
-                title="Dynamics Function and First-Order Approximation",
-                ylabel="Dynamics"
-            )
             
     def plot_taylor_approximation(self, x_test, true_values, approx_function, approx_with_remainder_lower, approx_with_remainder_upper, expansion_point, title, ylabel):
         """
@@ -1052,20 +1018,12 @@ class TestCertifiedFirstOrderTaylorExpansion:
         """
         import matplotlib.pyplot as plt
 
-        if x_test.ndim == 1:  # 1D case
+        if x_test.shape[1] == 1:  # 1D case
             plt.figure(figsize=(8, 6))
             plt.plot(x_test, true_values, label="True Function", color="blue")
             plt.plot(x_test, approx_with_remainder_lower, label="Lower Bound", linestyle="--", color="green")
             plt.plot(x_test, approx_with_remainder_upper, label="Upper Bound", linestyle="--", color="red")
             plt.plot(x_test, approx_function, label="Approximation", linestyle=":", color="orange")
-            plt.fill_between(
-                x_test,
-                approx_with_remainder_lower,
-                approx_with_remainder_upper,
-                color="gray",
-                alpha=0.2,
-                label="Remainder Bounds"
-            )
             plt.axvline(expansion_point.item(), color="black", linestyle=":", label="Expansion Point")
             plt.title(title)
             plt.xlabel("x")
@@ -1074,7 +1032,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
             plt.grid(True)
             plt.show()
 
-        elif x_test.ndim == 2 and x_test.shape[1] == 2:  # 2D case
+        elif x_test.shape[1] == 2:  # 2D case
             fig, ax = plt.subplots(1, 2, figsize=(12, 6))
             for i in range(2):
                 ax[i].plot(x_test[:, i], true_values[:, i], label="True Function", color="blue")
@@ -1114,14 +1072,14 @@ class TestCertifiedFirstOrderTaylorExpansion:
             Tuple of (approx_with_remainder_lower, approx_with_remainder_upper).
         """
         approx_with_remainder_lower = (
-            result.linear_approximation[1].reshape(-1, 1) +
-            result.linear_approximation[0].dot((x_test - expansion_point).T) +
-            result.remainder[0].reshape(-1, 1)
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - expansion_point).T).T +
+            result.remainder[0]
         )
         approx_with_remainder_upper = (
-            result.linear_approximation[1].reshape(-1, 1) +
-            result.linear_approximation[0].dot((x_test - expansion_point).T) +
-            result.remainder[1].reshape(-1, 1)
+            result.linear_approximation[1] +
+            result.linear_approximation[0].dot((x_test - expansion_point).T).T +
+            result.remainder[1]
         )
         return approx_with_remainder_lower, approx_with_remainder_upper
 
