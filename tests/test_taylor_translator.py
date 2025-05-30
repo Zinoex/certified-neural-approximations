@@ -8,9 +8,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from certified_neural_approximations.translators.taylor_translator import (
     CertifiedFirstOrderTaylorExpansion,
-    TaylorTranslator,
-    max_monomial_vectorized
+    TaylorTranslator
 )
+from certified_neural_approximations.translators.numpy_translator import NumpyTranslator
 
 class TestCertifiedFirstOrderTaylorExpansion:
     def setup_method(self):
@@ -512,7 +512,11 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
 
         # Verify that the first-order approximation with the remainder term contains sin(x) on the interval
-        x_test = np.linspace(domain[0], domain[1], 1000)  # Multidimensional test points
+        n_points = 64  # Use fewer points for efficiency
+        x1_range = np.linspace(result_multi.domain[0][0], result_multi.domain[1][0], n_points)
+        x2_range = np.linspace(result_multi.domain[0][1], result_multi.domain[1][1], n_points)
+        X1, X2 = np.meshgrid(x1_range, x2_range)
+        x_test = np.column_stack([X1.ravel(), X2.ravel()])
         sin_x = np.sin(x_test)  # True sine values
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result_multi, x_test, expansion_point
@@ -597,7 +601,11 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
 
         # Verify that the first-order approximation with the remainder term contains cos(x) on the interval
-        x_test = np.linspace(domain[0], domain[1], 1000)  # Multidimensional test points
+        n_points = 64  # Use fewer points for efficiency
+        x1_range = np.linspace(result_multi.domain[0][0], result_multi.domain[1][0], n_points)
+        x2_range = np.linspace(result_multi.domain[0][1], result_multi.domain[1][1], n_points)
+        X1, X2 = np.meshgrid(x1_range, x2_range)
+        x_test = np.column_stack([X1.ravel(), X2.ravel()])
         cos_x = np.cos(x_test)  # True cosine values
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result_multi, x_test, expansion_point
@@ -648,7 +656,11 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
 
         # Verify that the first-order approximation with the remainder term contains exp(x) on the interval
-        x_test = np.linspace(domain[0], domain[1], 1000)  # Ensure x_test is a column vector
+        n_points = 64  # Use fewer points for efficiency
+        x1_range = np.linspace(result_multi.domain[0][0], result_multi.domain[1][0], n_points)
+        x2_range = np.linspace(result_multi.domain[0][1], result_multi.domain[1][1], n_points)
+        X1, X2 = np.meshgrid(x1_range, x2_range)
+        x_test = np.column_stack([X1.ravel(), X2.ravel()])
         exp_x = np.exp(x_test)  # True exponential values, flattened for comparison
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result_multi, x_test, expansion_point
@@ -719,7 +731,11 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
 
         # Verify that the first-order approximation with the remainder term contains log(x) on the interval
-        x_test = np.linspace(domain[0], domain[1], 1000)  # Multidimensional test points
+        n_points = 64  # Use fewer points for efficiency
+        x1_range = np.linspace(result_multi.domain[0][0], result_multi.domain[1][0], n_points)
+        x2_range = np.linspace(result_multi.domain[0][1], result_multi.domain[1][1], n_points)
+        X1, X2 = np.meshgrid(x1_range, x2_range)
+        x_test = np.column_stack([X1.ravel(), X2.ravel()])
         log_x = np.log(x_test)  # True logarithm values
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result_multi, x_test, expansion_point
@@ -771,7 +787,11 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
 
         # Verify that the first-order approximation with the remainder term contains sqrt(x) on the interval
-        x_test = np.linspace(domain[0], domain[1], 1000)  # Multidimensional test points
+        n_points = 64  # Use fewer points for efficiency
+        x1_range = np.linspace(result_multi.domain[0][0], result_multi.domain[1][0], n_points)
+        x2_range = np.linspace(result_multi.domain[0][1], result_multi.domain[1][1], n_points)
+        X1, X2 = np.meshgrid(x1_range, x2_range)
+        x_test = np.column_stack([X1.ravel(), X2.ravel()])
         sqrt_x = np.sqrt(x_test)  # True square root values
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result_multi, x_test, expansion_point
@@ -842,7 +862,11 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.allclose(result_multi.linear_approximation[0], expected_jacobian_multi)
 
         # Verify that the first-order approximation with the remainder term contains x^3 on the interval
-        x_test = np.linspace(domain[0], domain[1], 1000)  # Multidimensional test points
+        n_points = 64  # Use fewer points for efficiency
+        x1_range = np.linspace(result_multi.domain[0][0], result_multi.domain[1][0], n_points)
+        x2_range = np.linspace(result_multi.domain[0][1], result_multi.domain[1][1], n_points)
+        X1, X2 = np.meshgrid(x1_range, x2_range)
+        x_test = np.column_stack([X1.ravel(), X2.ravel()])
         pow_x = np.power(x_test, exponent)  # True power values
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             result_multi, x_test, expansion_point
@@ -931,8 +955,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert te_final.remainder[1] is not None
 
         # Verify that the first-order approximation with the remainder term contains the composite function on the interval
-        x_test = np.linspace(te_x.domain[0], te_x.domain[1], 1000).reshape(-1, 1)  # Ensure x_test is a column vector
-        composite_x = 0.2 * np.exp(np.sin(np.power(x_test, 3)) + 0.1 * x_test).flatten()  # True composite function values
+        x_test = np.linspace(te_x.domain[0], te_x.domain[1], 1000)  # Ensure x_test is a column vector
+        composite_x = 0.2 * np.exp(np.sin(np.power(x_test, 3)) + 0.1 * x_test)  # True composite function values
         approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
             te_final, x_test, te_x.expansion_point
         )
@@ -949,9 +973,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
         )
 
         assert np.allclose(te_final.linear_approximation[1], expected_constant_manual)
-        assert np.allclose(te_final.linear_approximation[0], expected_jacobian_manual.reshape(-1, 1))
-
-            
+        assert np.allclose(te_final.linear_approximation[0], expected_jacobian_manual)
+           
     def test_compute_dynamics(self):
         """Test the compute_dynamics method."""
         def compute_dynamics(x, translator):
@@ -962,8 +985,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
             return translator.stack([dx, dy])
 
         # Define the input Taylor expansion for x
-        expansion_point = np.array([0.1, 0.2])
         domain = (np.array([-0.5, -0.5]), np.array([0.5, 0.5]))
+        expansion_point = (domain[1] + domain[0]) / 2
         x = CertifiedFirstOrderTaylorExpansion(
             expansion_point=expansion_point,
             domain=domain
@@ -990,6 +1013,38 @@ class TestCertifiedFirstOrderTaylorExpansion:
         expected_constant = np.array([dx_expected, dy_expected])
 
         assert np.allclose(result.linear_approximation[1], expected_constant)
+
+        # Test function approximation over domain using meshgrid for proper 2D sampling
+        n_points = 64  # Use fewer points for efficiency
+        x1_range = np.linspace(result.domain[0][0], result.domain[1][0], n_points)
+        x2_range = np.linspace(result.domain[0][1], result.domain[1][1], n_points)
+        X1, X2 = np.meshgrid(x1_range, x2_range)
+        x_test = np.column_stack([X1.ravel(), X2.ravel()])
+        
+        f_x = compute_dynamics(x_test.T, NumpyTranslator()).T
+        approx_with_remainder_lower, approx_with_remainder_upper = self.compute_approximation_bounds(
+            result, x_test, result.expansion_point
+        )
+
+        PLOT_TESTS = False
+        if PLOT_TESTS:
+            approx_function = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - result.expansion_point).T).T
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test,
+                true_values=f_x,
+                approx_function=approx_function,
+                approx_with_remainder_lower=approx_with_remainder_lower,
+                approx_with_remainder_upper=approx_with_remainder_upper,
+                expansion_point=expansion_point,
+                title=f"Dynamics Function and First-Order Approximation",
+                ylabel="f(x)"
+            )
+
+        assert np.all(f_x >= approx_with_remainder_lower)
+        assert np.all(f_x <= approx_with_remainder_upper)
             
     def plot_taylor_approximation(self, x_test, true_values, approx_function, approx_with_remainder_lower, approx_with_remainder_upper, expansion_point, title, ylabel):
         """
@@ -1006,8 +1061,9 @@ class TestCertifiedFirstOrderTaylorExpansion:
             ylabel (str): Label for the y-axis.
         """
         import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
 
-        if x_test.shape[1] == 1:  # 1D case
+        if x_test.shape[1] == 1 and true_values.shape[1]==1:  # 1D case
             plt.figure(figsize=(8, 6))
             plt.plot(x_test, true_values, label="True Function", color="blue")
             plt.plot(x_test, approx_with_remainder_lower, label="Lower Bound", linestyle="--", color="green")
@@ -1021,27 +1077,29 @@ class TestCertifiedFirstOrderTaylorExpansion:
             plt.grid(True)
             plt.show()
 
-        elif x_test.shape[1] == 2:  # 2D case
-            fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-            for i in range(2):
-                ax[i].plot(x_test[:, i], true_values[:, i], label="True Function", color="blue")
-                ax[i].plot(x_test[:, i], approx_with_remainder_lower[:, i], label="Lower Bound", linestyle="--", color="green")
-                ax[i].plot(x_test[:, i], approx_with_remainder_upper[:, i], label="Upper Bound", linestyle="--", color="red")
-                ax[i].plot(x_test[:, i], approx_function[:, i], label="Approximation", linestyle=":", color="orange")
-                ax[i].fill_between(
-                    x_test[:, i],
-                    approx_with_remainder_lower[:, i],
-                    approx_with_remainder_upper[:, i],
-                    color="gray",
-                    alpha=0.2,
-                    label="Remainder Bounds"
-                )
-                ax[i].axvline(expansion_point[i], color="black", linestyle=":", label="Expansion Point")
-                ax[i].set_title(f"{title} (Dimension {i + 1})")
-                ax[i].set_xlabel(f"x[{i}]")
-                ax[i].set_ylabel(ylabel)
-                ax[i].legend()
-                ax[i].grid(True)
+        elif x_test.shape[1] == 2 and true_values.shape[1]==2:  # 2D case - create 3D scatter plots
+            fig = plt.figure(figsize=(15, 6))
+            
+            for i in range(2):  # For each output dimension
+                ax = fig.add_subplot(1, 2, i+1, projection='3d')
+                
+                # Use scatter plots for irregular grids
+                ax.scatter(x_test[:, 0], x_test[:, 1], true_values[:, i], alpha=0.7, color='blue', label='True Function', s=1)
+                ax.scatter(x_test[:, 0], x_test[:, 1], approx_function[:, i], alpha=0.5, color='orange', label='Approximation', s=1)
+                ax.scatter(x_test[:, 0], x_test[:, 1], approx_with_remainder_lower[:, i], alpha=0.3, color='green', label='Lower Bound', s=1)
+                ax.scatter(x_test[:, 0], x_test[:, 1], approx_with_remainder_upper[:, i], alpha=0.3, color='red', label='Upper Bound', s=1)
+                
+                # Mark expansion point
+                ax.scatter(expansion_point[0], expansion_point[1], 
+                          true_values[np.argmin(np.sum((x_test - expansion_point)**2, axis=1)), i],
+                          color='black', s=100, label='Expansion Point')
+                
+                ax.set_title(f"{title} - Output {i+1}")
+                ax.set_xlabel("x₁")
+                ax.set_ylabel("x₂") 
+                ax.set_zlabel(f"{ylabel}[{i}]")
+                ax.legend()
+                
             plt.tight_layout()
             plt.show()
 
