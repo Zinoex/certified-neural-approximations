@@ -326,10 +326,10 @@ class CertifiedFirstOrderTaylorExpansion:
         Index into a Taylor expansion to extract specific components.
         
         Args:
-            key (int): Index of the component to extract
+            key (int or slice): Index or slice of the components to extract
             
         Returns:
-            CertifiedFirstOrderTaylorExpansion: Single-component Taylor expansion
+            CertifiedFirstOrderTaylorExpansion: Single-component or multi-component Taylor expansion
         """
         if isinstance(key, int):
             idx_slice = slice(key, key + 1)
@@ -343,7 +343,19 @@ class CertifiedFirstOrderTaylorExpansion:
                 linear_approximation=(new_df_c, new_f_c),
                 remainder=(new_remainder_lower, new_remainder_upper)
             )
-        raise TypeError(f"CertifiedFirstOrderTaylorExpansion indices must be integers, not {type(key)}")
+        elif isinstance(key, slice):
+            new_df_c = self.linear_approximation[0][key]
+            new_f_c = self.linear_approximation[1][key]
+            new_remainder_lower = self.remainder[0][key]
+            new_remainder_upper = self.remainder[1][key]
+            return CertifiedFirstOrderTaylorExpansion(
+                expansion_point=self.expansion_point,
+                domain=self.domain,
+                linear_approximation=(new_df_c, new_f_c),
+                remainder=(new_remainder_lower, new_remainder_upper)
+            )
+        else:
+            raise TypeError(f"CertifiedFirstOrderTaylorExpansion indices must be integers or slices, not {type(key)}")
 
     def range(self):
         """
