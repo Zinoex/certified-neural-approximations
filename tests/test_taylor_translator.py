@@ -1111,44 +1111,6 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.all(f_x >= approx_with_remainder_lower), "True function values should be above lower bound"
         assert np.all(f_x <= approx_with_remainder_upper), "True function values should be below upper bound"
 
-        # Optional plotting for visualization
-        PLOT_TESTS = False
-        if PLOT_TESTS:
-            # For visualization, we can plot a 2D slice by fixing other dimensions
-            # Fix all but the first two dimensions to their expansion point values
-            fixed_dims = expansion_point[2:]
-            n_points_2d = 32
-            x1_range = np.linspace(domain[0][0], domain[1][0], n_points_2d)
-            x2_range = np.linspace(domain[0][1], domain[1][1], n_points_2d)
-            X1, X2 = np.meshgrid(x1_range, x2_range)
-            
-            # Create test points for 2D slice
-            x_test_2d = np.zeros((n_points_2d**2, len(expansion_point)))
-            x_test_2d[:, 0] = X1.ravel()
-            x_test_2d[:, 1] = X2.ravel()
-            x_test_2d[:, 2:] = fixed_dims
-            
-            # Compute approximation and bounds for 2D slice
-            f_x_2d = quadcopter.compute_dynamics(x_test_2d.T, NumpyTranslator()).T
-            approx_with_remainder_lower_2d, approx_with_remainder_upper_2d = self.compute_approximation_bounds(
-                result, x_test_2d, result.expansion_point
-            )
-            approx_function_2d = (
-                result.linear_approximation[1] +
-                result.linear_approximation[0].dot((x_test_2d - result.expansion_point).T).T
-            )
-            
-            self.plot_taylor_approximation(
-                x_test=x_test_2d[:, :2],  # Only plot first 2 dimensions
-                true_values=f_x_2d,
-                approx_function=approx_function_2d,
-                approx_with_remainder_lower=approx_with_remainder_lower_2d,
-                approx_with_remainder_upper=approx_with_remainder_upper_2d,
-                expansion_point=expansion_point[:2],
-                title="Quadcopter Dynamics (2D slice: omega_x vs omega_y)",
-                ylabel="Angular Acceleration"
-            )
-
     def plot_taylor_approximation(self, x_test, true_values, approx_function, approx_with_remainder_lower, approx_with_remainder_upper, expansion_point, title, ylabel):
         """
         Helper function to plot Taylor approximation and bounds for 1D and 2D cases.
