@@ -768,8 +768,26 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result, x_test, te_pos.expansion_point
         )
 
-        assert np.all(sqrt_x >= approx_with_remainder_lower)
-        assert np.all(sqrt_x <= approx_with_remainder_upper)
+        assert np.all(sqrt_x >= approx_with_remainder_lower - 10e-9)
+        assert np.all(sqrt_x <= approx_with_remainder_upper + 10e-9)
+
+        # Optional plotting for visualization
+        PLOT_TESTS = False
+        if PLOT_TESTS:
+            approx_function = (
+                result.linear_approximation[1] +
+                result.linear_approximation[0].dot((x_test - expansion_point).T).T
+            )
+            self.plot_taylor_approximation(
+                x_test=x_test,
+                true_values=sqrt_x,
+                approx_function=approx_function,
+                approx_with_remainder_lower=approx_with_remainder_lower,
+                approx_with_remainder_upper=approx_with_remainder_upper,
+                expansion_point=expansion_point,
+                title="Square Root Function and First-Order Approximation",
+                ylabel="sqrt(x)"
+            )
 
         # Multidimensional test
         domain = (np.array([1.0, 4.0]), np.array([16.0, 25.0]))

@@ -711,23 +711,29 @@ class TaylorTranslator:
         if np.any(range_lower < 0):
             raise ValueError("Square root domain error: range[0] must be non-negative")
 
-        # Compute the second derivative bounds for sqrt(x): f''(x) = -1/(4 * x^(3/2))
-        second_derivative_lower = -1 / (4 * np.power(range_lower, 1.5))
-        second_derivative_upper = -1 / (4 * np.power(range_upper, 1.5))
-
-        # Ensure valid bounds
-        second_derivative_lower = np.minimum(second_derivative_lower, 0)
-        second_derivative_upper = np.maximum(second_derivative_upper, 0)
-
-        # Compute the maximum deviation from the expansion point
-        max_deviation = np.maximum(
-            np.abs(range_lower - a.expansion_point),
-            np.abs(range_upper - a.expansion_point)
-        )
-
-        # Compute the remainder bounds using the second derivative
-        remainder_lower = (second_derivative_lower / 2) * max_deviation**2
-        remainder_upper = (second_derivative_upper / 2) * max_deviation**2
+        # Handle edge case when range_lower is exactly 0
+        # When range_lower = 0, the second derivative at 0 is infinite, but we can still bound the remainder
+        safe_range_lower = np.maximum(range_lower, 1e-12)  # Avoid division by zero
+        
+        # Use monotonicity: sqrt is concave, so linear approximation is always above the true function
+        # This means the remainder is always non-positive
+        linear_at_lower = sqrt_y0 + grad_y0 * (range_lower - y0)
+        linear_at_upper = sqrt_y0 + grad_y0 * (range_upper - y0)
+        
+        true_at_lower = np.sqrt(range_lower)
+        true_at_upper = np.sqrt(range_upper)
+        
+        # Since sqrt is concave (second derivative negative), linear approximation overestimates
+        # So remainder = true_value - linear_approximation ≤ 0
+        remainder_at_lower = true_at_lower - linear_at_lower
+        remainder_at_upper = true_at_upper - linear_at_upper
+        
+        # The remainder bounds are always non-positive due to concavity
+        remainder_lower = np.minimum(remainder_at_lower, remainder_at_upper)
+        remainder_upper = np.maximum(remainder_at_lower, remainder_at_upper)
+        
+        # Ensure upper bound is never positive (due to concavity)
+        remainder_upper = np.maximum(remainder_upper, 0.0)
 
         # Propagate the remainder through the derivative
         prop_rem_lower, prop_rem_upper = a.remainder
@@ -737,7 +743,7 @@ class TaylorTranslator:
         propagated_rem_lower = np.minimum(term1_rem, term2_rem)
         propagated_rem_upper = np.maximum(term1_rem, term2_rem)
 
-        # Combine propagated and second derivative remainders
+        # Combine propagated and local remainders
         final_rem_lower = propagated_rem_lower + remainder_lower
         final_rem_upper = propagated_rem_upper + remainder_upper
 
