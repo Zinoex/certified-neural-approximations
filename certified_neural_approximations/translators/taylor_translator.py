@@ -771,7 +771,8 @@ class TaylorTranslator:
         linear_at_upper = cbrt_y0 + grad_y0 * (range_upper - y0)
         
         # Handle zero values element-wise for multidimensional case
-        true_at_lower = np.where(range_lower == 0, np.zeros_like(range_lower), np.pow(range_lower, 1/3))
+        range_lower = np.maximum(range_lower, 0)  # Ensure non-negative for cbrt
+        true_at_lower = np.pow(range_lower, 1/3)
         true_at_upper = np.pow(range_upper, 1/3)
         
         # Remainder = true_value - linear_approximation
