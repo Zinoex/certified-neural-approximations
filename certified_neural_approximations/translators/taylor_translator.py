@@ -623,8 +623,8 @@ class TaylorTranslator:
         local_remainder = (
             np.zeros_like(np.exp(range[0])),
             np.maximum(
-                np.exp(range[0]) - (exp_y0 + exp_y0 * (a.linear_approximation[0] @ (range[0] - y0))),
-                np.exp(range[1]) - (exp_y0 + exp_y0 * (a.linear_approximation[0] @ (range[1] - y0)))
+                np.exp(range[0]) - (exp_y0 * (1 - y0) + exp_y0 * range[0]),
+                np.exp(range[1]) - (exp_y0 * (1 - y0) + exp_y0 * range[1])
             )
         )
 
