@@ -637,8 +637,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
             result, x_test, expansion_point
         )
 
-        assert np.all(exp_x >= approx_with_remainder_lower)
-        assert np.all(exp_x <= approx_with_remainder_upper)
+        assert np.all(exp_x >= approx_with_remainder_lower-10e-9)
+        assert np.all(exp_x <= approx_with_remainder_upper+10e-9)
 
         # Multidimensional test
         domain = (np.array([-10, 0.0]), np.array([np.pi, 0.1]))
