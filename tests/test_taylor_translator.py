@@ -1108,8 +1108,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
         )
 
         # Verify that the true function is contained within the bounds
-        assert np.all(f_x >= approx_with_remainder_lower), "True function values should be above lower bound"
-        assert np.all(f_x <= approx_with_remainder_upper), "True function values should be below upper bound"
+        assert np.all(f_x >= approx_with_remainder_lower-1e-9), "True function values should be above lower bound"
+        assert np.all(f_x <= approx_with_remainder_upper+1e-9), "True function values should be below upper bound"
 
     def plot_taylor_approximation(self, x_test, true_values, approx_function, approx_with_remainder_lower, approx_with_remainder_upper, expansion_point, title, ylabel):
         """

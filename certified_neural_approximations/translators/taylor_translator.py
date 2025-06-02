@@ -845,6 +845,16 @@ class TaylorTranslator:
         :param xs: list of certified taylor expansions
         :return: CertifiedFirstOrderTaylorExpansion
         """
+        # Assert that all expansion points are the same
+        for i, x in enumerate(xs):
+            assert np.array_equal(x.expansion_point, xs[0].expansion_point), \
+                f"Expansion point mismatch at index {i}: {x.expansion_point} != {xs[0].expansion_point}"
+        
+        # Assert that all domains are the same
+        for i, x in enumerate(xs):
+            assert np.array_equal(x.domain[0], xs[0].domain[0]) and np.array_equal(x.domain[1], xs[0].domain[1]), \
+                f"Domain mismatch at index {i}: {x.domain} != {xs[0].domain}"
+        
         return CertifiedFirstOrderTaylorExpansion(
             xs[0].expansion_point,
             xs[0].domain,
