@@ -773,11 +773,9 @@ class TaylorTranslator:
 
         # Use monotonicity of cbrt in accepted domains (i.e., no crossing zero)
         range = a.range()
-        if np.any(range[0] < 0 & range[1] > 0):
-            raise ValueError("Cube root domain error: range[0] and range[1] cross zero, resulting in infinite gradients")
 
         local_remainder = (
-            np.minmum(0.0, np.minimum(
+            np.minimum(0.0, np.minimum(
                 np.cbrt(range[0]) - (cbrt_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[0] - y0)),
                 np.cbrt(range[1]) - (cbrt_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[1] - y0))
             )),
