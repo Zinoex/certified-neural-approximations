@@ -1129,6 +1129,63 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert np.all(f_x >= approx_with_remainder_lower-1e-9), "True function values should be above lower bound"
         assert np.all(f_x <= approx_with_remainder_upper+1e-9), "True function values should be below upper bound"
 
+    def test_cbrt(self):
+        """Test cube root function."""
+        # Test positive domain
+        domain_pos = (np.array([1.0]), np.array([8.0]))
+        expansion_point_pos = (domain_pos[1] + domain_pos[0]) / 2
+        te_pos = CertifiedFirstOrderTaylorExpansion(
+            expansion_point_pos, domain_pos
+        )
+        
+        result_pos = self.translator.cbrt(te_pos)
+        
+        expected_constant_pos = np.pow(expansion_point_pos, 1/3)
+        expected_jacobian_pos = ((1/3) * np.pow(expansion_point_pos, -2/3)).reshape(-1, 1) * te_pos.linear_approximation[0]
+        
+        assert np.allclose(result_pos.linear_approximation[1], expected_constant_pos)
+        assert np.allclose(result_pos.linear_approximation[0], expected_jacobian_pos)
+
+        # Verify that the first-order approximation with the remainder term contains cbrt(x) on the positive interval
+        x_test_pos = np.linspace(te_pos.domain[0], te_pos.domain[1], 1000)
+        cbrt_x_pos = np.pow(x_test_pos, 1/3)
+        approx_with_remainder_lower_pos, approx_with_remainder_upper_pos = self.compute_approximation_bounds(
+            result_pos, x_test_pos, te_pos.expansion_point
+        )
+
+        assert np.all(cbrt_x_pos >= approx_with_remainder_lower_pos - 10e-9)
+        assert np.all(cbrt_x_pos <= approx_with_remainder_upper_pos + 10e-9)
+
+        # Multidimensional test - positive domain
+        domain_multi_pos = (np.array([1.0, 8.0]), np.array([8.0, 27.0]))
+        expansion_point_multi_pos = (domain_multi_pos[1] + domain_multi_pos[0]) / 2
+        te_multi_pos = CertifiedFirstOrderTaylorExpansion(
+            expansion_point=expansion_point_multi_pos,
+            domain=domain_multi_pos
+        )
+
+        result_multi_pos = self.translator.cbrt(te_multi_pos)
+
+        expected_constant_multi_pos = np.pow(expansion_point_multi_pos, 1/3)
+        expected_jacobian_multi_pos = ((1/3) * np.pow(expansion_point_multi_pos, -2/3)).reshape(-1, 1) * te_multi_pos.linear_approximation[0]
+
+        assert np.allclose(result_multi_pos.linear_approximation[1], expected_constant_multi_pos)
+        assert np.allclose(result_multi_pos.linear_approximation[0], expected_jacobian_multi_pos)
+
+        # Verify that the first-order approximation with the remainder term contains cbrt(x) on the interval
+        n_points = 64  # Use fewer points for efficiency
+        x1_range = np.linspace(result_multi_pos.domain[0][0], result_multi_pos.domain[1][0], n_points)
+        x2_range = np.linspace(result_multi_pos.domain[0][1], result_multi_pos.domain[1][1], n_points)
+        X1, X2 = np.meshgrid(x1_range, x2_range)
+        x_test_multi = np.column_stack([X1.ravel(), X2.ravel()])
+        cbrt_x_multi = np.pow(x_test_multi, 1/3)
+        approx_with_remainder_lower_multi, approx_with_remainder_upper_multi = self.compute_approximation_bounds(
+            result_multi_pos, x_test_multi, expansion_point_multi_pos
+        )
+
+        assert np.all(cbrt_x_multi >= approx_with_remainder_lower_multi)
+        assert np.all(cbrt_x_multi <= approx_with_remainder_upper_multi)
+        
     def plot_taylor_approximation(self, x_test, true_values, approx_function, approx_with_remainder_lower, approx_with_remainder_upper, expansion_point, title, ylabel):
         """
         Helper function to plot Taylor approximation and bounds for 1D and 2D cases.

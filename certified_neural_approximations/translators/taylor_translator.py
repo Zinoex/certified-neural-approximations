@@ -710,17 +710,14 @@ class TaylorTranslator:
         range_lower, range_upper = a.range()
         if np.any(range_lower < 0):
             raise ValueError("Square root domain error: range[0] must be non-negative")
-
-        # Handle edge case when range_lower is exactly 0
-        # When range_lower = 0, the second derivative at 0 is infinite, but we can still bound the remainder
-        safe_range_lower = np.maximum(range_lower, 1e-12)  # Avoid division by zero
         
         # Use monotonicity: sqrt is concave, so linear approximation is always above the true function
         # This means the remainder is always non-positive
         linear_at_lower = sqrt_y0 + grad_y0 * (range_lower - y0)
         linear_at_upper = sqrt_y0 + grad_y0 * (range_upper - y0)
         
-        true_at_lower = np.sqrt(range_lower)
+        # Handle zero values element-wise for multidimensional case
+        true_at_lower = np.where(range_lower == 0, np.zeros_like(range_lower), np.sqrt(range_lower))
         true_at_upper = np.sqrt(range_upper)
         
         # Since sqrt is concave (second derivative negative), linear approximation overestimates
@@ -760,33 +757,47 @@ class TaylorTranslator:
         :param a: CertifiedFirstOrderTaylorExpansion
         :return: CertifiedFirstOrderTaylorExpansion
         """
-        # Incoming Taylor approximation: y = f(x0) + Df(x0) @ (x - x0) + R
-        # Local Taylor expansion of cbrt(y): cbrt(y0) + (1/3) / (x^(2/3)) .* (y - y0) + T where y0 = f(x0)
-        # Substituting: log(y0) + 1/y0 .* (y0 + Df(x0) @ (x - x0) + R - y0) + T
-        # Rearranging:  log(y0) + 1/y0 .* Df(x0) @ (x - x0) + 1/y0 .* R + T
-
         y0 = a.linear_approximation[1]
         cbrt_y0 = np.pow(y0, 1/3)
         grad_y0 = (1/3) * np.pow(y0, -2/3)
 
         linear_term = grad_y0.reshape(grad_y0.shape[0], 1) * a.linear_approximation[0]
 
-        # Use monotonicity of cbrt in accepted domains (i.e., no crossing zero)
-        range = a.range()
+        # Use concavity/convexity properties of cbrt
+        range_lower, range_upper = a.range()
 
-        local_remainder = (
-            np.minimum(0.0, np.minimum(
-                np.cbrt(range[0]) - (cbrt_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[0] - y0)),
-                np.cbrt(range[1]) - (cbrt_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[1] - y0))
-            )),
-            np.maximum(0.0, np.maximum(
-                np.cbrt(range[0]) - (cbrt_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[0] - y0)),
-                np.cbrt(range[1]) - (cbrt_y0 + grad_y0.reshape(grad_y0.shape[0], 1) * (range[1] - y0))
-            ))
-        )
+        # Compute linear approximation at endpoints
+        linear_at_lower = cbrt_y0 + grad_y0 * (range_lower - y0)
+        linear_at_upper = cbrt_y0 + grad_y0 * (range_upper - y0)
+        
+        # Handle zero values element-wise for multidimensional case
+        true_at_lower = np.where(range_lower == 0, np.zeros_like(range_lower), np.pow(range_lower, 1/3))
+        true_at_upper = np.pow(range_upper, 1/3)
+        
+        # Remainder = true_value - linear_approximation
+        remainder_at_lower = true_at_lower - linear_at_lower
+        remainder_at_upper = true_at_upper - linear_at_upper
+        
+        # The remainder bounds are always non-positive due to concavity
+        remainder_lower = np.minimum(remainder_at_lower, remainder_at_upper)
+        remainder_upper = np.maximum(remainder_at_lower, remainder_at_upper)
+        
+        # Ensure upper bound is never positive (due to concavity)
+        remainder_upper = np.maximum(remainder_upper, 0.0)
 
-        remainder1, remainder2 = grad_y0 * a.remainder[0], grad_y0 * a.remainder[1]
-        remainder = np.minimum(remainder1, remainder2) + local_remainder[0], np.maximum(remainder1, remainder2) + local_remainder[1]
+        # Propagate the remainder through the derivative
+        prop_rem_lower, prop_rem_upper = a.remainder
+        term1_rem = grad_y0 * prop_rem_lower
+        term2_rem = grad_y0 * prop_rem_upper
+
+        propagated_rem_lower = np.minimum(term1_rem, term2_rem)
+        propagated_rem_upper = np.maximum(term1_rem, term2_rem)
+
+        # Combine propagated and local remainders
+        final_rem_lower = propagated_rem_lower + remainder_lower
+        final_rem_upper = propagated_rem_upper + remainder_upper
+
+        remainder = (final_rem_lower, final_rem_upper)
 
         return CertifiedFirstOrderTaylorExpansion(
             a.expansion_point,
