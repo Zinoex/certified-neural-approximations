@@ -1381,6 +1381,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
         
         for i, (min_val, max_val) in enumerate(system.input_domain):
             # Use center of domain as expansion point
+            if hasattr(system, 'delta'):
+                max_val = min_val + system.delta[i]
             center = (min_val + max_val) / 2
             expansion_point.append(center)
             
