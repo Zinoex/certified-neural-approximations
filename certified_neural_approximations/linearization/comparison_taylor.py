@@ -63,7 +63,9 @@ class ComparisonTaylorLinearization:
             python_result = self.python_linearizer.linearize_sample(sample)
             
             comparison = self._compare_results(julia_result, python_result, sample, 0)
-            
+            if not comparison["within_tolerance"]:
+                if not comparison["julia_in_py"]:
+                    print(f"Python tighter than Julia: {comparison}")
             # Add comparison metadata to the result
             python_result.comparison_metadata = comparison
             
@@ -128,6 +130,13 @@ class ComparisonTaylorLinearization:
                 np.max(A_upper_diff) < self.tolerance and
                 b_upper_diff < self.tolerance and
                 gap_diff < self.tolerance
+            ),
+            'julia_in_py': (
+                np.any(python_A_lower <= julia_A_lower + self.tolerance) and
+                np.any(python_b_lower <= julia_b_lower + self.tolerance) and
+                np.any(python_A_upper >= julia_A_upper - self.tolerance) and
+                np.any(python_b_upper >= julia_b_upper - self.tolerance) and
+                np.any(python_gap >= julia_gap)
             )
         })
         
