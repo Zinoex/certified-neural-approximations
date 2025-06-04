@@ -1106,8 +1106,8 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert result.remainder[0].shape == (2,)
         assert result.remainder[1].shape == (2,)
         
-        # Test that bounds contain true function values
-        self._verify_bounds_contain_true_function(system, te, result)
+        # Test that bounds contain true function values with plotting enabled
+        self._verify_bounds_contain_true_function(system, te, result, plot_results=True)
         
         # Test special property: at equilibrium (0,0), dynamics should be (0, mu)
         te_equilibrium = CertifiedFirstOrderTaylorExpansion(
@@ -1396,14 +1396,11 @@ class TestCertifiedFirstOrderTaylorExpansion:
             domain=(np.array(domain_lower), np.array(domain_upper))
         )
     
-    def _verify_bounds_contain_true_function(self, system, taylor_expansion, taylor_result, n_test_points=None):
+    def _verify_bounds_contain_true_function(self, system, taylor_expansion, taylor_result, n_test_points=None, plot_results=False):
         """Verify that Taylor bounds contain the true function values."""
         # Determine appropriate number of test points based on input dimension
         if n_test_points is None:
             # Use fewer points for high-dimensional systems to avoid computational explosion
-
-
-
             if system.input_dim <= 2:
                 n_test_points = 50
             elif system.input_dim <= 4:
@@ -1456,6 +1453,19 @@ class TestCertifiedFirstOrderTaylorExpansion:
         
         lower_bounds = linear_approx + taylor_result.remainder[0]
         upper_bounds = linear_approx + taylor_result.remainder[1]
+        
+        # Plot results if requested
+        if plot_results:
+            self.plot_taylor_approximation(
+                x_test=x_test,
+                true_values=true_values,
+                approx_function=linear_approx,
+                approx_with_remainder_lower=lower_bounds,
+                approx_with_remainder_upper=upper_bounds,
+                expansion_point=expansion_point,
+                title=f"{system.system_name} Dynamics and Taylor Bounds",
+                ylabel="f(x)"
+            )
         
         # Check containment with tolerance for numerical errors
         tolerance = 1e-6
