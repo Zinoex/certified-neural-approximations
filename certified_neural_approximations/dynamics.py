@@ -785,7 +785,7 @@ class LowThrustSpacecraft(DynamicalSystem):
         self,
         initial_mass = 750.0,  # kg
         exhaust_velocity = 40,  # km/s
-        mu = 3.98600 * 10e5,  # Gravitational parameter for Earth (km^3/s^2)
+        mu = 3.98600e5,  # Gravitational parameter for Earth (km^3/s^2)
         c = 1.0  # Normalization factor Tmax*ρ0/(m0*V0²)
     ):
         super().__init__()
@@ -841,9 +841,9 @@ class LowThrustSpacecraft(DynamicalSystem):
         # Extract state variables
         r = x[0]*1000      # Radial distance (convert to km)
         theta = x[1]       # Azimuthal angle
-        v_r = x[2] * 10e-3  # Radial velocity (convert to km)
-        v_theta = x[3] * 10e-3     # Angular velocity (convert to km)
-        delta_m = x[4]     # Mass decrease due to propellant consumption 
+        v_r = x[2] * 1e-3  # Radial velocity (convert to km)
+        v_theta = x[3] * 1e-3     # Angular velocity (convert to km)
+        delta_m = x[4]     # Mass decrease due to propellant consumption
         thrust_magnitude = x[5]    # Thrust magnitude (normalized) (in N)
         thrust_angle = x[6]        # Thrust angle
         

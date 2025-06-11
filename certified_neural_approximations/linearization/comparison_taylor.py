@@ -126,10 +126,10 @@ class ComparisonTaylorLinearization:
             'gap_diff': gap_diff,
             'within_tolerance': (
                 np.max(A_lower_diff) < self.tolerance and
-                b_lower_diff < self.tolerance and
+                np.max(b_lower_diff) < self.tolerance and
                 np.max(A_upper_diff) < self.tolerance and
-                b_upper_diff < self.tolerance and
-                gap_diff < self.tolerance
+                np.max(b_upper_diff) < self.tolerance and
+                np.max(gap_diff) < self.tolerance
             ),
             'julia_in_py': (
                 np.any(python_A_lower <= julia_A_lower + self.tolerance) and
