@@ -161,79 +161,115 @@ class CertifiedFirstOrderTaylorExpansion:
         1. Propagated remainders: g(c)*R_h + h(c)*R_g
         2. Higher-order terms from (∇g·dx)(∇h·dx)
         3. Cross terms: R_g * R_h
+        4. Cross terms: R_g * J_h(x-c) and R_h * J_g(x-c)
         """
         if isinstance(other, CertifiedFirstOrderTaylorExpansion):
             # Taylor expansion multiplication using product rule
             assert np.allclose(self.expansion_point, other.expansion_point, atol=1e-12), "Expansion points must match for TE * TE"
             assert np.allclose(self.domain[0], other.domain[0], atol=1e-12) and np.allclose(self.domain[1], other.domain[1], atol=1e-12), "Domains must match for TE * TE"
 
-            # Extract components: (Jacobian, constant)
-            J_g, y0_g = self.linear_approximation
-            R_g_low, R_g_high = self.remainder
+            # Extract components for self (g)
+            jacobian_self, const_self = self.linear_approximation
+            remainder_self_low, remainder_self_high = self.remainder
 
-            J_h, y0_h = other.linear_approximation
-            R_h_low, R_h_high = other.remainder
+            # Extract components for other (h)
+            jacobian_other, const_other = other.linear_approximation
+            remainder_other_low, remainder_other_high = other.remainder
             
-            # Ensure arrays are at least 1D for consistent operations
-            y0_g = np.atleast_1d(y0_g)
-            y0_h = np.atleast_1d(y0_h)
+            # Ensure constant terms are at least 1D for consistent operations
+            const_self_1d = np.atleast_1d(const_self)
+            const_other_1d = np.atleast_1d(const_other)
 
-            # Product rule: f(c) = g(c) * h(c)
-            new_const = y0_g * y0_h
+            # Product rule for new constant: f(c) = g(c) * h(c)
+            new_const = const_self_1d * const_other_1d
             
-            # Product rule: ∇f(c) = g(c)∇h(c) + h(c)∇g(c)
-            # Handle broadcasting correctly for element-wise multiplication
-            if len(y0_g.shape) == 1 and len(y0_h.shape) == 1:
+            # Product rule for new Jacobian: ∇f(c) = g(c)∇h(c) + h(c)∇g(c)
+            if len(const_self_1d.shape) == 1 and len(const_other_1d.shape) == 1:
                 # Element-wise case: each output component is independent
-                new_J = np.diag(y0_g) @ J_h + np.diag(y0_h) @ J_g
+                new_jacobian = np.diag(const_self_1d) @ jacobian_other + np.diag(const_other_1d) @ jacobian_self
             else:
-                raise NotImplementedError("General tensor multiplication not yet implemented")
+                raise NotImplementedError("General tensor multiplication not yet implemented for Jacobian calculation")
 
-            # Remainder computation with proper interval arithmetic
-            # Term 1: g(c) * R_h
-            term1_low = np.where(y0_g >= 0, y0_g * R_h_low, y0_g * R_h_high)
-            term1_high = np.where(y0_g >= 0, y0_g * R_h_high, y0_g * R_h_low)
+            # Remainder computation
+            # Term: const_self * Remainder_other
+            const_self_times_rem_other_low = np.where(const_self_1d >= 0, const_self_1d * remainder_other_low, const_self_1d * remainder_other_high)
+            const_self_times_rem_other_high = np.where(const_self_1d >= 0, const_self_1d * remainder_other_high, const_self_1d * remainder_other_low)
             
-            # Term 2: h(c) * R_g  
-            term2_low = np.where(y0_h >= 0, y0_h * R_g_low, y0_h * R_g_high)
-            term2_high = np.where(y0_h >= 0, y0_h * R_g_high, y0_h * R_g_low)
+            # Term: const_other * Remainder_self  
+            const_other_times_rem_self_low = np.where(const_other_1d >= 0, const_other_1d * remainder_self_low, const_other_1d * remainder_self_high)
+            const_other_times_rem_self_high = np.where(const_other_1d >= 0, const_other_1d * remainder_self_high, const_other_1d * remainder_self_low)
 
-            # Term 3: R_g * R_h (cross terms)
-            cross_products = np.array([
-                R_g_low * R_h_low, R_g_low * R_h_high,
-                R_g_high * R_h_low, R_g_high * R_h_high
+            # Term: Remainder_self * Remainder_other
+            rem_self_times_rem_other_products = np.array([
+                remainder_self_low * remainder_other_low, remainder_self_low * remainder_other_high,
+                remainder_self_high * remainder_other_low, remainder_self_high * remainder_other_high
             ])
-            term3_low = np.min(cross_products, axis=0)
-            term3_high = np.max(cross_products, axis=0)
+            rem_self_times_rem_other_low = np.min(rem_self_times_rem_other_products, axis=0)
+            rem_self_times_rem_other_high = np.max(rem_self_times_rem_other_products, axis=0)
 
-            # Higher Order Terms (HOT) from (∇g·dx)(∇h·dx)
+            # Higher Order Terms (HOT) from (Jacobian_self · dx) * (Jacobian_other · dx)
             dx_low = self.domain[0] - self.expansion_point
             dx_high = self.domain[1] - self.expansion_point
 
-            # Compute interval bounds for Jacobian times displacement
-            u_low, u_high = _mat_interval_vec_mul(J_g, dx_low, dx_high)
-            v_low, v_high = _mat_interval_vec_mul(J_h, dx_low, dx_high)
+            # Compute interval bounds for Jacobian_self * dx
+            j_self_times_dx_low, j_self_times_dx_high = _mat_interval_vec_mul(jacobian_self, dx_low, dx_high)
+            j_self_times_dx_low_1d, j_self_times_dx_high_1d = np.atleast_1d(j_self_times_dx_low), np.atleast_1d(j_self_times_dx_high)
             
-            u_low, u_high = np.atleast_1d(u_low), np.atleast_1d(u_high)
-            v_low, v_high = np.atleast_1d(v_low), np.atleast_1d(v_high)
+            # Compute interval bounds for Jacobian_other * dx
+            j_other_times_dx_low, j_other_times_dx_high = _mat_interval_vec_mul(jacobian_other, dx_low, dx_high)
+            j_other_times_dx_low_1d, j_other_times_dx_high_1d = np.atleast_1d(j_other_times_dx_low), np.atleast_1d(j_other_times_dx_high)
 
-            # Interval multiplication for higher-order terms
-            uv_products = np.array([
-                u_low * v_low, u_low * v_high,
-                u_high * v_low, u_high * v_high
+            # Interval multiplication for (Jacobian_self · dx) * (Jacobian_other · dx)
+            hot_jdx_jdx_products = np.array([
+                j_self_times_dx_low_1d * j_other_times_dx_low_1d, j_self_times_dx_low_1d * j_other_times_dx_high_1d,
+                j_self_times_dx_high_1d * j_other_times_dx_low_1d, j_self_times_dx_high_1d * j_other_times_dx_high_1d
             ])
-            hot_low = np.min(uv_products, axis=0)
-            hot_high = np.max(uv_products, axis=0)
+            hot_jdx_jdx_low = np.min(hot_jdx_jdx_products, axis=0)
+            hot_jdx_jdx_high = np.max(hot_jdx_jdx_products, axis=0)
+            
+            # Term: Remainder_self * (Jacobian_other · dx)
+            # Ensure Remainder_self components are at least 1D
+            remainder_self_low_1d = np.atleast_1d(remainder_self_low)
+            remainder_self_high_1d = np.atleast_1d(remainder_self_high)
+
+            rem_self_times_j_other_dx_products = np.array([
+                remainder_self_low_1d * j_other_times_dx_low_1d, remainder_self_low_1d * j_other_times_dx_high_1d,
+                remainder_self_high_1d * j_other_times_dx_low_1d, remainder_self_high_1d * j_other_times_dx_high_1d
+            ])
+            rem_self_times_j_other_dx_low = np.min(rem_self_times_j_other_dx_products, axis=0)
+            rem_self_times_j_other_dx_high = np.max(rem_self_times_j_other_dx_products, axis=0)
+
+            # Term: Remainder_other * (Jacobian_self · dx)
+            # Ensure Remainder_other components are at least 1D
+            remainder_other_low_1d = np.atleast_1d(remainder_other_low)
+            remainder_other_high_1d = np.atleast_1d(remainder_other_high)
+            
+            rem_other_times_j_self_dx_products = np.array([
+                remainder_other_low_1d * j_self_times_dx_low_1d, remainder_other_low_1d * j_self_times_dx_high_1d,
+                remainder_other_high_1d * j_self_times_dx_low_1d, remainder_other_high_1d * j_self_times_dx_high_1d
+            ])
+            rem_other_times_j_self_dx_low = np.min(rem_other_times_j_self_dx_products, axis=0)
+            rem_other_times_j_self_dx_high = np.max(rem_other_times_j_self_dx_products, axis=0)
             
             # Combine all remainder terms
-            final_rem_low = term1_low + term2_low + term3_low + hot_low
-            final_rem_high = term1_high + term2_high + term3_high + hot_high
+            final_remainder_low = (const_self_times_rem_other_low + 
+                                   const_other_times_rem_self_low + 
+                                   rem_self_times_rem_other_low + 
+                                   hot_jdx_jdx_low + 
+                                   rem_self_times_j_other_dx_low + 
+                                   rem_other_times_j_self_dx_low)
+            final_remainder_high = (const_self_times_rem_other_high + 
+                                    const_other_times_rem_self_high + 
+                                    rem_self_times_rem_other_high + 
+                                    hot_jdx_jdx_high + 
+                                    rem_self_times_j_other_dx_high + 
+                                    rem_other_times_j_self_dx_high)
             
             return CertifiedFirstOrderTaylorExpansion(
                 self.expansion_point,
                 self.domain,
-                (new_J, new_const),
-                (final_rem_low, final_rem_high)
+                (new_jacobian, new_const),
+                (final_remainder_low, final_remainder_high)
             )
         elif isinstance(other, (int, float, np.number)):
             # Scalar multiplication: scales all terms
@@ -298,19 +334,18 @@ class CertifiedFirstOrderTaylorExpansion:
         propagated_rem_upper = np.maximum(prop_rem_term1, prop_rem_term2)        # Second-order remainder: g''(y) = 2/y³, so Lagrange remainder involves max |2/η³|
         coeff_f_double_prime = 2.0
         exponent_f_double_prime = -3
-        M_g_double_prime_factor = max_monomial_vectorized(coeff_f_double_prime, exponent_f_double_prime, (a_range_lower, a_range_upper))
+        # Compute actual min and max of the second derivative 2/y^3 over the range of y
+        M_min_g_double_prime = min_monomial_vectorized(coeff_f_double_prime, exponent_f_double_prime, (a_range_lower, a_range_upper))
+        M_max_g_double_prime = max_monomial_vectorized(coeff_f_double_prime, exponent_f_double_prime, (a_range_lower, a_range_upper))
         
-        # Use proper remainder bound computation for function composition f(g(x)) = 1/g(x)
-        second_derivative_bounds = (-M_g_double_prime_factor, M_g_double_prime_factor)  # Symmetric for reciprocal
+        second_derivative_bounds = (M_min_g_double_prime, M_max_g_double_prime)
         local_error_magnitude_min, local_error_magnitude_max = compute_function_composition_remainder_bound(
             self, second_derivative_bounds
         )
         
-        # For reciprocal, the remainder is symmetric, so we use the absolute maximum
-        local_error_magnitude = np.maximum(np.abs(local_error_magnitude_min), np.abs(local_error_magnitude_max))
-
-        final_rem_lower = propagated_rem_lower - local_error_magnitude
-        final_rem_upper = propagated_rem_upper + local_error_magnitude
+        # Combine propagated remainder with local Lagrange error
+        final_rem_lower = propagated_rem_lower + local_error_magnitude_min
+        final_rem_upper = propagated_rem_upper + local_error_magnitude_max
 
         return CertifiedFirstOrderTaylorExpansion(
             self.expansion_point,
@@ -541,7 +576,7 @@ class TaylorTranslator:
             remainder
         )
 
-    def cos(self, a):
+    def cos(self, a: CertifiedFirstOrderTaylorExpansion):
         """
         Element-wise cosine
         :param a: CertifiedFirstOrderTaylorExpansion
@@ -618,7 +653,7 @@ class TaylorTranslator:
             remainder
         )
 
-    def exp(self, a):
+    def exp(self, a: CertifiedFirstOrderTaylorExpansion):
         """
         Element-wise exponential
         :param a: CertifiedFirstOrderTaylorExpansion
@@ -654,7 +689,7 @@ class TaylorTranslator:
             remainder
         )
 
-    def log(self, a):
+    def log(self, a: CertifiedFirstOrderTaylorExpansion):
         """
         Element-wise logarithm
         :param a: CertifiedFirstOrderTaylorExpansion
@@ -710,7 +745,7 @@ class TaylorTranslator:
             (final_rem_lower, final_rem_upper)
         )
 
-    def sqrt(self, a):
+    def sqrt(self, a: CertifiedFirstOrderTaylorExpansion):
         """
         Element-wise square root
         :param a: CertifiedFirstOrderTaylorExpansion
@@ -1012,56 +1047,85 @@ def compute_function_composition_remainder_bound(inner_taylor_expansion, second_
     
     Args:
         inner_taylor_expansion: CertifiedFirstOrderTaylorExpansion representing g(x)
-        second_derivative_bounds: (M_min, M_max) bounds on f''(y) over the range of g(x)
+        second_derivative_bounds: (M_min, M_max) bounds on f''(y) over the range of g(x).
+                                  M_min and M_max are expected to be np.ndarray of shape (m,),
+                                  where m is the output dimension of g(x).
         
     Returns:
-        tuple: (remainder_lower, remainder_upper) bounds for the Lagrange remainder
+        tuple: (remainder_lower, remainder_upper) bounds for the Lagrange remainder, np.ndarray of shape (m,).
     """
-    M_min, M_max = second_derivative_bounds
+    M_min_f_double_prime, M_max_f_double_prime = second_derivative_bounds
+
+    # g(x) is inner_taylor_expansion
+    # g(x) approx g_c + J_g_c * (x - x_c) + R_g(x)
+    # We need to bound S(x) = g(x) - g_c = J_g_c * (x - x_c) + R_g(x)
     
-    # For composition f(g(x)), the Lagrange remainder is bounded by:
-    # |R(x)| ≤ M/2! * |g(x) - g(c)|²
-    # where M is the maximum of |f''(y)| over the range of g(x)
+    J_g_c = inner_taylor_expansion.linear_approximation[0]  # Jacobian of g at center x_c
+    R_g_lower, R_g_upper = inner_taylor_expansion.remainder # Remainder of g
+
+    x_c = inner_taylor_expansion.expansion_point
+    domain_lower_x, domain_upper_x = inner_taylor_expansion.domain
+
+    # delta_x = x - x_c
+    delta_x_lower = domain_lower_x - x_c
+    delta_x_upper = domain_upper_x - x_c
+
+    # Calculate interval for L(x) = J_g_c * delta_x
+    # J_g_c has shape (m, n), delta_x_lower/upper have shape (n,)
+    # L_lower/upper will have shape (m,)
     
-    # The challenge is to bound max_{x ∈ D} |g(x) - g(c)|²
-    # For a Taylor expansion g(x) = g(c) + ∇g(c)(x-c) + R_g(x), we have:
-    # |g(x) - g(c)| ≤ |∇g(c)(x-c)| + |R_g(x)|
+    if J_g_c.ndim == 1: # If g is scalar-input, scalar-output, J_g_c might be scalar
+        J_g_c = J_g_c.reshape(1, -1) if J_g_c.shape == delta_x_lower.shape else J_g_c.reshape(-1, 1)
+        if J_g_c.shape[1] != delta_x_lower.shape[0]: # try to fix if it was (1,) and delta_x is (1,)
+             J_g_c = J_g_c.T
+
+
+    num_outputs_g = J_g_c.shape[0]
+    L_lower = np.zeros(num_outputs_g)
+    L_upper = np.zeros(num_outputs_g)
+
+    for i in range(num_outputs_g):
+        J_row_i = J_g_c[i, :]
+        # Interval of J_row_i * delta_x_component
+        # L_i_lower = sum_k (A_k * X_lower_k if A_k > 0 else A_k * X_upper_k)
+        # L_i_upper = sum_k (A_k * X_upper_k if A_k > 0 else A_k * X_lower_k)
+        L_lower[i] = np.sum(np.where(J_row_i > 0, J_row_i * delta_x_lower, J_row_i * delta_x_upper))
+        L_upper[i] = np.sum(np.where(J_row_i > 0, J_row_i * delta_x_upper, J_row_i * delta_x_lower))
+
+    # Interval for S(x) = g(x) - g_c = L(x) + R_g(x)
+    S_min = L_lower + R_g_lower
+    S_max = L_upper + R_g_upper
+
+    # Interval for K(x) = S(x)^2 = (g(x) - g_c)^2
+    # K_lower is 0 if S_min and S_max have different signs (or one is zero)
+    # otherwise K_lower is min(S_min^2, S_max^2)
+    K_lower = np.where(S_min * S_max <= 0, 0, np.minimum(S_min**2, S_max**2))
+    K_upper = np.maximum(S_min**2, S_max**2)
+
+    # Local error E_local = (1/2) * [M_min_f'', M_max_f''] * [K_lower, K_upper]
+    # This is an interval product. For [a,b] * [c,d] where c,d >=0:
+    # result is [min(ac,ad), max(bc,bd)] if a,b have same sign
+    # or more generally [min(ac,ad,bc,bd), max(ac,ad,bc,bd)]
     
-    # Method 1: Use the maximum Euclidean distance in the input domain
-    # This gives us max_{x ∈ D} |∇g(c)(x-c)|
-    max_euclidean_dist_sq = max_euclidean_distance_squared(
-        inner_taylor_expansion.expansion_point, 
-        inner_taylor_expansion.domain
-    )
+    # Ensure M_min_f_double_prime, M_max_f_double_prime, K_lower, K_upper are arrays
+    M_min_f_double_prime = np.asarray(M_min_f_double_prime)
+    M_max_f_double_prime = np.asarray(M_max_f_double_prime)
+    K_lower = np.asarray(K_lower)
+    K_upper = np.asarray(K_upper)
+
+    # Products for interval multiplication:
+    # M_min * K_lower, M_min * K_upper, M_max * K_lower, M_max * K_upper
+    product_terms = np.array([
+        M_min_f_double_prime * K_lower,
+        M_min_f_double_prime * K_upper,
+        M_max_f_double_prime * K_lower,
+        M_max_f_double_prime * K_upper
+    ])
+
+    local_error_min = 0.5 * np.min(product_terms, axis=0)
+    local_error_max = 0.5 * np.max(product_terms, axis=0)
     
-    # For the linear part ∇g(c)(x-c), we need ||∇g(c)||² * ||x-c||²
-    jacobian = inner_taylor_expansion.linear_approximation[0]
-    
-    # For each output component, compute the maximum contribution from the linear part
-    if len(jacobian.shape) == 1:
-        # Single output component
-        max_linear_contrib_sq = (np.linalg.norm(jacobian)**2) * max_euclidean_dist_sq
-    else:
-        # Multiple output components
-        max_linear_contrib_sq = np.array([
-            (np.linalg.norm(jacobian[i])**2) * max_euclidean_dist_sq 
-            for i in range(jacobian.shape[0])
-        ])
-      # Add the contribution from the remainder of the inner function
-    # Use triangle inequality more precisely: |∇g(c)(x-c) + R_g(x)| ≤ |∇g(c)(x-c)| + |R_g(x)|
-    R_g_lower, R_g_upper = inner_taylor_expansion.remainder
-    max_remainder_contrib = np.maximum(np.abs(R_g_lower), np.abs(R_g_upper))
-    
-    # Combine using triangle inequality: |a + b|² ≤ (|a| + |b|)²
-    max_linear_contrib = np.sqrt(max_linear_contrib_sq)
-    max_deviation = max_linear_contrib + max_remainder_contrib
-    max_deviation_sq = max_deviation ** 2
-    
-    # Apply the Lagrange remainder formula
-    remainder_magnitude_max = np.maximum(0, (M_max / 2) * max_deviation_sq)
-    remainder_magnitude_min = np.minimum(0, (M_min / 2) * max_deviation_sq)
-    
-    return remainder_magnitude_min, remainder_magnitude_max
+    return local_error_min, local_error_max
 
 # Helper function for TE * TE multiplication remainder calculation
 def _mat_interval_vec_mul(M, v_low, v_high):
