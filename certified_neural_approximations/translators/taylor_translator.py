@@ -774,8 +774,8 @@ class TaylorTranslator:
         :return: CertifiedFirstOrderTaylorExpansion
         """
         y0 = a.linear_approximation[1]
-        cbrt_y0 = np.pow(y0, 1/3)
-        grad_y0 = (1/3) * np.pow(y0, -2/3)
+        cbrt_y0 = np.power(y0, 1/3)
+        grad_y0 = (1/3) * np.power(y0, -2/3)
 
         linear_term = grad_y0.reshape(grad_y0.shape[0], 1) * a.linear_approximation[0]
 
@@ -788,8 +788,8 @@ class TaylorTranslator:
         
         # Handle zero values element-wise for multidimensional case
         range_lower = np.maximum(range_lower, 0)  # Ensure non-negative for cbrt
-        true_at_lower = np.pow(range_lower, 1/3)
-        true_at_upper = np.pow(range_upper, 1/3)
+        true_at_lower = np.power(range_lower, 1/3)
+        true_at_upper = np.power(range_upper, 1/3)
         
         # Remainder = true_value - linear_approximation
         remainder_at_lower = true_at_lower - linear_at_lower
