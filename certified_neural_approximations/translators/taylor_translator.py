@@ -1047,14 +1047,15 @@ def compute_function_composition_remainder_bound(inner_taylor_expansion, second_
             (np.linalg.norm(jacobian[i])**2) * max_euclidean_dist_sq 
             for i in range(jacobian.shape[0])
         ])
-    
-    # Add the contribution from the remainder of the inner function
-    # This is a rough upper bound: max|R_g(x)|
+      # Add the contribution from the remainder of the inner function
+    # Use triangle inequality more precisely: |∇g(c)(x-c) + R_g(x)| ≤ |∇g(c)(x-c)| + |R_g(x)|
     R_g_lower, R_g_upper = inner_taylor_expansion.remainder
-    max_remainder_contrib_sq = np.maximum(np.abs(R_g_lower)**2, np.abs(R_g_upper)**2)
+    max_remainder_contrib = np.maximum(np.abs(R_g_lower), np.abs(R_g_upper))
     
-    # Combine the contributions (this is a rough upper bound)
-    max_deviation_sq = max_linear_contrib_sq + max_remainder_contrib_sq
+    # Combine using triangle inequality: |a + b|² ≤ (|a| + |b|)²
+    max_linear_contrib = np.sqrt(max_linear_contrib_sq)
+    max_deviation = max_linear_contrib + max_remainder_contrib
+    max_deviation_sq = max_deviation ** 2
     
     # Apply the Lagrange remainder formula
     remainder_magnitude_max = np.maximum(0, (M_max / 2) * max_deviation_sq)
