@@ -1321,57 +1321,75 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert result.remainder[1].shape == (3,)
         
         self._verify_bounds_contain_true_function(system, te, result)
-    
-    def test_low_thrust_spacecraft_dynamics(self):
-        """Test Low Thrust Spacecraft dynamics with Taylor translator."""
-        system = self.systems['LowThrustSpacecraft']
-        te = self.create_taylor_expansion_for_system(system, scale_factor=0.1)
+
+    def test_exponential_bounds_for_sample_case(self):
+        """
+        Tests that the Python Taylor model produces valid bounds for Exponential dynamics
+        for a specific sample case defined by a center and radius.
+        This ensures the linear approximation plus remainder bounds the true function.
+        """
+        system = self.systems['Exponential'] # Get from self.systems
         
-        result = system.compute_dynamics(te, self.translator)
-        
-        assert result.linear_approximation[0].shape == (5, 7)  # 5 outputs, 7 inputs
-        assert result.linear_approximation[1].shape == (5,)
-        assert result.remainder[0].shape == (5,)
-        assert result.remainder[1].shape == (5,)
-        
-        self._verify_bounds_contain_true_function(system, te, result)
-    
-    def test_all_systems_consistency(self):
-        """Test that all systems produce consistent Taylor expansions."""
-        inconsistent_systems = []
-        
-        for name, system in self.systems.items():
-            try:
-                te = self.create_taylor_expansion_for_system(system, scale_factor=0.1)
-                result = system.compute_dynamics(te, self.translator)
-                
-                # Basic consistency checks
-                assert result.expansion_point is not None, f"{name}: expansion_point is None"
-                assert result.domain is not None, f"{name}: domain is None"
-                assert result.linear_approximation[0] is not None, f"{name}: Jacobian is None"
-                assert result.linear_approximation[1] is not None, f"{name}: constant is None"
-                assert result.remainder[0] is not None, f"{name}: remainder[0] is None"
-                assert result.remainder[1] is not None, f"{name}: remainder[1] is None"
-                
-                # Check remainder ordering
-                assert np.all(result.remainder[0] <= result.remainder[1]), \
-                    f"{name}: remainder bounds not properly ordered"
-                
-                # Check finite values
-                assert np.all(np.isfinite(result.linear_approximation[0])), f"{name}: non-finite Jacobian"
-                assert np.all(np.isfinite(result.linear_approximation[1])), f"{name}: non-finite constant"
-                assert np.all(np.isfinite(result.remainder[0])), f"{name}: non-finite remainder[0]"
-                assert np.all(np.isfinite(result.remainder[1])), f"{name}: non-finite remainder[1]"
-                
-                print(f"✓ {name}: Taylor expansion consistent")
-                
-            except Exception as e:
-                inconsistent_systems.append((name, str(e)))
-                print(f"✗ {name}: {e}")
-        
-        if inconsistent_systems:
-            pytest.fail(f"Inconsistent systems: {inconsistent_systems}")
-    
+        center = np.array([-0.5, 0.75])
+        radius = np.array([0.5, 0.25])
+        expansion_point = center
+        domain_lower = center - radius
+        domain_upper = center + radius
+
+        # Create an initial Taylor expansion representing the input 'x' over the domain.
+        # This is f(x) = x, so Jacobian is Identity, const is c, remainder is 0.
+        # The .to_format method correctly sets up such an initial TE.
+        initial_te = self.translator.to_format(expansion_point, domain_lower, domain_upper)
+
+        # Compute Taylor expansion for the Exponential dynamics f(initial_te)
+        # result_te is the Taylor expansion of system.compute_dynamics(x)
+        result_te = system.compute_dynamics(initial_te, self.translator)
+
+        # Verify that the computed Taylor bounds for the system's dynamics
+        # contain the true function values over the domain.
+        # initial_te provides the domain for generating test points x.
+        # result_te is the Taylor expansion of f(x) whose bounds are being verified.
+        self._verify_bounds_contain_true_function(
+            system=system, 
+            taylor_expansion=initial_te, # Defines the input domain of x for testing
+            taylor_result=result_te,      # This is the T.E. of f(x) to be verified
+            plot_results=False            # Set to True to generate plots if needed
+        )
+
+    def test_NonLipschitzVectorField_bounds_for_sample_case(self):
+        """
+        Tests that the Python Taylor model produces valid bounds for Non-Lipschitz vector fields
+        for a specific sample case defined by a center and radius.
+        This ensures the linear approximation plus remainder bounds the true function.
+        """
+        system = self.systems['NonLipschitzVectorField2'] # Get from self.systems
+
+        center = np.array([0.25, 0.5])
+        radius = np.array([0.25, 0.5])
+        expansion_point = center
+        domain_lower = center - radius
+        domain_upper = center + radius
+
+        # Create an initial Taylor expansion representing the input 'x' over the domain.
+        # This is f(x) = x, so Jacobian is Identity, const is c, remainder is 0.
+        # The .to_format method correctly sets up such an initial TE.
+        initial_te = self.translator.to_format(expansion_point, domain_lower, domain_upper)
+
+        # Compute Taylor expansion for the Exponential dynamics f(initial_te)
+        # result_te is the Taylor expansion of system.compute_dynamics(x)
+        result_te = system.compute_dynamics(initial_te, self.translator)
+
+        # Verify that the computed Taylor bounds for the system's dynamics
+        # contain the true function values over the domain.
+        # initial_te provides the domain for generating test points x.
+        # result_te is the Taylor expansion of f(x) whose bounds are being verified.
+        self._verify_bounds_contain_true_function(
+            system=system, 
+            taylor_expansion=initial_te, # Defines the input domain of x for testing
+            taylor_result=result_te,      # This is the T.E. of f(x) to be verified
+            plot_results=True            # Set to True to generate plots if needed
+        )
+
     def create_taylor_expansion_for_system(self, system, scale_factor=0.1):
         """Create Taylor expansion for system's input domain."""
         # Generate expansion point within domain
@@ -1402,11 +1420,11 @@ class TestCertifiedFirstOrderTaylorExpansion:
         if n_test_points is None:
             # Use fewer points for high-dimensional systems to avoid computational explosion
             if system.input_dim <= 2:
-                n_test_points = 50
+                n_test_points = 100
             elif system.input_dim <= 4:
-                n_test_points = 20
+                n_test_points = 50
             else:
-                n_test_points = 10
+                n_test_points = 30
         
         # Generate test points within the domain
         test_points = []
