@@ -1107,7 +1107,7 @@ class TestCertifiedFirstOrderTaylorExpansion:
         assert result.remainder[1].shape == (2,)
         
         # Test that bounds contain true function values with plotting enabled
-        self._verify_bounds_contain_true_function(system, te, result, plot_results=True)
+        self._verify_bounds_contain_true_function(system, te, result, plot_results=False)
         
         # Test special property: at equilibrium (0,0), dynamics should be (0, mu)
         te_equilibrium = CertifiedFirstOrderTaylorExpansion(
@@ -1431,11 +1431,6 @@ class TestCertifiedFirstOrderTaylorExpansion:
                 upper = taylor_expansion.domain[1][i]
                 x_test.append(np.random.uniform(lower, upper, n_random))
             x_test = np.column_stack(x_test)
-        
-        # Limit total number of test points for computational efficiency
-        if len(x_test) > 10000:
-            indices = np.random.choice(len(x_test), 10000, replace=False)
-            x_test = x_test[indices]
         
         # Compute true function values using numpy translator
         try:
