@@ -17,9 +17,7 @@ scipy
 dlkoopman
 z3-solver
 dreal
-pyinterval
 sympy
-pycddlib
 scipy
 
 #Plotting
