@@ -905,6 +905,16 @@ class TaylorTranslator:
             remainder
         )
 
+    def cat(self, a):
+        """
+        Stack a list of certified taylor expansions vertically
+
+        :param a: list of certified taylor expansions
+
+        :return: CertifiedFirstOrderTaylorExpansion
+        """
+        return self.stack(a)
+
     def stack(self, xs):
         """
         Stack a list of certified taylor expansions vertically
