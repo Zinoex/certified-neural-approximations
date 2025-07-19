@@ -7,7 +7,6 @@
 
 import torch
 from typing import List
-from interval import interval
 
 
 def square_init_data(domain, batch_size):
@@ -112,10 +111,6 @@ class Rectangle:
             ],
             batch_size=batch_size,
         )
-
-    def as_intervals(self) -> List[interval]:
-        """Expresses rectangle as intervals."""
-        return [interval(dx) for dx in zip(self.lower_bounds, self.upper_bounds)]
 
     def check_interior(self, S: torch.Tensor) -> torch.Tensor:
         """Checks if points in S are in interior of rectangle.
