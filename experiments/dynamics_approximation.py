@@ -4,7 +4,7 @@ import os
 import torch
 from certified_neural_approximations.dynamics import WaterTank, JetEngine, SteamGovernor, Exponential, \
     NonLipschitzVectorField1, NonLipschitzVectorField2
-from certified_neural_approximations.dynamics import VanDerPolOscillator, Sine2D, NonlinearOscillator
+from certified_neural_approximations.dynamics import VanDerPolOscillator, Sine2D, NonlinearOscillator, LowThrustSpacecraft
 
 from certified_neural_approximations.neural_abstractions.cli import get_config
 from certified_neural_approximations.neural_abstractions.main import verify_neural_abstractions
@@ -29,6 +29,7 @@ NEW_SYSTEMS = [
     (VanDerPolOscillator, "vdp/config.yaml"),
     (Sine2D, "sine2d/config.yaml"),
     (NonlinearOscillator, "nonlin-osc/config.yaml"),
+    (LowThrustSpacecraft, "low-thrust/config.yaml")
 ]
 
 SYSTEMS = NA_SYSTEMS + NEW_SYSTEMS

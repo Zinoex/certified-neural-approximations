@@ -11,7 +11,6 @@ from typing import Callable, List, Union
 
 import dreal
 import sympy as sp
-from interval import imath, interval
 import numpy as np
 import torch
 from .domains import Rectangle, Sphere
@@ -63,45 +62,6 @@ class Benchmark:
         """
         return self.domain.generate_bloated_data(n)
 
-    def get_image(self):
-        """Find the image of the function wrt the domain."""
-        if isinstance(self.domain, Sphere):
-            raise ValueError("Intervals not implemented for spherical domains")
-        return self.f(self.domain.as_intervals())
-
-    def normalise(self):
-        """Normalise dynamics to [-1, 1]^d."""
-        scale = []
-        for dim in self.image:
-            scale.append((dim[0].sup - dim[0].inf) / 2)
-        self.scale = scale
-        self.name += "-normalised"
-
-    def unnormalise(self):
-        """Unnormalise dynamics"""
-        self.scale = [1 for i in range(self.dimension)]
-        self.name = self.name[:-11]
-
-    def get_scaling(self):
-        """Determine scaling for normalisation.
-
-        Returns:
-            shift (np.ndarray): shift for normalisation.
-            scale (np.ndarray): scale for normalisation.
-        """
-        scales = []
-        shifts = []
-        for dim in self.image:
-            shifts.append(dim.midpoint[0].inf)
-            scales.append((dim[0].sup - dim[0].inf) / 2)
-        return np.array(shifts).reshape(-1, 1), list(scales)
-
-    def f_intervals(self, v):
-        """Evaluate model using interval arithmetic.
-
-        Relies on PyInterval."""
-        return self.f(v)
-
 
 class Linear(Benchmark):
     def __init__(self) -> None:
@@ -110,8 +70,6 @@ class Linear(Benchmark):
         self.short_name = "lin"
         self.domain = Rectangle([-1, -1], [1, 1])
         self.scale = [1, 1]
-        self.image = self.get_image()
-        # self.normalise()
 
     def f(self, v):
         x, y = v
@@ -138,8 +96,6 @@ class SteamGovernor(Benchmark):
         self.short_name = "steam"
         self.domain = Rectangle([-1, -1, -1], [1, 1, 1])
         self.scale = [1 for i in range(self.dimension)]
-        self.image = self.get_image()
-        # self.normalise()
 
     def f(self, v):
         x, y, z = v
@@ -164,17 +120,6 @@ class SteamGovernor(Benchmark):
                 ]
         return [fi / si for fi, si in zip(f, self.scale)]
 
-    def f_intervals(self, v):
-        x, y, z = v
-        f = [
-            y,
-            z**2 * imath.sin(x) * imath.cos(x) - imath.sin(x) - 3 * y,
-            -(imath.cos(x) - 1),
-        ]
-        return [fi / si for fi, si in zip(f, self.scale)]
-
-    def get_image(self):
-        return self.f_intervals(self.domain.as_intervals())
 
 
 class JetEngine(Benchmark):
@@ -184,8 +129,6 @@ class JetEngine(Benchmark):
         self.short_name = "jet"
         self.domain = Rectangle([-1, -1], [1, 1])
         self.scale = [1 for i in range(self.dimension)]
-        self.image = self.get_image()
-        # self.normalise()
 
     def f(self, v):
         x, y = v
@@ -200,8 +143,6 @@ class NL1(Benchmark):
         self.short_name = "NL1"
         self.domain = Rectangle([0, -1], [1, 1])
         self.scale = [1 for i in range(self.dimension)]
-        # self.image = self.get_image()
-        # self.normalise()#
 
     def get_data(self, n=10000):
         """
@@ -233,8 +174,6 @@ class NL2(Benchmark):
         self.short_name = "NL2"
         self.domain = Rectangle([-1, -1], [1, 1])
         self.scale = [1 for i in range(self.dimension)]
-        # self.image = self.get_image()
-        # self.normalise()#
 
     def f(self, v):
         x, y = v
@@ -260,8 +199,6 @@ class WaterTank(Benchmark):
         self.short_name = "tank"
         self.domain = Rectangle([0.1], [10])
         self.scale = [1 for i in range(self.dimension)]
-        # self.image = self.get_image()
-        # self.normalise()#
 
     def get_data(self, n=10000):
         """
@@ -292,8 +229,6 @@ class Exponential(Benchmark):
         self.short_name = "exp"
         self.domain = Rectangle([-1, -1], [1, 1])
         self.scale = [1 for i in range(self.dimension)]
-        self.image = self.get_image()
-        # self.normalise()#
 
     def f(self, v):
         x, y = v
@@ -308,11 +243,6 @@ class Exponential(Benchmark):
                 f = [sp.sin(sp.exp(y + 1)), sp.exp(sp.sin(x + 1))]
         return [fi / si for fi, si in zip(f, self.scale)]
 
-    def f_intervals(self, v):
-        x, y = v
-        f = [imath.sin(imath.exp(y)), imath.exp(imath.sin(x))]
-        return [fi / si for fi, si in zip(f, self.scale)]
-
 
 class VanDerPol(Benchmark):
     def __init__(self) -> None:
@@ -322,8 +252,6 @@ class VanDerPol(Benchmark):
         self.domain = Rectangle([-3, -3], [3, 3])
         self.scale = [1 for i in range(self.dimension)]
         self.mu = 1.0
-        self.image = self.get_image()
-        # self.normalise()
 
     def f(self, v):
         x, y = v
@@ -340,8 +268,6 @@ class Sine2D(Benchmark):
         self.scale = [1 for i in range(self.dimension)]
         self.freq_y = 1.0
         self.freq_x = 1.0
-        self.image = self.get_image()
-        # self.normalise()
 
     def f(self, v):
         x, y = v
@@ -362,8 +288,6 @@ class NonlinearOscillator(Benchmark):
         self.short_name = "nonlin-osc"
         self.domain = Rectangle([-3.0], [3.0])
         self.scale = [1 for i in range(self.dimension)]
-        # self.image = self.get_image()
-        # self.normalise()#
 
         # Parameters for the nonlinear terms
         self.linear_coeff = 1.0

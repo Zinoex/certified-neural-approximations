@@ -98,7 +98,9 @@ class AugmentedSample(CertificationRegion):
 
     @staticmethod
     def from_certification_region(region, first_order_model):
-        return AugmentedSample(region.center, region.radius, first_order_model, region.output_dim, region.split_dim)
+        aug_sample = AugmentedSample(region.center, region.radius, first_order_model, region.output_dim, region.split_dim)
+        aug_sample.min_radius = region.min_radius
+        return aug_sample
 
     def isfinite(self):
         return np.isfinite(self.first_order_model[0][0]).all() and np.isfinite(self.first_order_model[0][1]).all() and \
