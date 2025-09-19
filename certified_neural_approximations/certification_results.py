@@ -82,7 +82,10 @@ class CertificationRegion:
             if max_error > 0.0:
                 error_list[i] = max_error
 
-        delta_maxmin_ratio = np.max(delta[split_dims]) / np.min(delta[split_dims])
+        if np.sum(error_list) < 1e-9 and not timeout:
+            return self.nextsplitdim(taylor_approximation, dynamics, timeout=True)
+
+        delta_maxmin_ratio = np.max(delta[split_dims]) / (1e-9 + np.min(delta[split_dims]))
         if delta_maxmin_ratio.item() > 1e2:
             # Softmax calculation
             probabilities = error_list / np.sum(error_list)

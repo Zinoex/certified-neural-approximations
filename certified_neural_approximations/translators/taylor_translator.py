@@ -347,6 +347,24 @@ class CertifiedFirstOrderTaylorExpansion:
         final_rem_lower = propagated_rem_lower + local_error_magnitude_min
         final_rem_upper = propagated_rem_upper + local_error_magnitude_max
 
+        # Apply monotonic bounds tightening for reciprocal function
+        # 1/x is monotonically decreasing for x > 0 and x < 0 separately
+        reciprocal_at_boundaries = (1.0 / a_range_lower, 1.0 / a_range_upper)  # Note: order matches domain order
+        
+        # Create temporary Taylor expansion to use the monotonic tightening helper
+        temp_expansion = CertifiedFirstOrderTaylorExpansion(
+            self.expansion_point,
+            self.domain,
+            (new_J, new_const),
+            (final_rem_lower, final_rem_upper)
+        )
+        
+        clip_rem_lower, clip_rem_upper = apply_monotonic_bounds_tightening(temp_expansion, reciprocal_at_boundaries, is_increasing=False)
+        
+        # Intersect the Taylor bounds with the monotonic bounds
+        final_rem_lower = np.maximum(final_rem_lower, clip_rem_lower)
+        final_rem_upper = np.minimum(final_rem_upper, clip_rem_upper)
+
         return CertifiedFirstOrderTaylorExpansion(
             self.expansion_point,
             self.domain,
@@ -509,8 +527,6 @@ class TaylorTranslator:
         grad_f_y0 = np.cos(y0)        # cos(y0), derivative of sin(y) at y0
 
         linear_term_jacobian = grad_f_y0.reshape(-1, 1) * a.linear_approximation[0]
-
-        # Lagrange remainder for sin:
         domain_low, domain_high = a.range()
 
         # Check if any point x = k*2pi + pi/2 (where sin(x) = +1) is within [a, b]
@@ -529,13 +545,8 @@ class TaylorTranslator:
         M_lagrange_max[contains_trough] = 1.0  # If contains trough, max is 1.0
         M_lagrange_max = np.maximum(M_lagrange_max, 0.0)  # Ensure non-negative max
 
-        # Only need to consider the distance between peaks/troughs and the expansion point
-        min_abs_y_minus_peak = np.minimum(np.abs(k_lower_bound*2*np.pi + np.pi/2 - y0), np.abs(k_upper_bound*2*np.pi + np.pi/2 - y0))
-        
         max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - y0), np.abs(domain_high - y0))
-        max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_peak)
-        max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
-        local_error_magnitude_max = (M_lagrange_max / 2) * max_sq_y_minus_y0
+        local_error_magnitude_max = (M_lagrange_max / 2) * max_abs_y_minus_y0 ** 2
         
         # Lower bound for k (must be an integer, so use ceil)
         k_lower_bound = np.ceil((domain_low - np.pi/2) / (2*np.pi))
@@ -547,25 +558,34 @@ class TaylorTranslator:
         M_lagrange_min = np.minimum(-np.sin(domain_low), -np.sin(domain_high))
         M_lagrange_min[contains_crest] = -1.0  # If contains crest, min is -1.0
         M_lagrange_min = np.minimum(M_lagrange_min, 0.0)  # Ensure non-negative max
-        
-        # Only need to consider the distance between peaks/troughs and the expansion point
-        min_abs_y_minus_trough = np.minimum(np.abs(k_lower_bound*2*np.pi + 3*np.pi/2 - y0), np.abs(k_upper_bound*2*np.pi + 3*np.pi/2 - y0))
-        
+
         max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - y0), np.abs(domain_high - y0))
-        max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_trough)
-        max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
-        local_error_magnitude_min = (M_lagrange_min / 2) * max_sq_y_minus_y0
+        local_error_magnitude_min = (M_lagrange_min / 2) * max_abs_y_minus_y0 ** 2
 
         prop_rem_lower_y, prop_rem_upper_y = a.remainder
-        
         term1_rem = grad_f_y0 * prop_rem_lower_y
         term2_rem = grad_f_y0 * prop_rem_upper_y
         
         propagated_taylor_rem_lower = np.minimum(term1_rem, term2_rem)
         propagated_taylor_rem_upper = np.maximum(term1_rem, term2_rem)
 
+        # --- Final summation (applies to all elements) ---
         final_rem_lower = propagated_taylor_rem_lower + local_error_magnitude_min
         final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude_max
+
+        # Apply global bounds tightening for sin function (range [-1, 1])
+        temp_expansion = CertifiedFirstOrderTaylorExpansion(
+            a.expansion_point,
+            a.domain,
+            (linear_term_jacobian, f_y0_val),
+            (final_rem_lower, final_rem_upper)
+        )
+        
+        clip_rem_lower, clip_rem_upper = apply_global_bounds_tightening(temp_expansion, -1.0, 1.0)
+        
+        # Intersect the Taylor bounds with the global range bounds
+        final_rem_lower = np.maximum(final_rem_lower, clip_rem_lower)
+        final_rem_upper = np.minimum(final_rem_upper, clip_rem_upper)
 
         remainder = (final_rem_lower, final_rem_upper)
 
@@ -582,13 +602,11 @@ class TaylorTranslator:
         :param a: CertifiedFirstOrderTaylorExpansion
         :return: CertifiedFirstOrderTaylorExpansion
         """
-        y0 = a.linear_approximation[1] # Center of expansion for y
-        cos_y0_val = np.cos(y0)        # cos(y0)
-        grad_cos_y0 = -np.sin(y0)      # -sin(y0), derivative of cos(y) at y0
+        y0 = a.linear_approximation[1]  # Center of expansion for y
+        f_y0_val = np.cos(y0)         # cos(y0)
+        grad_cos_y0 = -np.sin(y0)       # -sin(y0), derivative of cos(y) at y0
 
         linear_term_jacobian = grad_cos_y0.reshape(-1, 1) * a.linear_approximation[0]
-
-        # Lagrange remainder for cos:
         domain_low, domain_high = a.range()
 
         # Check if any point x = k*2pi (where cos(x) = +1) is within [a, b]
@@ -606,13 +624,8 @@ class TaylorTranslator:
         M_lagrange_max[contains_trough] = 1.0  # If contains trough, max is 1.0
         M_lagrange_max = np.maximum(M_lagrange_max, 0.0)  # Ensure non-negative max
 
-        # Only need to consider the distance between peaks/troughs and the expansion point      
-        min_abs_y_minus_peak = np.minimum(np.abs(k_lower_bound*2*np.pi - y0), np.abs(k_upper_bound*2*np.pi - y0))
-                
         max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - y0), np.abs(domain_high - y0))
-        max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_peak)
-        max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
-        local_error_magnitude_max = (M_lagrange_max / 2) * max_sq_y_minus_y0
+        local_error_magnitude_max = (M_lagrange_max / 2) * max_abs_y_minus_y0 ** 2
 
         # Lower bound for k (must be an integer, so use ceil)
         k_lower_bound = np.ceil(domain_low / (2*np.pi))
@@ -624,14 +637,9 @@ class TaylorTranslator:
         M_lagrange_min = np.minimum(-np.cos(domain_low), -np.cos(domain_high))
         M_lagrange_min[contains_crest] = -1.0  # If contains crest, min is -1.0
         M_lagrange_min = np.minimum(M_lagrange_min, 0.0)  # Ensure non-negative max
-                      
-        # Only need to consider the distance between peaks/troughs and the expansion point
-        min_abs_y_minus_trough = np.minimum(np.abs(k_lower_bound*2*np.pi + np.pi - y0), np.abs(k_upper_bound*2*np.pi + np.pi - y0))
-        
+
         max_abs_y_minus_y0 = np.maximum(np.abs(domain_low - y0), np.abs(domain_high - y0))
-        max_abs_y_minus_y0 = np.minimum(max_abs_y_minus_y0, min_abs_y_minus_trough)
-        max_sq_y_minus_y0 = max_abs_y_minus_y0 ** 2
-        local_error_magnitude_min = (M_lagrange_min / 2) * max_sq_y_minus_y0
+        local_error_magnitude_min = (M_lagrange_min / 2) * max_abs_y_minus_y0 ** 2
 
         # Propagate remainder through the derivative
         prop_rem_lower_y, prop_rem_upper_y = a.remainder
@@ -641,15 +649,30 @@ class TaylorTranslator:
         propagated_taylor_rem_lower = np.minimum(term1_rem, term2_rem)
         propagated_taylor_rem_upper = np.maximum(term1_rem, term2_rem)
 
+        # --- Final summation (applies to all elements) ---
         final_rem_lower = propagated_taylor_rem_lower + local_error_magnitude_min
         final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude_max
+
+        # Apply global bounds tightening for cos function (range [-1, 1])
+        temp_expansion = CertifiedFirstOrderTaylorExpansion(
+            a.expansion_point,
+            a.domain,
+            (linear_term_jacobian, f_y0_val),
+            (final_rem_lower, final_rem_upper)
+        )
+        
+        clip_rem_lower, clip_rem_upper = apply_global_bounds_tightening(temp_expansion, -1.0, 1.0)
+        
+        # Intersect the Taylor bounds with the global range bounds
+        final_rem_lower = np.maximum(final_rem_lower, clip_rem_lower)
+        final_rem_upper = np.minimum(final_rem_upper, clip_rem_upper)
 
         remainder = (final_rem_lower, final_rem_upper)
 
         return CertifiedFirstOrderTaylorExpansion(
             a.expansion_point,
             a.domain,
-            (linear_term_jacobian, cos_y0_val),
+            (linear_term_jacobian, f_y0_val),
             remainder
         )
 
@@ -719,7 +742,6 @@ class TaylorTranslator:
         second_derivative_lower = np.minimum(second_derivative_lower, 0)
         second_derivative_upper = np.maximum(second_derivative_upper, 0)
 
-        # Compute the maximum deviation from the expansion point
         max_deviation = np.maximum(
             np.abs(lower - y0),
             np.abs(upper - y0)
@@ -729,6 +751,10 @@ class TaylorTranslator:
         remainder_lower = (second_derivative_lower / 2) * max_deviation**2
         remainder_upper = (second_derivative_upper / 2) * max_deviation**2
 
+        # We can add a clip to ensure non-positivity just in case of float error
+        remainder_upper = np.minimum(remainder_upper, 0.0)
+        remainder_lower = np.minimum(remainder_lower, remainder_upper)
+
         # Propagate the remainder through the derivative
         remainder1, remainder2 = grad_y0 * a.remainder[0], grad_y0 * a.remainder[1]
         propagated_rem_lower = np.minimum(remainder1, remainder2)
@@ -737,6 +763,24 @@ class TaylorTranslator:
         # Combine propagated and second derivative remainders
         final_rem_lower = propagated_rem_lower + remainder_lower
         final_rem_upper = propagated_rem_upper + remainder_upper
+
+        # Apply monotonic bounds tightening for log function
+        # log is monotonically increasing, so use boundary values as global bounds
+        log_at_boundaries = (np.log(lower), np.log(upper))
+        
+        # Create temporary Taylor expansion to use the monotonic tightening helper
+        temp_expansion = CertifiedFirstOrderTaylorExpansion(
+            a.expansion_point,
+            a.domain,
+            (linear_term, log_y0),
+            (final_rem_lower, final_rem_upper)
+        )
+        
+        clip_rem_lower, clip_rem_upper = apply_monotonic_bounds_tightening(temp_expansion, log_at_boundaries, is_increasing=True)
+        
+        # Intersect the Taylor bounds with the monotonic bounds
+        final_rem_lower = np.maximum(final_rem_lower, clip_rem_lower)
+        final_rem_upper = np.minimum(final_rem_upper, clip_rem_upper)
 
         return CertifiedFirstOrderTaylorExpansion(
             a.expansion_point,
@@ -794,6 +838,24 @@ class TaylorTranslator:
         # Combine propagated and local remainders
         final_rem_lower = propagated_rem_lower + remainder_lower
         final_rem_upper = propagated_rem_upper + remainder_upper
+
+        # Apply monotonic bounds tightening for sqrt function
+        # sqrt is monotonically increasing and defined only for non-negative values
+        sqrt_at_boundaries = (np.sqrt(range_lower), np.sqrt(range_upper))
+        
+        # Create temporary Taylor expansion to use the monotonic tightening helper
+        temp_expansion = CertifiedFirstOrderTaylorExpansion(
+            a.expansion_point,
+            a.domain,
+            (linear_term, sqrt_y0),
+            (final_rem_lower, final_rem_upper)
+        )
+        
+        clip_rem_lower, clip_rem_upper = apply_monotonic_bounds_tightening(temp_expansion, sqrt_at_boundaries, is_increasing=True)
+        
+        # Intersect the Taylor bounds with the monotonic bounds
+        final_rem_lower = np.maximum(final_rem_lower, clip_rem_lower)
+        final_rem_upper = np.minimum(final_rem_upper, clip_rem_upper)
 
         return CertifiedFirstOrderTaylorExpansion(
             a.expansion_point,
@@ -867,6 +929,26 @@ class TaylorTranslator:
         """
         assert isinstance(exponent_b, int), "Exponent must be an integer"
 
+        # Handle trivial cases
+        if exponent_b == 0:
+            # f(y) = 1, f'(y) = 0
+            f_y0 = np.ones_like(a.linear_approximation[1])
+            grad_f_y0 = np.zeros_like(a.linear_approximation[1])
+            linear_term_jacobian = np.zeros_like(a.linear_approximation[0])
+            local_error_magnitude_min = 0.0
+            local_error_magnitude_max = 0.0
+            remainder = (local_error_magnitude_min * np.ones_like(f_y0), local_error_magnitude_max * np.ones_like(f_y0))
+            return CertifiedFirstOrderTaylorExpansion(
+                a.expansion_point,
+                a.domain,
+                (linear_term_jacobian, f_y0),
+                remainder
+            )
+        
+        elif exponent_b == 1:
+            # f(y) = y, f'(y) = 1
+            return a
+
         y0 = a.linear_approximation[1]
         f_y0 = np.power(y0, exponent_b)
         grad_f_y0 = exponent_b * np.power(y0, exponent_b - 1)
@@ -895,6 +977,45 @@ class TaylorTranslator:
 
         final_rem_lower = propagated_taylor_rem_lower + local_error_magnitude_min
         final_rem_upper = propagated_taylor_rem_upper + local_error_magnitude_max
+        
+        # Apply monotonic bounds tightening for specific power functions
+        range_of_y = a.range()
+        if exponent_b > 0:
+            # For positive exponents, x^n is monotonically increasing for x > 0
+            if np.all(range_of_y[0] > 0):  # All values in range are positive
+                power_at_boundaries = (np.power(range_of_y[0], exponent_b), np.power(range_of_y[1], exponent_b))
+                
+                # Create temporary Taylor expansion to use the monotonic tightening helper
+                temp_expansion = CertifiedFirstOrderTaylorExpansion(
+                    a.expansion_point,
+                    a.domain,
+                    (linear_term_jacobian, f_y0),
+                    (final_rem_lower, final_rem_upper)
+                )
+                
+                clip_rem_lower, clip_rem_upper = apply_monotonic_bounds_tightening(temp_expansion, power_at_boundaries, is_increasing=True)
+                
+                # Intersect the Taylor bounds with the monotonic bounds
+                final_rem_lower = np.maximum(final_rem_lower, clip_rem_lower)
+                final_rem_upper = np.minimum(final_rem_upper, clip_rem_upper)
+        elif exponent_b < 0:
+            # For negative exponents, x^n is monotonically decreasing for x > 0 (same as 1/x^|n|)
+            if np.all(range_of_y[0] > 0):  # All values in range are positive
+                power_at_boundaries = (np.power(range_of_y[0], exponent_b), np.power(range_of_y[1], exponent_b))
+                
+                # Create temporary Taylor expansion to use the monotonic tightening helper
+                temp_expansion = CertifiedFirstOrderTaylorExpansion(
+                    a.expansion_point,
+                    a.domain,
+                    (linear_term_jacobian, f_y0),
+                    (final_rem_lower, final_rem_upper)
+                )
+                
+                clip_rem_lower, clip_rem_upper = apply_monotonic_bounds_tightening(temp_expansion, power_at_boundaries, is_increasing=False)
+                
+                # Intersect the Taylor bounds with the monotonic bounds
+                final_rem_lower = np.maximum(final_rem_lower, clip_rem_lower)
+                final_rem_upper = np.minimum(final_rem_upper, clip_rem_upper)
         
         remainder = (final_rem_lower, final_rem_upper)
 
@@ -1136,6 +1257,91 @@ def compute_function_composition_remainder_bound(inner_taylor_expansion, second_
     local_error_max = 0.5 * np.max(product_terms, axis=0)
     
     return local_error_min, local_error_max
+
+
+def apply_global_bounds_tightening(taylor_expansion, global_lower_bound, global_upper_bound):
+    """
+    Apply post-processing step to tighten remainder bounds for functions with known global ranges.
+    
+    For functions f(y) with known bounds f(y) ∈ [L, U], we can clip the remainder R_f(y) 
+    to the domain:
+    R_f(y) ∈ [L - f_L(y), U - f_L(y)] ⊆ [L - max_y f_L(y), U - min_y f_L(y)]
+    
+    where f_L(y) is the linear approximation part of the Taylor expansion.
+    
+    Args:
+        taylor_expansion (CertifiedFirstOrderTaylorExpansion): The Taylor expansion to tighten
+        global_lower_bound (float): Known global lower bound L for the function
+        global_upper_bound (float): Known global upper bound U for the function
+        
+    Returns:
+        tuple: (tightened_remainder_lower, tightened_remainder_upper)
+    """
+    # Extract linear approximation components
+    linear_jacobian, f_y0_val = taylor_expansion.linear_approximation
+    
+    # Get domain bounds
+    x_domain_low, x_domain_high = taylor_expansion.domain
+    x_0 = taylor_expansion.expansion_point
+    
+    # Find the interval for (x - x_0)
+    delta_x_low = x_domain_low - x_0
+    delta_x_high = x_domain_high - x_0
+
+    # Compute range of f_L(x) using interval arithmetic (center-radius form)
+    delta_x_center = (delta_x_low + delta_x_high) / 2.0
+    delta_x_radius = (delta_x_high - delta_x_low) / 2.0
+    
+    # Range of J_f @ (x - x_0) = (J_f @ center) +/- (|J_f| @ radius)
+    f_L_center_offset = linear_jacobian @ delta_x_center
+    f_L_radius = np.abs(linear_jacobian) @ delta_x_radius
+    
+    # Total range of f_L(x) = f_0 + range(J_f @ (x - x_0))
+    f_L_min = (f_y0_val + f_L_center_offset) - f_L_radius
+    f_L_max = (f_y0_val + f_L_center_offset) + f_L_radius
+    
+    # Compute the new remainder bounds implied by the global range
+    # R_f(x) >= global_lower_bound - f_L(x)
+    # The constant lower bound must be <= the minimum of the right side:
+    # R_min' <= min_x(global_lower_bound - f_L(x)) = global_lower_bound - max_x(f_L(x))
+    clip_rem_lower = global_lower_bound - f_L_max
+    
+    # R_f(x) <= global_upper_bound - f_L(x)
+    # The constant upper bound must be >= the maximum of the right side:
+    # R_max' >= max_x(global_upper_bound - f_L(x)) = global_upper_bound - min_x(f_L(x))
+    clip_rem_upper = global_upper_bound - f_L_min
+    
+    return clip_rem_lower, clip_rem_upper
+
+
+def apply_monotonic_bounds_tightening(taylor_expansion, domain_range, is_increasing=True):
+    """
+    Apply post-processing step to tighten remainder bounds for monotonic functions.
+    
+    For monotonic functions, we can use the fact that extreme values occur at boundaries.
+    We compute the actual function values at the boundaries and use them as global bounds.
+    
+    Args:
+        taylor_expansion (CertifiedFirstOrderTaylorExpansion): The Taylor expansion to tighten
+        domain_range (tuple): (f(domain_low), f(domain_high)) - function values at domain boundaries
+        is_increasing (bool): True if function is monotonically increasing, False if decreasing
+        
+    Returns:
+        tuple: (tightened_remainder_lower, tightened_remainder_upper)
+    """
+    f_at_low, f_at_high = domain_range
+    
+    if is_increasing:
+        # For increasing functions: min = f(domain_low), max = f(domain_high)
+        global_lower = f_at_low
+        global_upper = f_at_high
+    else:
+        # For decreasing functions: min = f(domain_high), max = f(domain_low)
+        global_lower = f_at_high
+        global_upper = f_at_low
+    
+    return apply_global_bounds_tightening(taylor_expansion, global_lower, global_upper)
+
 
 # Helper function for TE * TE multiplication remainder calculation
 def _mat_interval_vec_mul(M, v_low, v_high):
