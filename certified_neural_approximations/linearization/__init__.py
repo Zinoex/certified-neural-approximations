@@ -16,5 +16,5 @@ def default_linearization(dynamics):
 __all__ = [
     "TaylorLinearization",
     "CrownLinearization",
-    "BackupLinearization"
+    "BackupLinearization",
 ]

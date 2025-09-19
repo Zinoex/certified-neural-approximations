@@ -138,7 +138,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Find a counterexample for upper bound
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
-            split_dim = data.nextsplitdim(mlb, dynamics)
+            split_dim = data.nextsplitdim(mlb, dynamics, timeout=True)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, start_time, [sample_left, sample_right])
@@ -188,7 +188,7 @@ class MarabouTaylorStrategy(VerificationStrategy):
         # Find a counterexample for lower bound
         res, vals, stats = network.solve(verbose=False, options=options)
         if stats.hasTimedOut():
-            split_dim = data.nextsplitdim(mlb, dynamics)
+            split_dim = data.nextsplitdim(mlb, dynamics, timeout=True)
             if split_dim is not None:
                 sample_left, sample_right = split_sample(data, delta, split_dim)
                 return SampleResultMaybe(data, start_time, [sample_left, sample_right])

@@ -3,7 +3,7 @@ import numpy as np
 
 
 class CertificationRegion:
-    def __init__(self, center: np.array, radius: np.array, output_dim: int = None, split_dim: int = None):
+    def __init__(self, center: np.array, radius: np.array, output_dim: int = None, split_dims: list[int] = None, last_split_dim: int = None):
         self.center = center
         # radius in the sense of a hyperrectangle
         # {x : x[i] = c[i] + \alpha[i] r[i], \alpha \in [-1, 1]^n, i = 1..n}
@@ -11,9 +11,13 @@ class CertificationRegion:
         self.output_dim = output_dim
         self.min_radius = 1e-6 * self.radius
 
-        if split_dim is None:
-            split_dim = center.shape[0] - 1
-        self.split_dim = split_dim
+        if split_dims is None:
+            split_dims = list(range(center.shape[0]))
+        self.split_dims = split_dims
+
+        if last_split_dim is None:
+            last_split_dim = len(split_dims) - 1
+        self.last_split_dim = last_split_dim
 
     def __iter__(self):
         return iter((self.center, self.radius, self.output_dim))
@@ -24,7 +28,7 @@ class CertificationRegion:
         """
         return np.prod(2 * self.radius).item()
 
-    def nextsplitdim(self, taylor_approximation, dynamics):
+    def nextsplitdim(self, taylor_approximation, dynamics, timeout=False):
         """
         Identify the dimension with the highest approximation error for splitting.
 
@@ -36,25 +40,29 @@ class CertificationRegion:
         :param dynamics: The actual dynamics function to compare against
         :return: The dimension index with the highest approximation error
         """
+        if timeout:
+            split_dims = list(range(self.center.shape[0]))
+        else:
+            split_dims = self.split_dims
+
         sample, delta = self.center, self.radius  # Unpack the data tuple
-        split_dim = None
         approximation_error = taylor_approximation(sample) - dynamics(sample).flatten()[self.output_dim]
         # i0 = self.incrementsplitdim() # Make sure that we cycle through the dimensions, incase the approximation error is always zero
-        error_list = np.ones(len(delta)) * 10e-9  # Initializenear zero
-        rng = np.random.default_rng()
+        error_list = np.ones(len(split_dims)) * 10e-9  # Initialize near zero
 
         if all(delta < self.min_radius):
             return None
 
-        for i in range(len(delta)):
-            # i = (i0 + j) % len(delta)
-            delta_i = delta[i]
-            if delta_i < self.min_radius[i]:
+        for i in range(len(split_dims)):
+            j = split_dims[i]  # Get the current split dimension index
+
+            delta_j = delta[j]
+            if delta_j < self.min_radius[j]:
                 error_list[i] = 0.0
                 continue
 
             left_point = sample.copy()
-            left_point[i] -= 0.5 * delta_i
+            left_point[j] -= 0.5 * delta_j
 
             # Calculate the Taylor approximation at the left point (corrected by the error from the centre)
             approx = taylor_approximation(left_point) - approximation_error
@@ -62,7 +70,7 @@ class CertificationRegion:
             left_error = np.abs(approx - true_value)
 
             right_point = sample.copy()
-            right_point[i] += 0.5 * delta_i
+            right_point[j] += 0.5 * delta_j
 
             # Calculate the Taylor approximation at the right point (corrected by the error from the centre)
             approx = taylor_approximation(right_point) - approximation_error
@@ -74,31 +82,36 @@ class CertificationRegion:
             if max_error > 0.0:
                 error_list[i] = max_error
 
-        delta_maxmin_ratio = np.max(delta) / np.min(delta)
+        delta_maxmin_ratio = np.max(delta[split_dims]) / np.min(delta[split_dims])
         if delta_maxmin_ratio.item() > 1e2:
             # Softmax calculation
             probabilities = error_list / np.sum(error_list)
-            split_dim = np.random.choice(len(error_list), p=probabilities)
+            split_dim_idx = np.random.choice(len(error_list), p=probabilities)
         else:
-            split_dim = np.argmax(error_list)
-        return split_dim
+            split_dim_idx = np.argmax(error_list)
+        return split_dims[split_dim_idx]
 
     def incrementsplitdim(self):
-        self.split_dim = (self.split_dim + 1) % self.center.shape[0]
-        return self.split_dim
+        self.last_split_dim = (self.last_split_dim + 1) % len(self.split_dims)
+        return self.split_dims[self.last_split_dim]
+    
+    def islinear(self):
+        return len(self.split_dims) == 0
 
     def __repr__(self):
         return f"CertificationRegion(center={self.center}, radius={self.radius}, output_dim={self.output_dim})"
 
 
 class AugmentedSample(CertificationRegion):
-    def __init__(self, center, radius, first_order_model, output_dim=None, split_dim=None):
-        super().__init__(center, radius, output_dim, split_dim)
+    def __init__(self, center, radius, first_order_model, output_dim=None, split_dims=None, last_split_dim=None):
+        super().__init__(center, radius, output_dim, split_dims, last_split_dim)
         self.first_order_model = first_order_model
 
     @staticmethod
     def from_certification_region(region, first_order_model):
-        return AugmentedSample(region.center, region.radius, first_order_model, region.output_dim, region.split_dim)
+        aug_sample = AugmentedSample(region.center, region.radius, first_order_model, region.output_dim, region.split_dims, region.last_split_dim)
+        aug_sample.min_radius = region.min_radius
+        return aug_sample
 
     def isfinite(self):
         return np.isfinite(self.first_order_model[0][0]).all() and np.isfinite(self.first_order_model[0][1]).all() and \

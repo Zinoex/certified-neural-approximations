@@ -9,6 +9,7 @@ from certified_neural_approximations.executors import (
 from certified_neural_approximations.verification import MarabouTaylorStrategy
 from certified_neural_approximations.linearization import default_linearization
 from certified_neural_approximations.certification_results import CertificationRegion
+from certified_neural_approximations.translators import DependencyGraphTranslator
 
 from certified_neural_approximations.generate_data import generate_grid
 
@@ -48,13 +49,26 @@ def verify_nn(
 
     partial_process_sample = partial(strategy.verify, epsilon=dynamics_model.epsilon)
 
+    # Trace symbolic dependencies
+    translator = DependencyGraphTranslator()
+    x = translator.identity(input_dim)
+    DG = dynamics_model.compute_dynamics(x, translator)
+
+    def nonlin_dependencies(j):
+        """
+        Get the dependencies for the j-th output dimension.
+        """
+        return [i for i in range(DG.dependencies.shape[1]) if DG.dependencies[j, i] == "nonlin"]
+
+    # Initialize the input grid for the dynamics model
     X_train, _ = generate_grid(input_dim, dynamics_model.input_domain, delta=dynamics_model.delta)
     output_dim = dynamics_model.output_dim
     samples = [
-        CertificationRegion(x, dynamics_model.delta, j)
+        CertificationRegion(x, dynamics_model.delta, j, nonlin_dependencies(j))
         for j in range(output_dim) for x in X_train
     ]
 
+    # Initialize the executor based on the number of workers
     if num_workers == 0:
         executor = SinglethreadExecutor()
     elif num_workers >= 1:
