@@ -55,8 +55,8 @@ class CertifiedFirstOrderTaylorExpansion:
         """
         if isinstance(other, CertifiedFirstOrderTaylorExpansion):
             # Ensure compatible expansion points and domains
-            assert all(self.expansion_point == other.expansion_point)
-            assert self.domain == other.domain
+            assert np.allclose(self.expansion_point, other.expansion_point, atol=1e-12), "Expansion points must match for addition"
+            assert np.allclose(self.domain[0], other.domain[0], atol=1e-12) and np.allclose(self.domain[1], other.domain[1], atol=1e-12), "Domains must match for addition"
 
             # Properly add the linear approximation tuples element-wise
             new_jacobian = self.linear_approximation[0] + other.linear_approximation[0]
@@ -96,8 +96,8 @@ class CertifiedFirstOrderTaylorExpansion:
         Note: For interval subtraction [a,b] - [c,d] = [a-d, b-c]
         """
         if isinstance(other, CertifiedFirstOrderTaylorExpansion):
-            assert all(self.expansion_point == other.expansion_point)
-            assert self.domain == other.domain
+            assert np.allclose(self.expansion_point, other.expansion_point, atol=1e-12), "Expansion points must match for subtraction"
+            assert np.allclose(self.domain[0], other.domain[0], atol=1e-12) and np.allclose(self.domain[1], other.domain[1], atol=1e-12), "Domains must match for subtraction"
 
             # Properly subtract the linear approximation tuples element-wise
             new_jacobian = self.linear_approximation[0] - other.linear_approximation[0]
@@ -125,8 +125,8 @@ class CertifiedFirstOrderTaylorExpansion:
     def __rsub__(self, other):
         """Right subtraction (scalar - TaylorExpansion)."""
         if isinstance(other, CertifiedFirstOrderTaylorExpansion):
-            assert self.expansion_point == other.expansion_point
-            assert self.domain == other.domain
+            assert np.allclose(self.expansion_point, other.expansion_point, atol=1e-12), "Expansion points must match for subtraction"
+            assert np.allclose(self.domain[0], other.domain[0], atol=1e-12) and np.allclose(self.domain[1], other.domain[1], atol=1e-12), "Domains must match for subtraction"
 
             # Properly subtract the linear approximation tuples element-wise
             new_jacobian = other.linear_approximation[0] - self.linear_approximation[0]
@@ -505,14 +505,14 @@ class TaylorTranslator:
         new_linear = (linear_term, constant_term)
 
         remainder_lower, remainder_upper = b.remainder
-        remainder1, remainder2 = a @ remainder_lower, a @ remainder_upper
-        new_remainder = np.minimum(remainder1, remainder2), np.maximum(remainder1, remainder2)
+        # Use _mat_interval_vec_mul for proper interval matrix-vector multiplication
+        new_remainder_lower, new_remainder_upper = _mat_interval_vec_mul(a, remainder_lower, remainder_upper)
 
         return CertifiedFirstOrderTaylorExpansion(
             b.expansion_point,
             b.domain,
             new_linear,
-            new_remainder
+            (new_remainder_lower, new_remainder_upper)
         )
 
     def sin(self, a: CertifiedFirstOrderTaylorExpansion):
@@ -871,7 +871,7 @@ class TaylorTranslator:
         :return: CertifiedFirstOrderTaylorExpansion
         """
         y0 = a.linear_approximation[1]
-        cbrt_y0 = np.power(y0, 1/3)
+        cbrt_y0 = np.cbrt(y0)
         grad_y0 = (1/3) * np.power(y0, -2/3)
 
         linear_term = grad_y0.reshape(grad_y0.shape[0], 1) * a.linear_approximation[0]
@@ -883,11 +883,10 @@ class TaylorTranslator:
         linear_at_lower = cbrt_y0 + grad_y0 * (range_lower - y0)
         linear_at_upper = cbrt_y0 + grad_y0 * (range_upper - y0)
         
-        # Handle zero values element-wise for multidimensional case
-        range_lower = np.maximum(range_lower, 0)  # Ensure non-negative for cbrt
-        true_at_lower = np.power(range_lower, 1/3)
-        true_at_upper = np.power(range_upper, 1/3)
-        
+        # Handle cube root for all real numbers (no domain restriction needed)
+        true_at_lower = np.cbrt(range_lower)
+        true_at_upper = np.cbrt(range_upper)
+
         # Remainder = true_value - linear_approximation
         remainder_at_lower = true_at_lower - linear_at_lower
         remainder_at_upper = true_at_upper - linear_at_upper
@@ -911,13 +910,29 @@ class TaylorTranslator:
         final_rem_lower = propagated_rem_lower + remainder_lower
         final_rem_upper = propagated_rem_upper + remainder_upper
 
-        remainder = (final_rem_lower, final_rem_upper)
+        # Apply monotonic bounds tightening for cbrt function
+        # cbrt is monotonically increasing over all real numbers
+        cbrt_at_boundaries = (np.cbrt(range_lower), np.cbrt(range_upper))
+        
+        # Create temporary Taylor expansion to use the monotonic tightening helper
+        temp_expansion = CertifiedFirstOrderTaylorExpansion(
+            a.expansion_point,
+            a.domain,
+            (linear_term, cbrt_y0),
+            (final_rem_lower, final_rem_upper)
+        )
+        
+        clip_rem_lower, clip_rem_upper = apply_monotonic_bounds_tightening(temp_expansion, cbrt_at_boundaries, is_increasing=True)
+        
+        # Intersect the Taylor bounds with the monotonic bounds
+        final_rem_lower = np.maximum(final_rem_lower, clip_rem_lower)
+        final_rem_upper = np.minimum(final_rem_upper, clip_rem_upper)
 
         return CertifiedFirstOrderTaylorExpansion(
             a.expansion_point,
             a.domain,
             (linear_term, cbrt_y0),
-            remainder
+            (final_rem_lower, final_rem_upper)
         )
 
     def pow(self, a, exponent_b):
@@ -1044,12 +1059,12 @@ class TaylorTranslator:
         """
         # Assert that all expansion points are the same
         for i, x in enumerate(xs):
-            assert np.array_equal(x.expansion_point, xs[0].expansion_point), \
+            assert np.allclose(x.expansion_point, xs[0].expansion_point, atol=1e-12), \
                 f"Expansion point mismatch at index {i}: {x.expansion_point} != {xs[0].expansion_point}"
         
         # Assert that all domains are the same
         for i, x in enumerate(xs):
-            assert np.array_equal(x.domain[0], xs[0].domain[0]) and np.array_equal(x.domain[1], xs[0].domain[1]), \
+            assert np.allclose(x.domain[0], xs[0].domain[0], atol=1e-12) and np.allclose(x.domain[1], xs[0].domain[1], atol=1e-12), \
                 f"Domain mismatch at index {i}: {x.domain} != {xs[0].domain}"
         
         return CertifiedFirstOrderTaylorExpansion(
@@ -1098,14 +1113,42 @@ def max_monomial_vectorized(c, n, intervals):
     # Initialize bounds with endpoint values
     max_values = np.maximum(f_a, f_b)
 
-    # Check critical points for even powers (n > 0 and n is even)
+    # Handle even powers (n > 0 and n is even)
     even_power = (n > 0) & (n % 2 == 0)
     if np.any(even_power):
-        # For even powers, the maximum absolute value occurs at the endpoint with the largest magnitude
-        abs_a = np.abs(a)
-        abs_b = np.abs(b)
-        critical_max = np.maximum(abs_a, abs_b)
-        max_values[even_power] = np.maximum(max_values[even_power], (c * np.power(critical_max, n))[even_power])
+        # For even powers, check if interval contains zero
+        contains_zero = (a <= 0) & (b >= 0)
+        zero_critical = even_power & contains_zero
+        
+        # For even powers with c > 0, zero is a minimum, not maximum
+        # For even powers with c < 0, zero is a maximum
+        # For even powers with c = 0, the function is identically zero
+        
+        # When c < 0 and interval contains zero, zero gives the maximum value (which is 0)
+        negative_coeff_zero_critical = zero_critical & (c < 0)
+        max_values[negative_coeff_zero_critical] = 0.0
+        
+        # For c > 0 (positive coefficient), the maximum is at the endpoint with largest |x|
+        positive_coeff_even = even_power & (c > 0)
+        if np.any(positive_coeff_even):
+            abs_a = np.abs(a)
+            abs_b = np.abs(b)
+            critical_max = np.maximum(abs_a, abs_b)
+            max_at_critical = c * np.power(critical_max, n)
+            max_values[positive_coeff_even] = np.maximum(max_values[positive_coeff_even], max_at_critical[positive_coeff_even])
+
+    # Handle negative exponents
+    negative_exp = (n < 0)
+    if np.any(negative_exp):
+        # For negative exponents, the function is undefined at zero
+        # If the interval contains zero, we need to handle this carefully
+        contains_zero = (a <= 0) & (b >= 0)
+        problematic = negative_exp & contains_zero
+        
+        if np.any(problematic):
+            # For intervals containing zero with negative exponents, the function approaches infinity
+            # This should typically be caught earlier in the code, but we'll set to a large value
+            max_values[problematic] = np.inf
 
     return max_values
 
@@ -1127,16 +1170,45 @@ def min_monomial_vectorized(c, n, intervals):
     # Initialize bounds with endpoint values
     min_values = np.minimum(f_a, f_b)
 
-    # Check critical points for even powers (n > 0 and n is even)
+    # Handle even powers (n > 0 and n is even)
     even_power = (n > 0) & (n % 2 == 0)
     if np.any(even_power):
-        # For even powers, the minimum absolute value occurs at the endpoint with the smallest magnitude
-        abs_a = np.abs(a)
-        abs_b = np.abs(b)
-        critical_min = np.minimum(abs_a, abs_b)
-        min_values[even_power] = np.minimum(min_values[even_power], (c * np.power(critical_min, n))[even_power])
+        # For even powers, check if interval contains zero
+        contains_zero = (a <= 0) & (b >= 0)
+        zero_critical = even_power & contains_zero
+        
+        # For even powers with c > 0, zero is a minimum
+        # For even powers with c < 0, zero is a maximum, not minimum
+        # For even powers with c = 0, the function is identically zero
+        
+        # When c > 0 and interval contains zero, zero gives the minimum value (which is 0)
+        positive_coeff_zero_critical = zero_critical & (c > 0)
+        min_values[positive_coeff_zero_critical] = 0.0
+        
+        # For c < 0 (negative coefficient), the minimum is at the endpoint with largest |x|
+        negative_coeff_even = even_power & (c < 0)
+        if np.any(negative_coeff_even):
+            abs_a = np.abs(a)
+            abs_b = np.abs(b)
+            critical_max = np.maximum(abs_a, abs_b)
+            min_at_critical = c * np.power(critical_max, n)
+            min_values[negative_coeff_even] = np.minimum(min_values[negative_coeff_even], min_at_critical[negative_coeff_even])
+
+    # Handle negative exponents
+    negative_exp = (n < 0)
+    if np.any(negative_exp):
+        # For negative exponents, the function is undefined at zero
+        # If the interval contains zero, we need to handle this carefully
+        contains_zero = (a <= 0) & (b >= 0)
+        problematic = negative_exp & contains_zero
+        
+        if np.any(problematic):
+            # For intervals containing zero with negative exponents, the function approaches -infinity or +infinity
+            # This should typically be caught earlier in the code, but we'll set to a large negative value
+            min_values[problematic] = -np.inf
 
     return min_values
+
 
 def max_euclidean_distance_squared(expansion_point, domain):
     """
